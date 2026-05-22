@@ -1,0 +1,28 @@
+name: agentivity_artifacts
+description: >-
+  Flutter widgets for AI agent artifacts — charts, metrics, code, JSON, math,
+  SVG and status cards. Built for the AG-UI protocol and Agentivity platform.
+version: 0.1.0
+repository: https://github.com/agentivity-labs/agentivity_artifacts
+homepage: https://labs.agentivity.io/agentivity_artifacts/
+issue_tracker: https://github.com/agentivity-labs/agentivity_artifacts/issues
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  agentivity_ag_ui: ^0.3.5
+  fl_chart: ^0.69.0
+  flutter_svg: ^2.0.10+1
+  flutter_math_fork: ^0.7.2
+  flutter_highlight: ^0.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
