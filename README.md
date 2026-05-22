@@ -13,6 +13,14 @@ Drop them into any Flutter app standalone, or wire them into a live [AG-UI](http
 
 ---
 
+## The problem
+
+Most Flutter apps that integrate AI today display agent responses as raw text in a chat bubble. But agents can reason about *what* to show — a revenue chart, a live metric grid, a syntax-highlighted code block, a LaTeX formula. The missing piece is a set of ready-made Flutter widgets the agent can target by name, passing structured data instead of prose.
+
+That is what this package provides. Your agent says *"render a BarChart with this data"* — Flutter renders it natively, fully themed, with no extra code on your side.
+
+---
+
 ## What it renders
 
 | Group | Widget | AG-UI type key | What it shows |
