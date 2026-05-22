@@ -43,7 +43,7 @@ void main() {
 
     testWidgets('routes BarChart', (tester) async {
       await tester.pumpWidget(_wrap(
-        AgArtifactViewer(
+        const AgArtifactViewer(
           type: 'BarChart',
           props: {
             'title': 'Revenue',
@@ -63,7 +63,7 @@ void main() {
 
     testWidgets('routes LineChart', (tester) async {
       await tester.pumpWidget(_wrap(
-        AgArtifactViewer(
+        const AgArtifactViewer(
           type: 'LineChart',
           props: {
             'title': 'Growth',
@@ -95,7 +95,7 @@ void main() {
 
     testWidgets('routes KeyValue', (tester) async {
       await tester.pumpWidget(_wrap(
-        AgArtifactViewer(
+        const AgArtifactViewer(
           type: 'KeyValue',
           props: {
             'title': 'Order',
@@ -128,7 +128,7 @@ void main() {
 
     testWidgets('routes JsonViewer', (tester) async {
       await tester.pumpWidget(_wrap(
-        AgArtifactViewer(
+        const AgArtifactViewer(
           type: 'JsonViewer',
           props: {
             'title': 'Response',
@@ -158,7 +158,7 @@ void main() {
 
     testWidgets('routes Timeline', (tester) async {
       await tester.pumpWidget(_wrap(
-        AgArtifactViewer(
+        const AgArtifactViewer(
           type: 'Timeline',
           props: {
             'title': 'Pipeline',
