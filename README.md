@@ -11,6 +11,8 @@ Drop them into any Flutter app standalone, or wire them into a live [AG-UI](http
 
 **[🔬 Live showcase →](https://labs.agentivity.io/agentivity_artifacts/example/)**
 
+[![agentivity_artifacts screenshot](https://github.com/agentivity-labs/agentivity_artifacts/blob/master/doc/screenshots/s01.png?raw=true)](https://labs.agentivity.io/agentivity_artifacts/example/)
+
 ---
 
 ## The problem
