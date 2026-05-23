@@ -214,59 +214,91 @@ abstract class AgArtifactsThemes {
 
   // ── Official ──────────────────────────────────────────────────────────────
 
-  /// **Agentivity** — The official Agentivity Studio theme. Indigo primary,
-  /// clean shadows, balanced radius. Use this for consistency across the
-  /// Agentivity ecosystem.
-  static const AgArtifactsThemeData agentivity = AgArtifactsThemeData(
+  /// **Agentivity** — alias for [agentivityLight]. Kept for backward compat.
+  static const AgArtifactsThemeData agentivity = agentivityLight;
+
+  /// **Agentivity Light** — Official Agentivity Studio theme, light surface.
+  /// Iris `#8B61FF` primary palette, compact 5 px radius, studio font sizing.
+  static const AgArtifactsThemeData agentivityLight = AgArtifactsThemeData(
     chartPalette: [
-      '#6366f1', '#10b981', '#f59e0b',
-      '#ef4444', '#8b5cf6', '#06b6d4',
-      '#ec4899', '#84cc16',
+      '#8B61FF', '#10b981', '#f59e0b',
+      '#ef4444', '#06b6d4', '#ec4899',
+      '#84cc16', '#f97316',
     ],
-    cardRadius: 8.0,
+    cardRadius: 5.0,
     cardShadow: [
       BoxShadow(
         color: Color(0x0D000000),
+        blurRadius: 6,
+        offset: Offset(0, 2),
+        spreadRadius: 0,
+      ),
+    ],
+    badgeBackground: Color(0xFFF0ECFF),
+    badgeForeground: Color(0xFF6B3FE0),
+    labelFontSize: 9.5,
+    headerFontSize: 11.0,
+  );
+
+  /// **Agentivity Dark** — Official Agentivity Studio theme, dark surface.
+  /// Same iris `#8B61FF` palette on a `#161616`-family dark background.
+  static const AgArtifactsThemeData agentivityDark = AgArtifactsThemeData(
+    chartPalette: [
+      '#8B61FF', '#10b981', '#f59e0b',
+      '#ef4444', '#06b6d4', '#ec4899',
+      '#84cc16', '#f97316',
+    ],
+    cardRadius: 5.0,
+    cardBackground: Color(0xFF1E1E1E),
+    cardBorderColor: Color(0xFF2A2A2A),
+    cardShadow: [
+      BoxShadow(
+        color: Color(0x40000000),
         blurRadius: 8,
         offset: Offset(0, 2),
         spreadRadius: 0,
       ),
     ],
-    badgeBackground: Color(0xFFede9fe),
-    badgeForeground: Color(0xFF4f46e5),
+    badgeBackground: Color(0xFF2D2040),
+    badgeForeground: Color(0xFF8B61FF),
+    labelFontSize: 9.5,
+    headerFontSize: 11.0,
   );
 
   // ── Catalogue ─────────────────────────────────────────────────────────────
 
   /// All available themes keyed by display name.
   static const Map<String, AgArtifactsThemeData> all = {
-    'Neutral':    neutral,
-    'Glacier':    glacier,
-    'Brutalist':  brutalist,
-    'Paper':      paper,
-    'Candy':      candy,
-    'Noir':       noir,
-    'Aurora':     aurora,
-    'Velvet':     velvet,
-    'Ember':      ember,
-    'Terminal':   terminal,
-    'Agentivity': agentivity,
+    'Neutral':          neutral,
+    'Glacier':          glacier,
+    'Brutalist':        brutalist,
+    'Paper':            paper,
+    'Candy':            candy,
+    'Noir':             noir,
+    'Aurora':           aurora,
+    'Velvet':           velvet,
+    'Ember':            ember,
+    'Terminal':         terminal,
+    'Agentivity':       agentivity,
+    'Agentivity Light': agentivityLight,
+    'Agentivity Dark':  agentivityDark,
   };
 
   /// Recommended [Brightness] for each theme.
-  /// Dark themes work best with [ThemeData.dark]; light themes with [ThemeData.light].
   static const Map<String, Brightness> suggestedBrightness = {
-    'Neutral':    Brightness.light,
-    'Glacier':    Brightness.light,
-    'Brutalist':  Brightness.light,
-    'Paper':      Brightness.light,
-    'Candy':      Brightness.light,
-    'Noir':       Brightness.dark,
-    'Aurora':     Brightness.dark,
-    'Velvet':     Brightness.dark,
-    'Ember':      Brightness.dark,
-    'Terminal':   Brightness.dark,
-    'Agentivity': Brightness.light,
+    'Neutral':          Brightness.light,
+    'Glacier':          Brightness.light,
+    'Brutalist':        Brightness.light,
+    'Paper':            Brightness.light,
+    'Candy':            Brightness.light,
+    'Noir':             Brightness.dark,
+    'Aurora':           Brightness.dark,
+    'Velvet':           Brightness.dark,
+    'Ember':            Brightness.dark,
+    'Terminal':         Brightness.dark,
+    'Agentivity':       Brightness.light,
+    'Agentivity Light': Brightness.light,
+    'Agentivity Dark':  Brightness.dark,
   };
 
   /// Returns the recommended [ThemeData] (light or dark, Material 3)

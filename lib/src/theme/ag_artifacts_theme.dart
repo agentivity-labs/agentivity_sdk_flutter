@@ -9,6 +9,25 @@ import '../shared/color_utils.dart';
 /// widget needed. Every artifact widget reads it automatically via
 /// [AgArtifactsThemeData.of].
 ///
+/// ## Design tokens
+///
+/// Two scale multipliers are forwarded from the kit-level
+/// [AgKitPreferencesController] (when used with `agentivity_kit`), or can
+/// be set directly for standalone use:
+///
+/// | Field          | Default | Effect                                    |
+/// |----------------|---------|-------------------------------------------|
+/// | [fontScale]    | 1.0     | Scales all font-size helpers.             |
+/// | [spacingScale] | 1.0     | Scales [effectiveCardPadding].            |
+///
+/// Use the `effective*` getters in widget code so every rendering decision
+/// respects the user's scale preference:
+///
+/// ```dart
+/// final theme = AgArtifactsThemeData.of(context);
+/// Text('Label', style: TextStyle(fontSize: theme.effectiveLabelFontSize));
+/// ```
+///
 /// ## Setup
 ///
 /// ```dart
@@ -20,18 +39,6 @@ import '../shared/color_utils.dart';
 ///     extensions: [AgArtifactsThemes.noir],
 ///   ),
 /// )
-/// ```
-///
-/// ## Reading in a widget
-///
-/// ```dart
-/// final theme = AgArtifactsThemeData.of(context);
-/// ```
-///
-/// ## Customising a preset
-///
-/// ```dart
-/// extensions: [AgArtifactsThemes.glacier.copyWith(cardRadius: 4)],
 /// ```
 class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
   const AgArtifactsThemeData({
@@ -56,11 +63,15 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
     this.valueFontSize = 28.0,
     this.codeFontFamily,
     this.codeFontSize = 12.0,
+
+    // ── Scale tokens (propagated by AgKitPreferencesController) ─────────────
+    this.fontScale = 1.0,
+    this.spacingScale = 1.0,
   });
 
   // ── Charts ─────────────────────────────────────────────────────────────────
 
-  /// Ordered hex color list for chart datasets (e.g. `['#3b82f6', '#10b981']`).
+  /// Ordered hex color list for chart datasets.
   /// When `null`, [kDefaultPalette] is used.
   final List<String>? chartPalette;
 
@@ -81,39 +92,73 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
   /// Card border stroke width. Default: 1.
   final double cardBorderWidth;
 
-  /// Shadows applied to each card. Default: none.
-  /// Use `[BoxShadow(color: Color(0xFF000000), blurRadius: 0, offset: Offset(4, 4))]`
-  /// for the neo-brutalist hard-shadow effect.
+  /// Shadows applied to each card.
   final List<BoxShadow> cardShadow;
 
   // ── Badge ──────────────────────────────────────────────────────────────────
 
   /// Background of the type badge chip in the card header.
-  /// When `null`, `primaryContainer` at 40 % opacity is used.
   final Color? badgeBackground;
 
   /// Text color of the type badge chip.
-  /// When `null`, `colorScheme.primary` is used.
   final Color? badgeForeground;
 
   // ── Typography ─────────────────────────────────────────────────────────────
 
-  /// Font size for axis labels, legend dots, subtitles. Default: 10.
+  /// Base font size for axis labels, legend dots, subtitles. Default: 10.
   final double labelFontSize;
 
-  /// Font size for the card header title. Default: 12.
+  /// Base font size for the card header title. Default: 12.
   final double headerFontSize;
 
-  /// Font size for the main value in [AgMetricCard]. Default: 28.
+  /// Base font size for the main value in metric cards. Default: 28.
   final double valueFontSize;
 
-  /// Font family for [AgCodeBlock]. `null` → system monospace.
+  /// Font family for code blocks. `null` → system monospace.
   final String? codeFontFamily;
 
-  /// Font size for [AgCodeBlock] source text. Default: 12.
+  /// Base font size for code block source text. Default: 12.
   final double codeFontSize;
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Scale tokens ────────────────────────────────────────────────────────────
+
+  /// Font-size multiplier (1.0 = original). Propagated from
+  /// `AgKitPreferencesController.fontScale` when using `agentivity_kit`.
+  final double fontScale;
+
+  /// Spacing multiplier (1.0 = original). Propagated from
+  /// `AgKitPreferencesController.spacingScale` when using `agentivity_kit`.
+  final double spacingScale;
+
+  // ── Computed helpers ────────────────────────────────────────────────────────
+
+  /// Axis-label / legend font size, scaled by [fontScale].
+  double get effectiveLabelFontSize => labelFontSize * fontScale;
+
+  /// Card-header title font size, scaled by [fontScale].
+  double get effectiveHeaderFontSize => headerFontSize * fontScale;
+
+  /// Metric card value font size, scaled by [fontScale].
+  double get effectiveValueFontSize => valueFontSize * fontScale;
+
+  /// Code-block font size, scaled by [fontScale].
+  double get effectiveCodeFontSize => codeFontSize * fontScale;
+
+  /// Card inner padding, scaled by [spacingScale].
+  EdgeInsetsGeometry get effectiveCardPadding {
+    final p = cardPadding;
+    if (p is EdgeInsets) {
+      return EdgeInsets.fromLTRB(
+        p.left * spacingScale,
+        p.top * spacingScale,
+        p.right * spacingScale,
+        p.bottom * spacingScale,
+      );
+    }
+    return p; // non-EdgeInsets variants returned unchanged
+  }
+
+  // ── Static helpers ──────────────────────────────────────────────────────────
 
   /// Returns the nearest [AgArtifactsThemeData] from the [MaterialApp] theme
   /// extensions, or the built-in defaults when none is registered.
@@ -142,6 +187,8 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
     double? valueFontSize,
     String? codeFontFamily,
     double? codeFontSize,
+    double? fontScale,
+    double? spacingScale,
   }) =>
       AgArtifactsThemeData(
         chartPalette: chartPalette ?? this.chartPalette,
@@ -158,14 +205,15 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
         valueFontSize: valueFontSize ?? this.valueFontSize,
         codeFontFamily: codeFontFamily ?? this.codeFontFamily,
         codeFontSize: codeFontSize ?? this.codeFontSize,
+        fontScale: fontScale ?? this.fontScale,
+        spacingScale: spacingScale ?? this.spacingScale,
       );
 
   @override
   AgArtifactsThemeData lerp(AgArtifactsThemeData other, double t) =>
       AgArtifactsThemeData(
         chartPalette: t < 0.5 ? chartPalette : other.chartPalette,
-        cardRadius:
-            lerpDouble(cardRadius, other.cardRadius, t) ?? cardRadius,
+        cardRadius: lerpDouble(cardRadius, other.cardRadius, t) ?? cardRadius,
         cardPadding:
             EdgeInsetsGeometry.lerp(cardPadding, other.cardPadding, t) ??
                 cardPadding,
@@ -191,5 +239,8 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
         codeFontFamily: t < 0.5 ? codeFontFamily : other.codeFontFamily,
         codeFontSize:
             lerpDouble(codeFontSize, other.codeFontSize, t) ?? codeFontSize,
+        fontScale: lerpDouble(fontScale, other.fontScale, t) ?? fontScale,
+        spacingScale:
+            lerpDouble(spacingScale, other.spacingScale, t) ?? spacingScale,
       );
 }
