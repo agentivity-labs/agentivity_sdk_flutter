@@ -1,0 +1,22 @@
+name: agentivity_client
+description: >-
+  Pure-Dart API client for the Agentivity platform — discover agents/teams/
+  workflows, start and monitor runs, respond to human-in-the-loop requests,
+  chat with an agent, and read conversation history. Read/execute/history
+  only: creating or editing workflows, agents, teams, or credentials is a
+  Studio (admin) concern, not part of this client.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.7.0 <4.0.0'
+
+resolution: workspace
+
+dependencies:
+  dio: ^5.5.0
+  meta: ^1.15.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^4.0.0

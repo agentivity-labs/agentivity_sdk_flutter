@@ -10,3 +10,4 @@ dev_dependencies:
 workspace:
   - packages/agentivity_ag_ui
   - packages/agentivity_artifacts
+  - packages/agentivity_client
