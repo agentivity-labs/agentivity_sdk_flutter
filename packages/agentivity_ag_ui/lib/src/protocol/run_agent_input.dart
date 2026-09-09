@@ -42,6 +42,63 @@ final class ImageUrlContentPart extends MessageContentPart {
       };
 }
 
+/// Audio input, inlined as base64 — mirrors OpenAI Chat Completions' `input_audio`
+/// content part shape (`{type: "input_audio", input_audio: {data, format}}`).
+///
+/// Not currently produced or consumed by anything in this package — this is a
+/// protocol-completeness addition so text, images, and audio all travel as content
+/// parts on the *same* message channel (no separate upload/transcription endpoint
+/// needed for a client that already has the audio bytes, e.g. after on-device
+/// speech-to-text is not used and the model itself understands audio natively).
+final class InputAudioContentPart extends MessageContentPart {
+  const InputAudioContentPart({required this.data, required this.format});
+
+  /// Base64-encoded audio bytes.
+  final String data;
+
+  /// `'wav'`, `'mp3'`, or another format the target model accepts.
+  final String format;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'input_audio',
+        'input_audio': {'data': data, 'format': format},
+      };
+}
+
+/// A spoken reply, referenced by URL (e.g. from a server-side TTS step) or inlined
+/// as base64 — the output-side counterpart to [InputAudioContentPart].
+///
+/// Lets an assistant message carry its own spoken audio as part of the *same*
+/// response instead of a client having to make a second HTTP call to a separate
+/// text-to-speech endpoint after receiving the text.
+final class OutputAudioContentPart extends MessageContentPart {
+  const OutputAudioContentPart({this.url, this.data, this.format, this.transcript}) : assert(url != null || data != null, 'Provide either url or data.');
+
+  /// A fetchable URL for the audio, if the backend already synthesized and cached it.
+  final String? url;
+
+  /// Base64-encoded audio bytes, if inlined instead of referenced by URL.
+  final String? data;
+
+  /// `'wav'`, `'mp3'`, etc. — required when [data] is set; informational when [url] is set.
+  final String? format;
+
+  /// The text that was spoken, for accessibility/fallback rendering.
+  final String? transcript;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'output_audio',
+        'output_audio': {
+          if (url != null) 'url': url,
+          if (data != null) 'data': data,
+          if (format != null) 'format': format,
+          if (transcript != null) 'transcript': transcript,
+        },
+      };
+}
+
 /// File referenced by a backend-assigned file ID.
 final class FileContentPart extends MessageContentPart {
   const FileContentPart({required this.fileId, this.mimeType, this.name});
