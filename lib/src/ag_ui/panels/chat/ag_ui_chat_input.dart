@@ -256,10 +256,22 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     } else {
       try {
         final systemLocale = await _stt.systemLocale();
-        _localeId = systemLocale?.localeId;
-        developer.log('speech_to_text system locale: ${_localeId ?? '(default)'}', name: 'AgUiChatInput');
+        final available = await _stt.locales();
+        developer.log('speech_to_text available locales: ${available.map((l) => l.localeId).join(', ')}', name: 'AgUiChatInput');
+        // Only use the system locale if the plugin actually lists it as supported —
+        // systemLocale()'s id format isn't guaranteed to match what listen() accepts
+        // on every platform, and passing an unrecognized id can make listen() silently
+        // produce no results at all rather than falling back to a working default.
+        final matches = systemLocale != null && available.any((l) => l.localeId == systemLocale.localeId);
+        _localeId = matches ? systemLocale.localeId : null;
+        developer.log(
+          matches
+              ? 'speech_to_text using system locale: ${_localeId}'
+              : 'speech_to_text system locale (${systemLocale?.localeId}) not in the supported list — using the plugin default instead',
+          name: 'AgUiChatInput',
+        );
       } catch (error, stackTrace) {
-        developer.log('speech_to_text.systemLocale() threw — using the plugin default', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+        developer.log('speech_to_text locale lookup threw — using the plugin default', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
       }
     }
     if (mounted) setState(() => _sttAvailable = available);
@@ -285,18 +297,24 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     setState(() => _isListening = true);
     _openVoiceOverlay();
     _startSyntheticWaveform();
-    await _stt.listen(
-      onResult: (result) {
-        if (!mounted) return;
-        final text = result.recognizedWords;
-        _liveTranscript.value = text;
-        final base = _voiceSessionBaseText ?? '';
-        final merged = base.isEmpty ? text : (text.isEmpty ? base : '$base $text');
-        _ctrl.value = _ctrl.value.copyWith(text: merged, selection: TextSelection.collapsed(offset: merged.length));
-        if (result.finalResult) _stopListening(keepText: true);
-      },
-      listenOptions: SpeechListenOptions(listenFor: const Duration(seconds: 60), pauseFor: const Duration(seconds: 5), partialResults: true, localeId: _localeId),
-    );
+    developer.log('speech_to_text: starting listen() with localeId=${_localeId ?? '(default)'}', name: 'AgUiChatInput');
+    try {
+      await _stt.listen(
+        onResult: (result) {
+          if (!mounted) return;
+          final text = result.recognizedWords;
+          developer.log('speech_to_text onResult: "$text" (final=${result.finalResult}, confidence=${result.confidence})', name: 'AgUiChatInput');
+          _liveTranscript.value = text;
+          final base = _voiceSessionBaseText ?? '';
+          final merged = base.isEmpty ? text : (text.isEmpty ? base : '$base $text');
+          _ctrl.value = _ctrl.value.copyWith(text: merged, selection: TextSelection.collapsed(offset: merged.length));
+          if (result.finalResult) _stopListening(keepText: true);
+        },
+        listenOptions: SpeechListenOptions(listenFor: const Duration(seconds: 60), pauseFor: const Duration(seconds: 5), partialResults: true, localeId: _localeId),
+      );
+    } catch (error, stackTrace) {
+      developer.log('speech_to_text.listen() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+    }
   }
 
   void _pushWaveformLevel(double normalized) {
