@@ -202,26 +202,77 @@ void main() {
       expect((e as ToolCallResultEvent).content, 'legacy value');
     });
 
-    // ── Reasoning ─────────────────────────────────────────────────────────────
-    test('REASONING_MESSAGE_START', () {
-      final e = AgUiEvent.fromJson(
-          {'type': 'REASONING_MESSAGE_START', 'messageId': 'r1'});
-      expect(e, isA<ReasoningMessageStartEvent>());
+    // ── Thinking (spec names) ────────────────────────────────────────────────
+    test('THINKING_START', () {
+      final e = AgUiEvent.fromJson({'type': 'THINKING_START', 'messageId': 't1'});
+      expect(e, isA<ThinkingStartEvent>());
     });
 
-    test('REASONING_MESSAGE_CONTENT', () {
+    test('THINKING_TEXT_MESSAGE_START', () {
+      final e = AgUiEvent.fromJson(
+          {'type': 'THINKING_TEXT_MESSAGE_START', 'messageId': 't1'});
+      expect(e, isA<ThinkingTextMessageStartEvent>());
+    });
+
+    test('THINKING_TEXT_MESSAGE_CONTENT', () {
+      final e = AgUiEvent.fromJson({
+        'type': 'THINKING_TEXT_MESSAGE_CONTENT',
+        'messageId': 't1',
+        'delta': 'Let me think…',
+      });
+      expect(e, isA<ThinkingTextMessageContentEvent>());
+      expect((e as ThinkingTextMessageContentEvent).delta, 'Let me think…');
+    });
+
+    test('THINKING_TEXT_MESSAGE_END', () {
+      final e = AgUiEvent.fromJson({'type': 'THINKING_TEXT_MESSAGE_END', 'messageId': 't1'});
+      expect(e, isA<ThinkingTextMessageEndEvent>());
+    });
+
+    test('THINKING_END', () {
+      final e = AgUiEvent.fromJson({'type': 'THINKING_END', 'messageId': 't1'});
+      expect(e, isA<ThinkingEndEvent>());
+    });
+
+    // ── Reasoning (legacy pre-spec-fix wire names — backward compat) ────────────
+    test('REASONING_MESSAGE_START (legacy wire name) still parses', () {
+      final e = AgUiEvent.fromJson(
+          {'type': 'REASONING_MESSAGE_START', 'messageId': 'r1'});
+      expect(e, isA<ThinkingTextMessageStartEvent>());
+      // ignore: deprecated_member_use_from_same_package
+      expect(e, isA<ReasoningMessageStartEvent>()); // typedef alias, same type
+    });
+
+    test('REASONING_MESSAGE_CONTENT (legacy wire name) still parses', () {
       final e = AgUiEvent.fromJson({
         'type': 'REASONING_MESSAGE_CONTENT',
         'messageId': 'r1',
         'delta': 'Let me think…',
       });
-      expect(e, isA<ReasoningMessageContentEvent>());
-      expect((e as ReasoningMessageContentEvent).delta, 'Let me think…');
+      expect(e, isA<ThinkingTextMessageContentEvent>());
+      expect((e as ThinkingTextMessageContentEvent).delta, 'Let me think…');
     });
 
-    test('REASONING_MESSAGE_END', () {
+    test('REASONING_MESSAGE_END (legacy wire name) still parses', () {
       final e = AgUiEvent.fromJson({'type': 'REASONING_MESSAGE_END', 'messageId': 'r1'});
-      expect(e, isA<ReasoningMessageEndEvent>());
+      expect(e, isA<ThinkingTextMessageEndEvent>());
+    });
+
+    // ── Activity (Agentivity extension, not AG-UI spec) ─────────────────────────
+    test('ACTIVITY_SNAPSHOT is flagged as an Agentivity extension event', () {
+      final e = AgUiEvent.fromJson({
+        'type': 'ACTIVITY_SNAPSHOT',
+        'messageId': 'a1',
+        'activityType': 'browsing',
+        'content': {'url': 'https://example.com'},
+      });
+      expect(e, isA<ActivitySnapshotEvent>());
+      expect(e, isA<AgentivityExtensionEvent>());
+    });
+
+    test('spec events are not flagged as Agentivity extensions', () {
+      final e = AgUiEvent.fromJson({'type': 'THINKING_START', 'messageId': 't1'});
+      expect(e, isNot(isA<AgentivityExtensionEvent>()));
     });
 
     // ── State ─────────────────────────────────────────────────────────────────

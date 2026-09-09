@@ -60,22 +60,27 @@ sealed class AgUiEvent {
         content: _str(json, 'content').isNotEmpty ? _str(json, 'content') : (json['result']?.toString() ?? ''),
         role: _opt(json, 'role'),
       ),
-      // Reasoning / thinking
-      'REASONING_START' => ReasoningStartEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId')),
-      'REASONING_MESSAGE_START' => ReasoningMessageStartEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), role: _str(json, 'role').isEmpty ? 'reasoning' : _str(json, 'role')),
-      'REASONING_MESSAGE_CONTENT' => ReasoningMessageContentEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), delta: _str(json, 'delta')),
-      'REASONING_MESSAGE_END' => ReasoningMessageEndEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId')),
-      'REASONING_END' => ReasoningEndEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId')),
+      // Thinking / extended reasoning — spec names are THINKING_*
+      // (https://docs.ag-ui.com/concepts/events); tolerate the legacy REASONING_*
+      // names this package used to emit before they were corrected to match spec.
+      'THINKING_START' || 'REASONING_START' => ThinkingStartEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId')),
+      'THINKING_TEXT_MESSAGE_START' || 'REASONING_MESSAGE_START' => ThinkingTextMessageStartEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), role: _str(json, 'role').isEmpty ? 'reasoning' : _str(json, 'role')),
+      'THINKING_TEXT_MESSAGE_CONTENT' || 'REASONING_MESSAGE_CONTENT' => ThinkingTextMessageContentEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), delta: _str(json, 'delta')),
+      'THINKING_TEXT_MESSAGE_END' || 'REASONING_MESSAGE_END' => ThinkingTextMessageEndEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId')),
+      'THINKING_END' || 'REASONING_END' => ThinkingEndEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId')),
       // State
       'STATE_SNAPSHOT' => StateSnapshotEvent._(type: type, timestamp: ts, executionId: executionId, snapshot: json['snapshot']),
       'STATE_DELTA' => StateDeltaEvent._(type: type, timestamp: ts, executionId: executionId, delta: json['delta'] is List ? json['delta'] as List<dynamic> : const []),
-      // Messages / activity
+      // Messages
       'MESSAGES_SNAPSHOT' => MessagesSnapshotEvent._(type: type, timestamp: ts, executionId: executionId, messages: (json['messages'] as List<dynamic>?)?.whereType<Map<String, dynamic>>().toList() ?? const []),
+      // Activity — NOT part of the official AG-UI spec. This is an Agentivity-specific
+      // extension (both event classes implement AgentivityExtensionEvent so consumers can
+      // tell spec events and platform extensions apart at a glance).
       'ACTIVITY_SNAPSHOT' => ActivitySnapshotEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), activityType: _str(json, 'activityType'), content: json['content'] is Map<String, dynamic> ? Map<String, dynamic>.from(json['content'] as Map) : const {}, replace: json['replace'] != false),
       'ACTIVITY_DELTA' => ActivityDeltaEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), activityType: _str(json, 'activityType'), patch: json['patch'] is List ? json['patch'] as List<dynamic> : const []),
-      // Reasoning — chunk convenience + encrypted value
-      'REASONING_MESSAGE_CHUNK' => ReasoningMessageChunkEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _opt(json, 'messageId'), delta: _opt(json, 'delta')),
-      'REASONING_ENCRYPTED_VALUE' => ReasoningEncryptedValueEvent._(type: type, timestamp: ts, executionId: executionId, subtype: _str(json, 'subtype'), entityId: _str(json, 'entityId'), encryptedValue: _str(json, 'encryptedValue')),
+      // Thinking — chunk convenience + encrypted value (same REASONING_*/THINKING_* tolerance as above)
+      'THINKING_TEXT_MESSAGE_CHUNK' || 'REASONING_MESSAGE_CHUNK' => ThinkingTextMessageChunkEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _opt(json, 'messageId'), delta: _opt(json, 'delta')),
+      'THINKING_ENCRYPTED_VALUE' || 'REASONING_ENCRYPTED_VALUE' => ThinkingEncryptedValueEvent._(type: type, timestamp: ts, executionId: executionId, subtype: _str(json, 'subtype'), entityId: _str(json, 'entityId'), encryptedValue: _str(json, 'encryptedValue')),
       // Raw / custom
       'RAW' => RawEvent._(type: type, timestamp: ts, executionId: executionId, event: json['event'], source: _opt(json, 'source')),
       'CUSTOM' => CustomEvent._(type: type, timestamp: ts, executionId: executionId, name: _str(json, 'name'), value: json['value']),
@@ -238,51 +243,78 @@ final class ToolCallResultEvent extends AgUiEvent {
   final String? role;
 }
 
-// ── Reasoning / chain-of-thought ──────────────────────────────────────────────
+// ── Thinking / extended reasoning ─────────────────────────────────────────────
+//
+// Spec names: THINKING_START, THINKING_END, THINKING_TEXT_MESSAGE_START/CONTENT/END
+// (https://docs.ag-ui.com/concepts/events). Earlier versions of this package emitted
+// REASONING_* names that don't match the spec — AgUiEvent.fromJson still accepts the
+// old wire names (see above) so a not-yet-updated backend keeps working, but the class
+// names below are the corrected, spec-aligned public API.
 
-final class ReasoningStartEvent extends AgUiEvent {
-  const ReasoningStartEvent._({required super.type, super.timestamp, super.executionId, required this.messageId});
+final class ThinkingStartEvent extends AgUiEvent {
+  const ThinkingStartEvent._({required super.type, super.timestamp, super.executionId, required this.messageId});
   final String messageId;
 }
 
-final class ReasoningMessageStartEvent extends AgUiEvent {
-  const ReasoningMessageStartEvent._({required super.type, super.timestamp, super.executionId, required this.messageId, this.role = 'reasoning'});
+final class ThinkingTextMessageStartEvent extends AgUiEvent {
+  const ThinkingTextMessageStartEvent._({required super.type, super.timestamp, super.executionId, required this.messageId, this.role = 'reasoning'});
   final String messageId;
   final String role;
 }
 
-final class ReasoningMessageContentEvent extends AgUiEvent {
-  const ReasoningMessageContentEvent._({required super.type, super.timestamp, super.executionId, required this.messageId, required this.delta});
+final class ThinkingTextMessageContentEvent extends AgUiEvent {
+  const ThinkingTextMessageContentEvent._({required super.type, super.timestamp, super.executionId, required this.messageId, required this.delta});
   final String messageId;
   final String delta;
 }
 
-final class ReasoningMessageEndEvent extends AgUiEvent {
-  const ReasoningMessageEndEvent._({required super.type, super.timestamp, super.executionId, required this.messageId});
+final class ThinkingTextMessageEndEvent extends AgUiEvent {
+  const ThinkingTextMessageEndEvent._({required super.type, super.timestamp, super.executionId, required this.messageId});
   final String messageId;
 }
 
-final class ReasoningEndEvent extends AgUiEvent {
-  const ReasoningEndEvent._({required super.type, super.timestamp, super.executionId, required this.messageId});
+final class ThinkingEndEvent extends AgUiEvent {
+  const ThinkingEndEvent._({required super.type, super.timestamp, super.executionId, required this.messageId});
   final String messageId;
 }
 
-/// Convenience combined chunk (alternative to REASONING_MESSAGE_START + CONTENT + END).
-final class ReasoningMessageChunkEvent extends AgUiEvent {
-  const ReasoningMessageChunkEvent._({required super.type, super.timestamp, super.executionId, this.messageId, this.delta});
+/// Convenience combined chunk (alternative to THINKING_TEXT_MESSAGE_START + CONTENT + END).
+final class ThinkingTextMessageChunkEvent extends AgUiEvent {
+  const ThinkingTextMessageChunkEvent._({required super.type, super.timestamp, super.executionId, this.messageId, this.delta});
   final String? messageId;
   final String? delta;
 }
 
 /// Encrypted reasoning value for safety filtering of extended-thinking content.
-final class ReasoningEncryptedValueEvent extends AgUiEvent {
-  const ReasoningEncryptedValueEvent._({required super.type, super.timestamp, super.executionId, required this.subtype, required this.entityId, required this.encryptedValue});
+final class ThinkingEncryptedValueEvent extends AgUiEvent {
+  const ThinkingEncryptedValueEvent._({required super.type, super.timestamp, super.executionId, required this.subtype, required this.entityId, required this.encryptedValue});
 
   /// `"tool-call"` or `"message"`.
   final String subtype;
   final String entityId;
   final String encryptedValue;
 }
+
+// ── Backward-compat aliases (pre-rename class names) ──────────────────────────
+//
+// This package used to emit non-spec REASONING_* class names. These typedefs keep
+// existing `case ReasoningStartEvent(...)`-style pattern matches source-compatible;
+// remove in the next major version.
+
+@Deprecated('Renamed to match the AG-UI spec — use ThinkingStartEvent instead.')
+typedef ReasoningStartEvent = ThinkingStartEvent;
+@Deprecated('Renamed to match the AG-UI spec — use ThinkingTextMessageStartEvent instead.')
+typedef ReasoningMessageStartEvent = ThinkingTextMessageStartEvent;
+@Deprecated('Renamed to match the AG-UI spec — use ThinkingTextMessageContentEvent instead.')
+typedef ReasoningMessageContentEvent = ThinkingTextMessageContentEvent;
+@Deprecated('Renamed to match the AG-UI spec — use ThinkingTextMessageEndEvent instead.')
+typedef ReasoningMessageEndEvent = ThinkingTextMessageEndEvent;
+@Deprecated('Renamed to match the AG-UI spec — use ThinkingEndEvent instead.')
+typedef ReasoningEndEvent = ThinkingEndEvent;
+@Deprecated('Renamed to match the AG-UI spec — use ThinkingTextMessageChunkEvent instead.')
+typedef ReasoningMessageChunkEvent = ThinkingTextMessageChunkEvent;
+@Deprecated('Renamed to match the AG-UI spec — use ThinkingEncryptedValueEvent instead.')
+typedef ReasoningEncryptedValueEvent = ThinkingEncryptedValueEvent;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -297,14 +329,27 @@ final class StateDeltaEvent extends AgUiEvent {
   final List<dynamic> delta;
 }
 
-// ── Messages / activity ───────────────────────────────────────────────────────
+// ── Messages ───────────────────────────────────────────────────────────────────
 
 final class MessagesSnapshotEvent extends AgUiEvent {
   const MessagesSnapshotEvent._({required super.type, super.timestamp, super.executionId, required this.messages});
   final List<Map<String, dynamic>> messages;
 }
 
-final class ActivitySnapshotEvent extends AgUiEvent {
+// ── Activity (Agentivity extension — not part of the AG-UI spec) ───────────────
+//
+// `ACTIVITY_SNAPSHOT`/`ACTIVITY_DELTA` are Agentivity-platform-specific additions to
+// the core AG-UI event set, used to stream free-form "activity" content (e.g. a live
+// research/browsing trace) alongside the spec's own events. A backend implementing
+// only the official AG-UI spec will never emit these. Both classes implement
+// [AgentivityExtensionEvent] so a consumer can filter platform extensions out with
+// `event is AgentivityExtensionEvent` if they want spec-only behaviour.
+
+/// Marker for AG-UI events that are Agentivity-specific extensions, not part of the
+/// official AG-UI protocol spec (https://docs.ag-ui.com/concepts/events).
+sealed class AgentivityExtensionEvent {}
+
+final class ActivitySnapshotEvent extends AgUiEvent implements AgentivityExtensionEvent {
   const ActivitySnapshotEvent._({required super.type, super.timestamp, super.executionId, required this.messageId, required this.activityType, required this.content, required this.replace});
   final String messageId;
   final String activityType;
@@ -312,7 +357,7 @@ final class ActivitySnapshotEvent extends AgUiEvent {
   final bool replace;
 }
 
-final class ActivityDeltaEvent extends AgUiEvent {
+final class ActivityDeltaEvent extends AgUiEvent implements AgentivityExtensionEvent {
   const ActivityDeltaEvent._({required super.type, super.timestamp, super.executionId, required this.messageId, required this.activityType, required this.patch});
   final String messageId;
   final String activityType;
