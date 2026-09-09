@@ -75,7 +75,7 @@ class AgUiChatInput extends StatefulWidget {
     this.enabled = true,
     this.loading = false,
     this.isHil = false,
-    this.enableVoice = false,
+    this.enableVoice = true,
     this.enableAttachments = true,
     this.acceptedExtensions,
     this.actionBar,
