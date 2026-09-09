@@ -311,21 +311,33 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   /// config, etc.), it falls back to the synthetic waveform instead.
   Future<void> _startAmplitudeMetering() async {
     _receivedRealAmplitude = false;
+    // Armed immediately and unconditionally, BEFORE calling startStream() — that
+    // call can itself hang indefinitely (e.g. stuck waiting on an OS-level mic
+    // permission prompt that never resolves), so the fallback must not depend on
+    // startStream() ever completing at all, only on real data actually arriving.
+    _amplitudeWatchdog = Timer(const Duration(milliseconds: 1800), () {
+      if (!_receivedRealAmplitude && _isListening) {
+        developer.log('record: no real amplitude within 1.8s, falling back to a synthetic waveform', name: 'AgUiChatInput');
+        _startSyntheticWaveform();
+      }
+    });
     try {
-      final audioStream = await _recorder.startStream(const RecordConfig(encoder: AudioEncoder.pcm16bits));
+      final audioStream = await _recorder.startStream(const RecordConfig(encoder: AudioEncoder.pcm16bits)).timeout(const Duration(seconds: 3));
+      if (!_isListening) {
+        // Recording was stopped before startStream() finished — don't leave it running.
+        await _recorder.stop();
+        return;
+      }
       _recorderAudioSub = audioStream.listen((_) {});
       _amplitudeSub = _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen(_onAmplitude);
-      _amplitudeWatchdog = Timer(const Duration(milliseconds: 1500), () {
-        if (!_receivedRealAmplitude && _isListening) {
-          developer.log('record: no amplitude event received within 1.5s, falling back to a synthetic waveform', name: 'AgUiChatInput');
-          unawaited(_amplitudeSub?.cancel());
-          _amplitudeSub = null;
-          _startSyntheticWaveform();
-        }
-      });
     } catch (error, stackTrace) {
-      developer.log('record amplitude metering unavailable, falling back to a synthetic waveform', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
-      _startSyntheticWaveform();
+      developer.log(
+        'record.startStream() failed or timed out — check microphone permission (Windows: Settings > Privacy > Microphone). '
+        'The watchdog will fall back to a synthetic waveform.',
+        name: 'AgUiChatInput',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
