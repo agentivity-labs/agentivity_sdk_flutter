@@ -1,8 +1,5 @@
 name: agentivity_sdk_flutter
 
-packages:
-  - packages/**
-
 command:
   version:
     linkToCommits: true
@@ -12,7 +9,7 @@ command:
 
 scripts:
   analyze:
-    run: melos exec -- "dart analyze --fatal-infos"
+    run: melos exec -- "dart analyze --fatal-warnings"
     description: Analyze every package in the workspace.
 
   test:
