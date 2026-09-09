@@ -10,6 +10,12 @@ import 'code/ag_json_viewer.dart';
 import 'data/ag_key_value.dart';
 import 'data/ag_metric_card.dart';
 import 'data/ag_stat_grid.dart';
+import 'interaction/ag_choice_card.dart';
+import 'interaction/ag_confirm_card.dart';
+import 'interaction/ag_date_picker_card.dart';
+import 'interaction/ag_question_form.dart';
+import 'interaction/ag_rating_card.dart';
+import 'interaction/ag_summary_card.dart';
 import 'math/ag_latex.dart';
 import 'status/ag_status_card.dart';
 import 'status/ag_timeline.dart';
@@ -53,5 +59,13 @@ Map<String, AgUiComponentBuilder> buildArtifactsRegistry() {
 
     // SVG
     'Svg':        (context, p) => AgSvg(props: p),
+
+    // Interaction
+    'QuestionForm':   (context, p) => AgQuestionForm(props: p),
+    'ChoiceCard':     (context, p) => AgChoiceCard(props: p),
+    'ConfirmCard':    (context, p) => AgConfirmCard(props: p),
+    'RatingCard':     (context, p) => AgRatingCard(props: p),
+    'DatePickerCard': (context, p) => AgDatePickerCard(props: p),
+    'SummaryCard':    (context, p) => AgSummaryCard(props: p),
   };
 }
