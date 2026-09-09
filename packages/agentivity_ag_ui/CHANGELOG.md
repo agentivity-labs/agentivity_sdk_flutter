@@ -14,6 +14,10 @@
   extensions programmatically.
 - Package relocated into the `agentivity_sdk_flutter` monorepo (git history preserved via
   `git subtree`); this standalone repository will be retired once the SDK is fully consolidated.
+- **New**: `InputAudioContentPart`/`OutputAudioContentPart` added to `MessageContentPart` — audio
+  now rides the same content-parts array as text/images (`buildAgUiMessage`), mirroring OpenAI's
+  `input_audio` shape. Protocol-completeness addition only; no sender/receiver feature wired to
+  them yet.
 
 ## 0.3.12 - 2026-05-23
 
