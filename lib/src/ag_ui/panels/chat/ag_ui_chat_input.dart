@@ -155,6 +155,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   bool _sttAvailable = false;
   bool _isListening = false;
   bool _voiceOverlayOpen = false;
+  BuildContext? _voiceOverlayContext;
   String? _voiceSessionBaseText;
   final ValueNotifier<String> _liveTranscript = ValueNotifier<String>('');
   static const int _waveformBarCount = 24;
@@ -399,19 +400,30 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _VoiceRecordingOverlay(
-        pulseAnim: _voicePulseAnim,
-        waveform: _waveform,
-        elapsed: _recordingElapsed,
-        onStop: () => _stopListening(keepText: true),
-        onCancel: () => _stopListening(keepText: false),
-      ),
-    ).then((_) => _voiceOverlayOpen = false);
+      builder: (dialogContext) {
+        // Captured so _closeVoiceOverlay can pop the exact Navigator this dialog
+        // route was pushed onto — using the outer widget's own `context` with
+        // `rootNavigator: true` popped the wrong Navigator whenever the app has
+        // more than one (nested routing), which is why Cancel/Done did nothing.
+        _voiceOverlayContext = dialogContext;
+        return _VoiceRecordingOverlay(
+          pulseAnim: _voicePulseAnim,
+          waveform: _waveform,
+          elapsed: _recordingElapsed,
+          onStop: () => _stopListening(keepText: true),
+          onCancel: () => _stopListening(keepText: false),
+        );
+      },
+    ).then((_) {
+      _voiceOverlayOpen = false;
+      _voiceOverlayContext = null;
+    });
   }
 
   void _closeVoiceOverlay() {
-    if (_voiceOverlayOpen) {
-      Navigator.of(context, rootNavigator: true).maybePop();
+    final dialogContext = _voiceOverlayContext;
+    if (_voiceOverlayOpen && dialogContext != null && dialogContext.mounted) {
+      Navigator.of(dialogContext).pop();
     }
   }
 
