@@ -799,8 +799,29 @@ class _VoiceRecordingOverlay extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              IconButton(onPressed: onCancel, icon: const Icon(Icons.close_rounded, size: 18), tooltip: 'Cancel', visualDensity: VisualDensity.compact, color: cs.onSurfaceVariant),
-              IconButton(onPressed: onStop, icon: const Icon(Icons.check_rounded, size: 18), tooltip: 'Done', visualDensity: VisualDensity.compact, style: IconButton.styleFrom(backgroundColor: cs.primary, foregroundColor: cs.onPrimary)),
+              IconButton(
+                // Pops using this button's OWN context — the standard, guaranteed-correct
+                // way to close a dialog from inside itself, regardless of how many
+                // Navigators the app has. Also invokes onCancel for the state-side cleanup.
+                onPressed: () {
+                  onCancel();
+                  Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.close_rounded, size: 18),
+                tooltip: 'Cancel',
+                visualDensity: VisualDensity.compact,
+                color: cs.onSurfaceVariant,
+              ),
+              IconButton(
+                onPressed: () {
+                  onStop();
+                  Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.check_rounded, size: 18),
+                tooltip: 'Done',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(backgroundColor: cs.primary, foregroundColor: cs.onPrimary),
+              ),
             ],
           ),
         ),
