@@ -1,39 +1,35 @@
-# Agentivity SDK (Flutter)
+# agentivity_sdk
 
-The Flutter/Dart SDK for building applications against the Agentivity platform: a real-time,
-AG-UI-protocol client, generative-content widgets, and a platform API client — for building new
-apps and integrations, not for administering the platform (creating/editing workflows, agents,
-teams, or credentials stays inside the Studio app).
+The Flutter/Dart SDK for building applications against the [Agentivity](https://agentivity.io)
+platform: a real-time AG-UI-protocol client, generative-content widgets, and a platform API
+client — one package, for building new apps and integrations. Administering the platform
+(creating/editing workflows, agents, teams, or credentials) stays inside Agentivity Studio, not
+this SDK.
 
-## Packages
+## What's in it
 
-| Package | Purpose |
+| Area | What it gives you |
 | --- | --- |
-| [`agentivity_ag_ui`](packages/agentivity_ag_ui) | AG-UI protocol client — SSE streaming, chat/forms panels, run controllers. |
-| [`agentivity_artifacts`](packages/agentivity_artifacts) | Renderable widgets for AI-generated content (charts, code blocks, interaction cards, ...). |
-| [`agentivity_client`](packages/agentivity_client) | Platform API client — read, execute, and watch history for agents/teams/workflows/chat. |
+| **AG-UI protocol** | SSE streaming, event parsing, run controllers, and ready-made chat/forms/assistant panels. |
+| **Artifacts** | Renderable widgets for AI-generated content — charts, code blocks, JSON, status cards, and a 6-widget interaction-card family (choice, confirm, date, form, rating, summary). |
+| **Platform client** | Pure API access — discover agents/teams/workflows, start/monitor/cancel runs, respond to human-in-the-loop requests, chat, read history. |
 
-## Getting started
-
-This is a [melos](https://melos.invertase.dev/) monorepo.
-
-```bash
-dart pub global activate melos
-melos bootstrap
-```
-
-See each package's own README for usage.
-
-## Used together
-
-The three packages are designed to compose: `agentivity_client` talks to the backend,
-`agentivity_ag_ui` streams and renders the conversation, `agentivity_artifacts` renders any
-generative-UI content the agent sends back.
+Everything is exported from one barrel:
 
 ```dart
-import 'package:agentivity_client/agentivity_client.dart';
-import 'package:agentivity_ag_ui/agentivity_ag_ui.dart';
-import 'package:agentivity_artifacts/agentivity_artifacts.dart';
+import 'package:agentivity_sdk/agentivity_sdk.dart';
+```
+
+## Get started
+
+```yaml
+# pubspec.yaml
+dependencies:
+  agentivity_sdk: ^0.1.0
+```
+
+```dart
+import 'package:agentivity_sdk/agentivity_sdk.dart';
 
 final client = AgentivityPlatformClient(baseUrl: 'https://my-backend.example.com');
 
@@ -48,6 +44,27 @@ AgUiChatDiscussion(
 );
 ```
 
-`agentivity_client` deliberately stops at read/execute/history — it cannot create or edit
-workflows, agents, teams, or credentials. Building an admin/authoring surface (like Agentivity
-Studio itself) is a separate, out-of-scope concern for this SDK.
+## Scope: read, execute, and watch history — not administer
+
+The platform client covers everything a third-party application needs to **use** the platform:
+discovering entities, starting and monitoring runs (cancel/pause/resume/HIL), chatting over
+AG-UI, reading conversation/execution history, and discovering generative-UI widget bundles and
+icon assets.
+
+**Deliberately not included**: creating, editing, or deleting workflows, agents, teams, or
+credentials, and any diagnostic/inspector tooling (run inspector, node diagnostics, run metrics).
+Those are Agentivity Studio (admin) concerns.
+
+## Development
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+```
+
+A single Flutter package — no monorepo tooling required.
+
+## License
+
+MIT © Agentivity
