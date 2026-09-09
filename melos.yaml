@@ -1,0 +1,20 @@
+name: agentivity_sdk_flutter
+
+packages:
+  - packages/**
+
+command:
+  version:
+    linkToCommits: true
+    workspaceChangelog: true
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  analyze:
+    run: melos exec -- "dart analyze --fatal-infos"
+    description: Analyze every package in the workspace.
+
+  test:
+    run: melos exec --dir-exists=test -- "dart test"
+    description: Run tests for every package that has a test/ directory.
