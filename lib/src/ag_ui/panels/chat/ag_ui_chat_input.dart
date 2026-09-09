@@ -172,6 +172,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   final AudioRecorder _recorder = AudioRecorder();
   StreamSubscription<Amplitude>? _amplitudeSub;
   StreamSubscription<List<int>>? _recorderAudioSub;
+  Timer? _amplitudeWatchdog;
+  bool _receivedRealAmplitude = false;
 
   // If `record` itself can't provide amplitude either (e.g. mic permission denied),
   // fall back to a synthetic "breathing" waveform so there's still visible
@@ -226,6 +228,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _recordingElapsed.dispose();
     _recordingTimer?.cancel();
     _syntheticWaveformTimer?.cancel();
+    _amplitudeWatchdog?.cancel();
     _amplitudeSub?.cancel();
     _recorderAudioSub?.cancel();
     _recorder.dispose();
@@ -298,16 +301,27 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   /// own onSoundLevelChange isn't implemented on Windows or web (confirmed against
   /// its plugin source: neither backend ever calls it). The recorded audio bytes
   /// are discarded; only the dBFS amplitude stream drives the waveform.
+  ///
+  /// Deliberately does NOT gate on `hasPermission()` first: `record`'s own platform
+  /// support matrix lists permission-check support as unimplemented on Windows, so
+  /// a `false`/unreliable result there would wrongly skip real metering every time.
+  /// Instead this always attempts `startStream()` and arms a short watchdog — if no
+  /// real amplitude event arrives in time (denied permission, unsupported platform
+  /// config, etc.), it falls back to the synthetic waveform instead.
   Future<void> _startAmplitudeMetering() async {
+    _receivedRealAmplitude = false;
     try {
-      if (!await _recorder.hasPermission()) {
-        developer.log('record: microphone permission not granted, falling back to a synthetic waveform', name: 'AgUiChatInput');
-        _startSyntheticWaveform();
-        return;
-      }
       final audioStream = await _recorder.startStream(const RecordConfig(encoder: AudioEncoder.pcm16bits));
       _recorderAudioSub = audioStream.listen((_) {});
       _amplitudeSub = _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen(_onAmplitude);
+      _amplitudeWatchdog = Timer(const Duration(milliseconds: 1500), () {
+        if (!_receivedRealAmplitude && _isListening) {
+          developer.log('record: no amplitude event received within 1.5s, falling back to a synthetic waveform', name: 'AgUiChatInput');
+          unawaited(_amplitudeSub?.cancel());
+          _amplitudeSub = null;
+          _startSyntheticWaveform();
+        }
+      });
     } catch (error, stackTrace) {
       developer.log('record amplitude metering unavailable, falling back to a synthetic waveform', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
       _startSyntheticWaveform();
@@ -318,6 +332,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   /// onto a 0..1 bar height, clamped so silence still shows a faint baseline.
   void _onAmplitude(Amplitude amplitude) {
     if (!mounted || !_isListening) return;
+    _receivedRealAmplitude = true;
     final db = amplitude.current.clamp(-60.0, 0.0);
     final normalized = ((db + 60.0) / 60.0).clamp(0.05, 1.0);
     _pushWaveformLevel(normalized);
@@ -341,6 +356,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   }
 
   Future<void> _stopAmplitudeMetering() async {
+    _amplitudeWatchdog?.cancel();
+    _amplitudeWatchdog = null;
     _syntheticWaveformTimer?.cancel();
     _syntheticWaveformTimer = null;
     await _amplitudeSub?.cancel();
