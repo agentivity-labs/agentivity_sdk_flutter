@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
@@ -199,7 +200,27 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   // ── Speech-to-text ──────────────────────────────────────────────────────────
 
   Future<void> _initStt() async {
-    final available = await _stt.initialize(onError: (_) => setState(() => _isListening = false));
+    bool available;
+    try {
+      available = await _stt.initialize(
+        onError: (error) {
+          developer.log('speech_to_text error: $error', name: 'AgUiChatInput');
+          if (mounted) setState(() => _isListening = false);
+        },
+        onStatus: (status) => developer.log('speech_to_text status: $status', name: 'AgUiChatInput'),
+      );
+    } catch (error, stackTrace) {
+      developer.log('speech_to_text initialize() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+      available = false;
+    }
+    if (!available) {
+      developer.log(
+        'speech_to_text unavailable on this platform/browser — the mic button will be shown disabled. '
+        'On web this requires a browser with Web Speech API support (Chrome) and microphone permission; '
+        'on Windows this requires the OS speech recognition feature to be installed and enabled.',
+        name: 'AgUiChatInput',
+      );
+    }
     if (mounted) setState(() => _sttAvailable = available);
   }
 
@@ -350,8 +371,18 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
           // Leading actions (customizable via lib)
           if (widget.leadingActions != null && widget.leadingActions!.isNotEmpty) IconTheme(data: IconThemeData(size: 18, color: cs.onSurfaceVariant), child: Row(mainAxisSize: MainAxisSize.min, children: widget.leadingActions!)),
 
-          // Voice mic
-          if (widget.enableVoice && _sttAvailable) _VoiceButton(isListening: _isListening, pulseAnim: _voicePulseAnim, enabled: isEnabled, onTap: _toggleListening, color: cs.onSurfaceVariant),
+          // Voice mic — shown (disabled, with an explanatory tooltip) even when speech
+          // recognition isn't available on this platform/browser, rather than hidden
+          // outright, so it's clear the feature exists but can't be used right now.
+          if (widget.enableVoice)
+            _VoiceButton(
+              isListening: _isListening,
+              pulseAnim: _voicePulseAnim,
+              enabled: isEnabled && _sttAvailable,
+              unavailable: !_sttAvailable,
+              onTap: _toggleListening,
+              color: cs.onSurfaceVariant,
+            ),
 
           const Spacer(),
 
@@ -467,7 +498,7 @@ class _ToolbarIconButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _VoiceButton extends StatelessWidget {
-  const _VoiceButton({required this.isListening, required this.pulseAnim, required this.enabled, required this.onTap, required this.color});
+  const _VoiceButton({required this.isListening, required this.pulseAnim, required this.enabled, required this.onTap, required this.color, this.unavailable = false});
 
   final bool isListening;
   final Animation<double> pulseAnim;
@@ -475,13 +506,27 @@ class _VoiceButton extends StatelessWidget {
   final VoidCallback onTap;
   final Color color;
 
+  /// True when speech recognition isn't available on this platform/browser
+  /// (e.g. no Web Speech API support, mic permission denied, OS speech
+  /// recognition not installed). Changes the tooltip to explain why.
+  final bool unavailable;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: pulseAnim,
       builder: (context, _) {
-        return _ToolbarIconButton(icon: isListening ? Icons.mic_rounded : Icons.mic_none_rounded, tooltip: isListening ? 'Stop listening' : 'Voice input', color: isListening ? cs.error.withValues(alpha: pulseAnim.value) : color, onTap: enabled ? onTap : null);
+        return _ToolbarIconButton(
+          icon: isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+          tooltip: unavailable
+              ? 'Voice input unavailable on this device/browser'
+              : isListening
+              ? 'Stop listening'
+              : 'Voice input',
+          color: isListening ? cs.error.withValues(alpha: pulseAnim.value) : color,
+          onTap: enabled ? onTap : null,
+        );
       },
     );
   }
