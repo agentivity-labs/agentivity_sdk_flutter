@@ -155,6 +155,12 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   bool _voiceOverlayOpen = false;
   String? _voiceSessionBaseText;
   final ValueNotifier<String> _liveTranscript = ValueNotifier<String>('');
+  static const int _waveformBarCount = 24;
+  final ValueNotifier<List<double>> _waveform = ValueNotifier<List<double>>(List<double>.filled(_waveformBarCount, 0.0));
+  double _waveformScale = 1;
+  Stopwatch? _recordingStopwatch;
+  Timer? _recordingTimer;
+  final ValueNotifier<Duration> _recordingElapsed = ValueNotifier<Duration>(Duration.zero);
 
   // Animations
   // _pulseCtrl: breathing for voice mic (reverse repeat, 1 s)
@@ -198,6 +204,9 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _focusNode.dispose();
     _pulseCtrl.dispose();
     _liveTranscript.dispose();
+    _waveform.dispose();
+    _recordingElapsed.dispose();
+    _recordingTimer?.cancel();
     if (_isListening) _stt.stop();
     super.dispose();
   }
@@ -240,6 +249,13 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     }
     _voiceSessionBaseText = _ctrl.text;
     _liveTranscript.value = '';
+    _waveform.value = List<double>.filled(_waveformBarCount, 0.0);
+    _waveformScale = 1;
+    _recordingStopwatch = Stopwatch()..start();
+    _recordingElapsed.value = Duration.zero;
+    _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _recordingElapsed.value = _recordingStopwatch?.elapsed ?? Duration.zero;
+    });
     setState(() => _isListening = true);
     _openVoiceOverlay();
     await _stt.listen(
@@ -252,8 +268,22 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
         _ctrl.value = _ctrl.value.copyWith(text: merged, selection: TextSelection.collapsed(offset: merged.length));
         if (result.finalResult) _stopListening(keepText: true);
       },
+      onSoundLevelChange: _onSoundLevelChange,
       listenOptions: SpeechListenOptions(listenFor: const Duration(seconds: 60), pauseFor: const Duration(seconds: 5), partialResults: true),
     );
+  }
+
+  /// [level] is a platform-dependent amplitude/dB value with no fixed range,
+  /// so it's normalized against a running peak that decays slowly — that peak
+  /// adapts to the mic/environment instead of assuming a fixed dB scale.
+  void _onSoundLevelChange(double level) {
+    final magnitude = level.abs();
+    _waveformScale = magnitude > _waveformScale ? magnitude : _waveformScale * 0.97;
+    final normalized = _waveformScale <= 0.001 ? 0.05 : (magnitude / _waveformScale).clamp(0.05, 1.0);
+    final next = List<double>.of(_waveform.value)
+      ..removeAt(0)
+      ..add(normalized);
+    _waveform.value = next;
   }
 
   Future<void> _stopListening({required bool keepText}) async {
@@ -265,6 +295,10 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       }
     }
     _voiceSessionBaseText = null;
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    _recordingStopwatch?.stop();
+    _recordingStopwatch = null;
     if (mounted) setState(() => _isListening = false);
     _closeVoiceOverlay();
   }
@@ -283,7 +317,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       barrierDismissible: false,
       builder: (_) => _VoiceRecordingOverlay(
         pulseAnim: _voicePulseAnim,
-        transcript: _liveTranscript,
+        waveform: _waveform,
+        elapsed: _recordingElapsed,
         onStop: () => _stopListening(keepText: true),
         onCancel: () => _stopListening(keepText: false),
       ),
@@ -600,65 +635,78 @@ class _VoiceButton extends StatelessWidget {
 // _VoiceRecordingOverlay
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// A centered modal shown while listening — a large pulsing mic and the live
-/// partial transcript, mirroring the standard mobile voice-input pattern.
+/// A small, centered pill shown while listening — a live waveform reacting to
+/// sound level, an elapsed-time readout, and cancel/done controls. Minimal by
+/// design, matching the compact voice-recording bar pattern used by ChatGPT
+/// and other mobile chat apps rather than a full dialog.
 class _VoiceRecordingOverlay extends StatelessWidget {
-  const _VoiceRecordingOverlay({required this.pulseAnim, required this.transcript, required this.onStop, required this.onCancel});
+  const _VoiceRecordingOverlay({required this.pulseAnim, required this.waveform, required this.elapsed, required this.onStop, required this.onCancel});
 
   final Animation<double> pulseAnim;
-  final ValueListenable<String> transcript;
+  final ValueListenable<List<double>> waveform;
+  final ValueListenable<Duration> elapsed;
   final VoidCallback onStop;
   final VoidCallback onCancel;
+
+  static String _formatElapsed(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     return Dialog(
-      backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 32, 28, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedBuilder(
-              animation: pulseAnim,
-              builder: (context, _) {
-                return Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: cs.error.withValues(alpha: 0.10 + 0.12 * pulseAnim.value)),
-                  child: Center(child: Icon(Icons.mic_rounded, size: 40, color: cs.error.withValues(alpha: 0.55 + 0.45 * pulseAnim.value))),
-                );
-              },
-            ),
-            const SizedBox(height: 18),
-            Text('Listening…', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44, maxWidth: 280),
-              child: ValueListenableBuilder<String>(
-                valueListenable: transcript,
-                builder: (context, value, _) {
-                  return Text(
-                    value.isEmpty ? 'Say something…' : value,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: value.isEmpty ? cs.onSurfaceVariant.withValues(alpha: 0.6) : cs.onSurface),
-                  );
-                },
+      backgroundColor: cs.surfaceContainerHigh,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedBuilder(
+                animation: pulseAnim,
+                builder: (context, _) => Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: cs.error.withValues(alpha: 0.5 + 0.5 * pulseAnim.value))),
               ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TextButton(onPressed: onCancel, child: const Text('Cancel')),
-                const SizedBox(width: 8),
-                FilledButton.icon(onPressed: onStop, icon: const Icon(Icons.check_rounded, size: 18), label: const Text('Done')),
-              ],
-            ),
-          ],
+              const SizedBox(width: 10),
+              ValueListenableBuilder<Duration>(
+                valueListenable: elapsed,
+                builder: (context, value, _) => Text(_formatElapsed(value), style: theme.textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant, fontFeatures: const [FontFeature.tabularFigures()])),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ValueListenableBuilder<List<double>>(
+                  valueListenable: waveform,
+                  builder: (context, levels, _) {
+                    return SizedBox(
+                      height: 28,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (final level in levels)
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 100),
+                              width: 2.5,
+                              height: 4 + level * 22,
+                              decoration: BoxDecoration(color: cs.onSurfaceVariant.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(2)),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(onPressed: onCancel, icon: const Icon(Icons.close_rounded, size: 18), tooltip: 'Cancel', visualDensity: VisualDensity.compact, color: cs.onSurfaceVariant),
+              IconButton(onPressed: onStop, icon: const Icon(Icons.check_rounded, size: 18), tooltip: 'Done', visualDensity: VisualDensity.compact, style: IconButton.styleFrom(backgroundColor: cs.primary, foregroundColor: cs.onPrimary)),
+            ],
+          ),
         ),
       ),
     );
