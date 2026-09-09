@@ -7,12 +7,13 @@ import 'ag_ui_chat_input.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
 
-/// A self-contained chat panel backed by a [ChatController].
+/// A complete chat discussion — message list + composer, orchestrated as one
+/// widget — backed by a [ChatController].
 ///
 /// ## Pull-based (REST) usage
 ///
 /// ```dart
-/// AgUiChatPanel(
+/// AgUiChatDiscussion(
 ///   controller: ChatController(provider: myProvider, contextId: runId),
 ///   threadId: threadId,
 /// )
@@ -26,7 +27,7 @@ import 'chat_models.dart';
 /// active.
 ///
 /// ```dart
-/// AgUiChatPanel(
+/// AgUiChatDiscussion(
 ///   controller: ChatController.fromStream(
 ///     events: sseChannel.stream,
 ///     contextId: runId,
@@ -45,8 +46,8 @@ import 'chat_models.dart';
 ///
 /// Styling: add [AgThemeData] to your [ThemeData.extensions], or pass
 /// [style] for a one-off override. Override individual parts with builders.
-class AgUiChatPanel extends StatefulWidget {
-  const AgUiChatPanel({
+class AgUiChatDiscussion extends StatefulWidget {
+  const AgUiChatDiscussion({
     super.key,
     required this.controller,
     this.threadId,
@@ -147,10 +148,10 @@ class AgUiChatPanel extends StatefulWidget {
   final List<Widget>? inputTrailingActions;
 
   @override
-  State<AgUiChatPanel> createState() => _AgUiChatPanelState();
+  State<AgUiChatDiscussion> createState() => _AgUiChatDiscussionState();
 }
 
-class _AgUiChatPanelState extends State<AgUiChatPanel> {
+class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   List<ChatMessage> _messages = const [];
@@ -177,7 +178,7 @@ class _AgUiChatPanelState extends State<AgUiChatPanel> {
   }
 
   @override
-  void didUpdateWidget(AgUiChatPanel old) {
+  void didUpdateWidget(AgUiChatDiscussion old) {
     super.didUpdateWidget(old);
     if (old.controller != widget.controller) {
       old.controller.removeListener(_onControllerChange);
@@ -506,3 +507,9 @@ class _MessageBubble extends StatelessWidget {
     return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: message.text.isNotEmpty ? AgUiMarkdownBody(data: message.text, textColor: textColor, textStyle: textStyle) : const SizedBox.shrink());
   }
 }
+
+/// Deprecated name for [AgUiChatDiscussion] — "Panel" undersold that this widget
+/// already orchestrates both the message list and the composer as one component.
+/// Kept as a source-compatible alias; migrate to [AgUiChatDiscussion] directly.
+@Deprecated('Renamed to AgUiChatDiscussion — same widget, clearer name.')
+typedef AgUiChatPanel = AgUiChatDiscussion;

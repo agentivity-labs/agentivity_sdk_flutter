@@ -7,7 +7,7 @@ import '../../protocol/api_contract.dart';
 import 'chat_models.dart';
 import 'i_chat_provider.dart';
 
-/// Controls the state of an [AgUiChatPanel].
+/// Controls the state of an [AgUiChatDiscussion].
 ///
 /// ## Pull-based (REST)
 ///
@@ -100,8 +100,8 @@ class ChatController extends ChangeNotifier {
   ///
   /// Driven entirely by AG-UI SSE events ([RunStartedEvent] sets it, any
   /// terminal event or HIL gate clears it) — no polling required. Reflects in
-  /// [AgUiChatInput]'s loading indicator via [AgUiChatPanel]'s default input,
-  /// and is available to custom [AgUiChatPanel.inputBuilder]s too.
+  /// [AgUiChatInput]'s loading indicator via [AgUiChatDiscussion]'s default input,
+  /// and is available to custom [AgUiChatDiscussion.inputBuilder]s too.
   bool get isAwaitingResponse => _isAwaitingResponse;
 
   /// Set when a `CHAT_HIL_GATE_REACHED` event or an AG-UI interrupt with

@@ -110,7 +110,7 @@ class ChatHilGate {
 
 /// One piece of a multi-block chat message — either free text or an AG-UI interaction widget.
 /// A message with several blocks renders them in order, in the same bubble (see
-/// `_MessageBubble` in `ag_ui_chat_panel.dart`).
+/// `_MessageBubble` in `ag_ui_chat_discussion.dart`).
 class ChatContentBlock {
   const ChatContentBlock({required this.type, this.text, this.widgetProps});
 

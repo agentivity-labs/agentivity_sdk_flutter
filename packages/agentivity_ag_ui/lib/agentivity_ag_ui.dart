@@ -29,7 +29,7 @@ export 'src/panels/chat/chat_controller.dart';
 export 'src/panels/chat/i_chat_provider.dart';
 export 'src/panels/chat/chat_theme.dart';
 export 'src/panels/chat/ag_ui_chat_input.dart';
-export 'src/panels/chat/ag_ui_chat_panel.dart';
+export 'src/panels/chat/ag_ui_chat_discussion.dart';
 
 // panels — assistant
 export 'src/panels/assistant/assistant_models.dart';

@@ -18,6 +18,10 @@
   now rides the same content-parts array as text/images (`buildAgUiMessage`), mirroring OpenAI's
   `input_audio` shape. Protocol-completeness addition only; no sender/receiver feature wired to
   them yet.
+- **Rename**: `AgUiChatPanel` → `AgUiChatDiscussion`. "Panel" undersold what this widget already
+  does — it orchestrates both the message list and the composer as one component, with
+  `inputBuilder` as the supported extension point for app-specific input customization (e.g. run
+  controls). `AgUiChatPanel` remains available as a deprecated typedef alias.
 
 ## 0.3.12 - 2026-05-23
 
