@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:math' as math;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 
@@ -157,10 +159,26 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   final ValueNotifier<String> _liveTranscript = ValueNotifier<String>('');
   static const int _waveformBarCount = 24;
   final ValueNotifier<List<double>> _waveform = ValueNotifier<List<double>>(List<double>.filled(_waveformBarCount, 0.0));
-  double _waveformScale = 1;
   Stopwatch? _recordingStopwatch;
   Timer? _recordingTimer;
   final ValueNotifier<Duration> _recordingElapsed = ValueNotifier<Duration>(Duration.zero);
+
+  // speech_to_text's onSoundLevelChange isn't implemented by every platform backend
+  // (the Windows and web implementations never call it at all — confirmed against
+  // their source), so real waveform amplitude comes from a separate `record` session
+  // (dBFS via onAmplitudeChanged, supported on every platform this app targets,
+  // including Windows and web) running alongside speech_to_text purely for metering —
+  // its audio bytes are discarded, only the amplitude stream is used.
+  final AudioRecorder _recorder = AudioRecorder();
+  StreamSubscription<Amplitude>? _amplitudeSub;
+  StreamSubscription<List<int>>? _recorderAudioSub;
+
+  // If `record` itself can't provide amplitude either (e.g. mic permission denied),
+  // fall back to a synthetic "breathing" waveform so there's still visible
+  // confirmation that recording is active, rather than a dead flat line.
+  Timer? _syntheticWaveformTimer;
+  double _syntheticLevel = 0.3;
+  final math.Random _syntheticRandom = math.Random();
 
   // Animations
   // _pulseCtrl: breathing for voice mic (reverse repeat, 1 s)
@@ -207,6 +225,10 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _waveform.dispose();
     _recordingElapsed.dispose();
     _recordingTimer?.cancel();
+    _syntheticWaveformTimer?.cancel();
+    _amplitudeSub?.cancel();
+    _recorderAudioSub?.cancel();
+    _recorder.dispose();
     if (_isListening) _stt.stop();
     super.dispose();
   }
@@ -250,7 +272,6 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _voiceSessionBaseText = _ctrl.text;
     _liveTranscript.value = '';
     _waveform.value = List<double>.filled(_waveformBarCount, 0.0);
-    _waveformScale = 1;
     _recordingStopwatch = Stopwatch()..start();
     _recordingElapsed.value = Duration.zero;
     _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
@@ -258,6 +279,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     });
     setState(() => _isListening = true);
     _openVoiceOverlay();
+    unawaited(_startAmplitudeMetering());
     await _stt.listen(
       onResult: (result) {
         if (!mounted) return;
@@ -268,26 +290,71 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
         _ctrl.value = _ctrl.value.copyWith(text: merged, selection: TextSelection.collapsed(offset: merged.length));
         if (result.finalResult) _stopListening(keepText: true);
       },
-      onSoundLevelChange: _onSoundLevelChange,
       listenOptions: SpeechListenOptions(listenFor: const Duration(seconds: 60), pauseFor: const Duration(seconds: 5), partialResults: true),
     );
   }
 
-  /// [level] is a platform-dependent amplitude/dB value with no fixed range,
-  /// so it's normalized against a running peak that decays slowly — that peak
-  /// adapts to the mic/environment instead of assuming a fixed dB scale.
-  void _onSoundLevelChange(double level) {
-    final magnitude = level.abs();
-    _waveformScale = magnitude > _waveformScale ? magnitude : _waveformScale * 0.97;
-    final normalized = _waveformScale <= 0.001 ? 0.05 : (magnitude / _waveformScale).clamp(0.05, 1.0);
+  /// Runs a `record` session purely for real amplitude metering — speech_to_text's
+  /// own onSoundLevelChange isn't implemented on Windows or web (confirmed against
+  /// its plugin source: neither backend ever calls it). The recorded audio bytes
+  /// are discarded; only the dBFS amplitude stream drives the waveform.
+  Future<void> _startAmplitudeMetering() async {
+    try {
+      if (!await _recorder.hasPermission()) {
+        developer.log('record: microphone permission not granted, falling back to a synthetic waveform', name: 'AgUiChatInput');
+        _startSyntheticWaveform();
+        return;
+      }
+      final audioStream = await _recorder.startStream(const RecordConfig(encoder: AudioEncoder.pcm16bits));
+      _recorderAudioSub = audioStream.listen((_) {});
+      _amplitudeSub = _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen(_onAmplitude);
+    } catch (error, stackTrace) {
+      developer.log('record amplitude metering unavailable, falling back to a synthetic waveform', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+      _startSyntheticWaveform();
+    }
+  }
+
+  /// dBFS: roughly -60 (quiet) to 0 (loudest) for normal speech — mapped linearly
+  /// onto a 0..1 bar height, clamped so silence still shows a faint baseline.
+  void _onAmplitude(Amplitude amplitude) {
+    if (!mounted || !_isListening) return;
+    final db = amplitude.current.clamp(-60.0, 0.0);
+    final normalized = ((db + 60.0) / 60.0).clamp(0.05, 1.0);
+    _pushWaveformLevel(normalized);
+  }
+
+  void _pushWaveformLevel(double normalized) {
     final next = List<double>.of(_waveform.value)
       ..removeAt(0)
       ..add(normalized);
     _waveform.value = next;
   }
 
+  void _startSyntheticWaveform() {
+    _syntheticWaveformTimer?.cancel();
+    _syntheticWaveformTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
+      if (!mounted || !_isListening) return;
+      // Small random walk instead of pure noise, so it reads as organic movement.
+      _syntheticLevel = (_syntheticLevel + (_syntheticRandom.nextDouble() - 0.5) * 0.35).clamp(0.15, 0.85);
+      _pushWaveformLevel(_syntheticLevel);
+    });
+  }
+
+  Future<void> _stopAmplitudeMetering() async {
+    _syntheticWaveformTimer?.cancel();
+    _syntheticWaveformTimer = null;
+    await _amplitudeSub?.cancel();
+    _amplitudeSub = null;
+    await _recorderAudioSub?.cancel();
+    _recorderAudioSub = null;
+    if (await _recorder.isRecording()) {
+      await _recorder.stop();
+    }
+  }
+
   Future<void> _stopListening({required bool keepText}) async {
     if (_isListening) await _stt.stop();
+    await _stopAmplitudeMetering();
     if (!keepText) {
       final base = _voiceSessionBaseText;
       if (base != null) {
