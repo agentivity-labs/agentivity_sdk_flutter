@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -151,6 +152,9 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   final SpeechToText _stt = SpeechToText();
   bool _sttAvailable = false;
   bool _isListening = false;
+  bool _voiceOverlayOpen = false;
+  String? _voiceSessionBaseText;
+  final ValueNotifier<String> _liveTranscript = ValueNotifier<String>('');
 
   // Animations
   // _pulseCtrl: breathing for voice mic (reverse repeat, 1 s)
@@ -193,6 +197,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     if (_ownsController) _ctrl.dispose();
     _focusNode.dispose();
     _pulseCtrl.dispose();
+    _liveTranscript.dispose();
     if (_isListening) _stt.stop();
     super.dispose();
   }
@@ -225,24 +230,70 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   }
 
   Future<void> _toggleListening() async {
-    if (!_sttAvailable) return;
     if (_isListening) {
-      await _stt.stop();
-      setState(() => _isListening = false);
+      await _stopListening(keepText: true);
       return;
     }
+    if (!_sttAvailable) {
+      _showVoiceUnavailableMessage();
+      return;
+    }
+    _voiceSessionBaseText = _ctrl.text;
+    _liveTranscript.value = '';
     setState(() => _isListening = true);
+    _openVoiceOverlay();
     await _stt.listen(
       onResult: (result) {
         if (!mounted) return;
         final text = result.recognizedWords;
-        final current = _ctrl.text;
-        final merged = current.isEmpty ? text : '$current $text';
+        _liveTranscript.value = text;
+        final base = _voiceSessionBaseText ?? '';
+        final merged = base.isEmpty ? text : (text.isEmpty ? base : '$base $text');
         _ctrl.value = _ctrl.value.copyWith(text: merged, selection: TextSelection.collapsed(offset: merged.length));
-        if (result.finalResult) setState(() => _isListening = false);
+        if (result.finalResult) _stopListening(keepText: true);
       },
       listenOptions: SpeechListenOptions(listenFor: const Duration(seconds: 60), pauseFor: const Duration(seconds: 5), partialResults: true),
     );
+  }
+
+  Future<void> _stopListening({required bool keepText}) async {
+    if (_isListening) await _stt.stop();
+    if (!keepText) {
+      final base = _voiceSessionBaseText;
+      if (base != null) {
+        _ctrl.value = TextEditingValue(text: base, selection: TextSelection.collapsed(offset: base.length));
+      }
+    }
+    _voiceSessionBaseText = null;
+    if (mounted) setState(() => _isListening = false);
+    _closeVoiceOverlay();
+  }
+
+  void _showVoiceUnavailableMessage() {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('Voice input isn\'t available on this device or browser.')),
+    );
+  }
+
+  void _openVoiceOverlay() {
+    if (_voiceOverlayOpen) return;
+    _voiceOverlayOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _VoiceRecordingOverlay(
+        pulseAnim: _voicePulseAnim,
+        transcript: _liveTranscript,
+        onStop: () => _stopListening(keepText: true),
+        onCancel: () => _stopListening(keepText: false),
+      ),
+    ).then((_) => _voiceOverlayOpen = false);
+  }
+
+  void _closeVoiceOverlay() {
+    if (_voiceOverlayOpen) {
+      Navigator.of(context, rootNavigator: true).maybePop();
+    }
   }
 
   // ── File attachments ────────────────────────────────────────────────────────
@@ -378,7 +429,9 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
             _VoiceButton(
               isListening: _isListening,
               pulseAnim: _voicePulseAnim,
-              enabled: isEnabled && _sttAvailable,
+              // Stays tappable even when speech recognition is unavailable, so tapping
+              // it surfaces an explanation (a snackbar) instead of silently doing nothing.
+              tappable: isEnabled,
               unavailable: !_sttAvailable,
               onTap: _toggleListening,
               color: cs.onSurfaceVariant,
@@ -480,16 +533,21 @@ class _SendButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ToolbarIconButton extends StatelessWidget {
-  const _ToolbarIconButton({required this.icon, required this.tooltip, required this.onTap, required this.color});
+  const _ToolbarIconButton({required this.icon, required this.tooltip, required this.onTap, required this.color, this.dimmed = false});
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onTap;
   final Color color;
 
+  /// Forces the dimmed (disabled-looking) appearance even when [onTap] is non-null —
+  /// for buttons that stay tappable (e.g. to show an explanation) but shouldn't look active.
+  final bool dimmed;
+
   @override
   Widget build(BuildContext context) {
-    return Tooltip(message: tooltip, child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(6), child: Padding(padding: const EdgeInsets.all(5), child: Icon(icon, size: 18, color: onTap != null ? color : color.withValues(alpha: 0.35)))));
+    final isDim = dimmed || onTap == null;
+    return Tooltip(message: tooltip, child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(6), child: Padding(padding: const EdgeInsets.all(5), child: Icon(icon, size: 18, color: isDim ? color.withValues(alpha: 0.35) : color))));
   }
 }
 
@@ -498,17 +556,22 @@ class _ToolbarIconButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _VoiceButton extends StatelessWidget {
-  const _VoiceButton({required this.isListening, required this.pulseAnim, required this.enabled, required this.onTap, required this.color, this.unavailable = false});
+  const _VoiceButton({required this.isListening, required this.pulseAnim, required this.tappable, required this.onTap, required this.color, this.unavailable = false});
 
   final bool isListening;
   final Animation<double> pulseAnim;
-  final bool enabled;
+
+  /// Whether the button can be tapped at all (the overall input is enabled).
+  /// Unlike the old `enabled` flag, this stays `true` even when speech
+  /// recognition itself is unavailable, so a tap can surface why — see [unavailable].
+  final bool tappable;
   final VoidCallback onTap;
   final Color color;
 
   /// True when speech recognition isn't available on this platform/browser
   /// (e.g. no Web Speech API support, mic permission denied, OS speech
-  /// recognition not installed). Changes the tooltip to explain why.
+  /// recognition not installed). Dims the icon and changes the tooltip;
+  /// the button stays tappable so the user gets an explanation instead of silence.
   final bool unavailable;
 
   @override
@@ -525,9 +588,79 @@ class _VoiceButton extends StatelessWidget {
               ? 'Stop listening'
               : 'Voice input',
           color: isListening ? cs.error.withValues(alpha: pulseAnim.value) : color,
-          onTap: enabled ? onTap : null,
+          dimmed: unavailable,
+          onTap: tappable ? onTap : null,
         );
       },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _VoiceRecordingOverlay
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A centered modal shown while listening — a large pulsing mic and the live
+/// partial transcript, mirroring the standard mobile voice-input pattern.
+class _VoiceRecordingOverlay extends StatelessWidget {
+  const _VoiceRecordingOverlay({required this.pulseAnim, required this.transcript, required this.onStop, required this.onCancel});
+
+  final Animation<double> pulseAnim;
+  final ValueListenable<String> transcript;
+  final VoidCallback onStop;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Dialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(28, 32, 28, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: pulseAnim,
+              builder: (context, _) {
+                return Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: cs.error.withValues(alpha: 0.10 + 0.12 * pulseAnim.value)),
+                  child: Center(child: Icon(Icons.mic_rounded, size: 40, color: cs.error.withValues(alpha: 0.55 + 0.45 * pulseAnim.value))),
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            Text('Listening…', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44, maxWidth: 280),
+              child: ValueListenableBuilder<String>(
+                valueListenable: transcript,
+                builder: (context, value, _) {
+                  return Text(
+                    value.isEmpty ? 'Say something…' : value,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: value.isEmpty ? cs.onSurfaceVariant.withValues(alpha: 0.6) : cs.onSurface),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(onPressed: onCancel, child: const Text('Cancel')),
+                const SizedBox(width: 8),
+                FilledButton.icon(onPressed: onStop, icon: const Icon(Icons.check_rounded, size: 18), label: const Text('Done')),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
