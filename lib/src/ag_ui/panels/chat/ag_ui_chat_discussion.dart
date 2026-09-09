@@ -63,7 +63,7 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.onAttach,
     this.onHilResponse,
     // AgUiChatInput passthrough
-    this.enableVoice = false,
+    this.enableVoice = true,
     this.enableAttachments = true,
     this.acceptedAttachmentExtensions,
     this.inputActionBar,

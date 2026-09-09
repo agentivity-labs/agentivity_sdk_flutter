@@ -1,4 +1,8 @@
 import 'package:agentivity_sdk/agentivity_sdk.dart';
+// AgentEntity/AgentEntityPort are hidden from the merged package barrel (they collided
+// with agentivity_studio's own unrelated admin AgentEntity model) — import the deep path
+// directly since this test exercises them.
+import 'package:agentivity_sdk/src/ag_ui/agent/agent_run_models.dart' show AgentEntity, AgentEntityPort;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
