@@ -1,5 +1,20 @@
 ﻿# Changelog
 
+## Unreleased
+
+- **Fix**: reasoning/thinking events now use the AG-UI spec's own names
+  (`THINKING_START`/`THINKING_END`/`THINKING_TEXT_MESSAGE_START`/`CONTENT`/`END`) instead of
+  this package's earlier non-spec `REASONING_*` names, so a spec-compliant backend's reasoning
+  stream parses correctly. The old wire names and class names (`ReasoningStartEvent`, etc.) still
+  work — they're deprecated typedef aliases for the renamed classes — but should be migrated off
+  before the next major version.
+- **Docs**: `ACTIVITY_SNAPSHOT`/`ACTIVITY_DELTA` are now clearly marked as Agentivity-platform
+  extensions, not part of the official AG-UI spec — both event classes implement the new
+  `AgentivityExtensionEvent` marker so consumers can distinguish spec events from platform
+  extensions programmatically.
+- Package relocated into the `agentivity_sdk_flutter` monorepo (git history preserved via
+  `git subtree`); this standalone repository will be retired once the SDK is fully consolidated.
+
 ## 0.3.12 - 2026-05-23
 
 **Release 0.3.12**
