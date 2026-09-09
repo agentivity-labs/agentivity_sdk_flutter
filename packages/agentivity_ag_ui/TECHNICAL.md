@@ -22,7 +22,7 @@ Each feature area has its own provider interface, controller, and widget. You im
 
 | Feature | Interface | Controller | Widget |
 |---|---|---|---|
-| Chat | `IChatProvider` | `ChatController` | `AgUiChatPanel` |
+| Chat | `IChatProvider` | `ChatController` | `AgUiChatDiscussion` |
 | Human-in-the-loop | `IHilProvider` | `HilController` | `AgUiHilForm` |
 | AI assistant | `IAiAssistantProvider` | `AiAssistantController` | `AgUiAssistantPanel` |
 | Agent run | `IAgentRunProvider` | `AgentRunController` | `AgUiRunPanel` / `AgUiRunStatusBadge` |
@@ -74,7 +74,7 @@ Key state: `ctrl.threads`, `ctrl.messages`, `ctrl.isLoading`, `ctrl.errorMessage
 ### Widget
 
 ```dart
-AgUiChatPanel(
+AgUiChatDiscussion(
   controller: ctrl,
   threadId: 'thread-abc',
   // Optional overrides:
@@ -389,7 +389,7 @@ MaterialApp(
 ### Per-widget override
 
 ```dart
-AgUiChatPanel(
+AgUiChatDiscussion(
   controller: ctrl,
   style: AgUiChatTheme(userBubbleColor: Colors.purple.shade100),
 )
@@ -398,7 +398,7 @@ AgUiChatPanel(
 ### Full structural override (builder callbacks)
 
 ```dart
-AgUiChatPanel(
+AgUiChatDiscussion(
   controller: ctrl,
   messageBuilder: (msg) => MyCustomBubble(message: msg),
   inputBuilder: (onSend) => MyVoiceInputRow(onSend: onSend),
@@ -426,7 +426,7 @@ final chatControllerProvider = ChangeNotifierProvider<ChatController>((ref) {
 
 // In your widget:
 final ctrl = ref.watch(chatControllerProvider);
-AgUiChatPanel(controller: ctrl, threadId: selectedThread);
+AgUiChatDiscussion(controller: ctrl, threadId: selectedThread);
 ```
 
 The same pattern applies to all other controllers.

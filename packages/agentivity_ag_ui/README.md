@@ -98,7 +98,7 @@ Building an AI agent UI from scratch is harder than it looks. You need to handle
 ## What you get
 
 ### 💬 AI Chat — out of the box
-Drop `AgUiChatPanel` into your widget tree. Streaming messages, typing indicators, thread history — fully themed with `AgUiChatTheme`.
+Drop `AgUiChatDiscussion` into your widget tree. Streaming messages, typing indicators, thread history — fully themed with `AgUiChatTheme`.
 
 ### ✅ Human-in-the-Loop — approvals & forms
 When your agent needs a human decision, `AgUiHilForm` renders the right form automatically — approval cards, multi-field inputs, dropdowns, checkboxes. Built on the AG-UI interrupt protocol.
