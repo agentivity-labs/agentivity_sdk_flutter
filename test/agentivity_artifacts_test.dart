@@ -1,4 +1,6 @@
 import 'package:agentivity_artifacts/agentivity_artifacts.dart';
+import 'package:agentivity_artifacts/src/interaction/ag_question_form.dart';
+import 'package:agentivity_artifacts/src/interaction/ag_choice_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -231,6 +233,68 @@ void main() {
       ));
       await tester.pump();
       expect(find.text('Test'), findsOneWidget);
+    });
+  });
+
+  // Confirmed in production: AgQuestionForm/AgChoiceCard used to wrap their
+  // own content in IgnorePointer+Opacity(0.5) the instant they were
+  // submitted — stacked on top of the chat panel's OWN disabled-dimming
+  // wrapper (_MessageBubble._dimIfDisabled) once the parent caught up, the
+  // combined opacity rendered the just-typed/just-picked answer at ~10%,
+  // indistinguishable from "the text got erased". These widgets must not
+  // apply any Opacity/IgnorePointer of their own — dimming is owned
+  // entirely by whatever renders them (the chat panel).
+  group('AgQuestionForm', () {
+    testWidgets('typed answer stays fully opaque and visible after submit', (tester) async {
+      String? submitted;
+      await tester.pumpWidget(_wrap(
+        AgQuestionForm(
+          props: {
+            'title': 'Quick check',
+            'questions': [
+              {'id': 'q1', 'label': 'Your name?'},
+            ],
+            '__onSubmit': (String value) => submitted = value,
+          },
+        ),
+      ));
+
+      await tester.enterText(find.byType(TextField), 'Ada');
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      expect(submitted, '• Your name? → Ada');
+      expect(find.text('Ada'), findsOneWidget);
+      // No artificially-dimmed ancestor left behind by this widget itself —
+      // Material's own internal IgnorePointer usage (TextField, FilledButton)
+      // is unrelated and expected, so only opacity < 1.0 is checked.
+      expect(find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1.0), findsNothing);
+    });
+  });
+
+  group('AgChoiceCard', () {
+    testWidgets('selected option stays fully opaque and visible after submit', (tester) async {
+      String? submitted;
+      await tester.pumpWidget(_wrap(
+        AgChoiceCard(
+          props: {
+            'title': 'Pick one',
+            'options': [
+              {'id': 'a', 'label': 'Option A'},
+            ],
+            '__onSubmit': (String value) => submitted = value,
+          },
+        ),
+      ));
+
+      await tester.tap(find.text('Option A'));
+      await tester.pump();
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      expect(submitted, 'Choix : Option A');
+      expect(find.text('Option A'), findsOneWidget);
+      expect(find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1.0), findsNothing);
     });
   });
 }
