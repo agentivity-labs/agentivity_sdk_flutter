@@ -275,8 +275,6 @@ class _DefaultActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (submitting) return const Center(child: CircularProgressIndicator());
-
     return switch (request.kind) {
       FormRequestKind.approval => Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -285,7 +283,7 @@ class _DefaultActions extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                   foregroundColor:
                       theme.formRejectColor ?? colorScheme.error),
-              onPressed: () => onAct(FormOutcome.rejected),
+              onPressed: submitting ? null : () => onAct(FormOutcome.rejected),
               child: const Text('Reject'),
             ),
             SizedBox(width: theme.gap8),
@@ -293,7 +291,7 @@ class _DefaultActions extends StatelessWidget {
               style: FilledButton.styleFrom(
                   backgroundColor:
                       theme.formApproveColor ?? colorScheme.primary),
-              onPressed: () => onAct(FormOutcome.approved),
+              onPressed: submitting ? null : () => onAct(FormOutcome.approved),
               child: const Text('Approve'),
             ),
           ],
@@ -301,7 +299,7 @@ class _DefaultActions extends StatelessWidget {
       FormRequestKind.notification => Align(
           alignment: Alignment.centerRight,
           child: FilledButton(
-            onPressed: () => onAct(FormOutcome.submitted),
+            onPressed: submitting ? null : () => onAct(FormOutcome.submitted),
             child: const Text('Acknowledge'),
           ),
         ),
@@ -310,7 +308,7 @@ class _DefaultActions extends StatelessWidget {
           child: FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: theme.formSubmitColor ?? colorScheme.primary),
-            onPressed: () => onAct(FormOutcome.submitted),
+            onPressed: submitting ? null : () => onAct(FormOutcome.submitted),
             child: const Text('Submit'),
           ),
         ),

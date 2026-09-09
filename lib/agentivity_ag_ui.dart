@@ -10,6 +10,8 @@ export 'src/theme/ag_accent_colors.dart';
 // protocol
 export 'src/protocol/ag_ui_sse_channel.dart';
 export 'src/protocol/ag_ui_protocol.dart';
+export 'src/protocol/ag_ui_run_stream.dart';
+export 'src/protocol/platform_stream.dart';
 export 'src/protocol/ag_ui_state_controller.dart';
 export 'src/protocol/api_contract.dart';
 export 'src/protocol/run_agent_input.dart';
@@ -26,6 +28,7 @@ export 'src/panels/chat/chat_models.dart';
 export 'src/panels/chat/chat_controller.dart';
 export 'src/panels/chat/i_chat_provider.dart';
 export 'src/panels/chat/chat_theme.dart';
+export 'src/panels/chat/ag_ui_chat_input.dart';
 export 'src/panels/chat/ag_ui_chat_panel.dart';
 
 // panels — assistant
@@ -52,8 +55,12 @@ export 'src/agent/ag_ui_generative_view.dart';
 export 'src/agent/ag_ui_run_lifecycle_controller.dart';
 export 'src/agent/ag_ui_activity_controller.dart';
 export 'src/agent/ag_ui_context_registry.dart';
+export 'src/agent/ag_ui_platform_run_controller.dart';
 
 // connectors — pre-built backends
 export 'src/connectors/ag_ui_generic_connector.dart';
 export 'src/connectors/agentivity_connector.dart';
+export 'src/connectors/agentivity_platform_connector.dart';
+export 'src/connectors/agentivity_run_stream.dart';
+export 'src/connectors/agentivity_signals.dart';
 export 'src/connectors/lang_graph_connector.dart';

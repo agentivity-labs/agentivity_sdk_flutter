@@ -79,6 +79,7 @@ class AgUiSseChannel<T> {
   final math.Random _random = math.Random();
   bool _started = false;
   bool _disposed = false;
+  bool _terminated = false; // set when a terminal frame is received — suppresses reconnect
 
   void start() {
     if (_started || _disposed) return;
@@ -153,6 +154,7 @@ class AgUiSseChannel<T> {
 
   void _handleFrame(_SseFrame frame) {
     _recordActivity();
+    debugPrint('AgUiSseChannel[$_path] frame: event=${frame.event} id=${frame.id} data=${frame.data}');
     if (frame.id != null && frame.id!.trim().isNotEmpty) {
       _lastEventId = frame.id!.trim();
     }
@@ -172,12 +174,27 @@ class AgUiSseChannel<T> {
     _watchdogTimer = null;
     _lineSub = null;
     _cancelToken = null;
-    if (_disposed || _reconnectTimer != null) return;
+    // Do not reconnect if the stream ended cleanly with a terminal event.
+    if (_disposed || _terminated || _reconnectTimer != null) return;
     final delay = _computeReconnectDelay();
     _reconnectTimer = Timer(delay, () {
       _reconnectTimer = null;
-      if (!_disposed) unawaited(_connect());
+      if (!_disposed && !_terminated) unawaited(_connect());
     });
+  }
+
+  /// Called by the consumer when a terminal AG-UI event (RUN_FINISHED, RUN_ERROR)
+  /// is received. Prevents the channel from reconnecting after a clean run end.
+  void markTerminated() {
+    _terminated = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
+  /// Resets the terminal flag — allows a new run to reconnect on the same channel.
+  void resetTerminated() {
+    _terminated = false;
+    _reconnectAttempts = 0;
   }
 
   void _recordActivity() => _lastActivityAt = DateTime.now().toUtc();

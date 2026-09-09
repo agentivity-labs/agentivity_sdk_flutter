@@ -118,12 +118,33 @@ class AgUiToolCallItem extends AgUiGenerativeItem {
 ///
 /// Frontend tools (in [toolRegistry]) are executed locally on the device; their
 /// results are shown inline without a round-trip to the backend.
+/// Pending HIL gate — an interaction the user must respond to before the run continues.
+class AgUiHilGate {
+  const AgUiHilGate({
+    required this.requestId,
+    required this.threadId,
+    required this.question,
+    required this.title,
+    this.questionsToAsk = const [],
+  });
+
+  final String requestId;
+  final String threadId;
+  final String question;
+  final String title;
+  final List<String> questionsToAsk;
+}
+
 class AgUiGenerativeController extends ChangeNotifier {
   AgUiGenerativeController({
     required Stream<AgUiEvent> events,
     this.toolRegistry,
     this.widgetRegistry,
+    List<AgUiGenerativeItem>? initialItems,
   }) {
+    if (initialItems != null && initialItems.isNotEmpty) {
+      _items = List.of(initialItems);
+    }
     _sub = events.listen(_onEvent, onError: (_) {}, cancelOnError: false);
   }
 
@@ -136,12 +157,69 @@ class AgUiGenerativeController extends ChangeNotifier {
   final Map<String, _PendingTool> _pendingTools = {};
   StreamSubscription<AgUiEvent>? _sub;
 
+  bool _isRunning = false;
+  AgUiHilGate? _hilGate;
+
   List<AgUiGenerativeItem> get items => List.unmodifiable(_items);
+
+  /// True while the run is processing (between RUN_STARTED and a terminal event).
+  bool get isRunning => _isRunning;
+
+  /// Set when the run is waiting for a human response (HIL gate).
+  AgUiHilGate? get pendingHilGate => _hilGate;
+
+  /// Prepends historical items (e.g. loaded from a thread store) before live events.
+  /// Call before the SSE stream delivers any events, or to restore after a reconnect.
+  void seedItems(List<AgUiGenerativeItem> historicalItems) {
+    if (historicalItems.isEmpty) return;
+    _items = [...historicalItems, ..._items];
+    notifyListeners();
+  }
+
+  /// Clears the pending HIL gate (e.g. after the user submitted a response).
+  void clearHilGate() {
+    if (_hilGate == null) return;
+    _hilGate = null;
+    notifyListeners();
+  }
 
   // ── Event dispatch ──────────────────────────────────────────────────────────
 
   void _onEvent(AgUiEvent event) {
     switch (event) {
+      // ── Run lifecycle ────────────────────────────────────────────────────────
+      case RunStartedEvent _:
+        _isRunning = true;
+        notifyListeners();
+
+      case RunFinishedEvent e:
+        _isRunning = false;
+        if (e.isInterrupted) {
+          final interrupts = (e.outcome as AgUiInterruptOutcome?)?.interrupts ?? [];
+          for (final interrupt in interrupts) {
+            if (interrupt.reason.startsWith('chat')) {
+              final meta = interrupt.metadata ?? {};
+              _hilGate = AgUiHilGate(
+                requestId: interrupt.id,
+                threadId: (meta['threadId'] as String? ?? '').trim(),
+                question: interrupt.message ?? interrupt.reason,
+                title: (meta['title'] as String? ?? 'Input required').trim(),
+              );
+              break;
+            }
+          }
+        }
+        notifyListeners();
+
+      case RunErrorEvent _:
+        _isRunning = false;
+        notifyListeners();
+
+      // ── CUSTOM chat-channel events ───────────────────────────────────────────
+      case CustomEvent e:
+        _onCustomEvent(e);
+
+      // ── Streaming text ───────────────────────────────────────────────────────
       case TextMessageStartEvent e:
         _pendingTexts[e.messageId] = _PendingText(e.messageId, e.role);
         _items = [
@@ -253,15 +331,79 @@ class AgUiGenerativeController extends ChangeNotifier {
       case ToolCallResultEvent e:
         _applyBackendResult(e.toolCallId, e.content);
 
-      case CustomEvent e
-          when e.name == 'render' || e.name == 'ag-ui:render':
-        _applyRenderEvent(e.value);
-
-      case CustomEvent e when e.name == 'html' || e.name == 'ag-ui:html':
-        _applyHtmlEvent(e.value);
-
       default:
         break;
+    }
+  }
+
+  void _onCustomEvent(CustomEvent e) {
+    final value = e.value;
+    final data = value is Map<String, dynamic>
+        ? value
+        : value is Map
+            ? Map<String, dynamic>.from(value)
+            : <String, dynamic>{};
+
+    switch (e.name) {
+      // ── Generative widget / HTML ─────────────────────────────────────────────
+      case 'render' || 'ag-ui:render':
+        _applyRenderEvent(value);
+
+      case 'html' || 'ag-ui:html':
+        _applyHtmlEvent(value);
+
+      // ── Chat channel messages ────────────────────────────────────────────────
+      case 'CHAT_MESSAGE_RECEIVED':
+        final msgId = (data['messageId'] as String? ?? '').trim();
+        final text = (data['text'] as String? ?? '').trim();
+        final role = (data['role'] as String? ?? 'assistant').trim();
+        if (msgId.isNotEmpty) {
+          _items = [..._items, AgUiTextItem(messageId: msgId, role: role, text: text, isStreaming: false)];
+          notifyListeners();
+        }
+
+      // ── HIL gate ─────────────────────────────────────────────────────────────
+      case 'CHAT_HIL_GATE_REACHED' || 'HIL_GATE_REACHED':
+        final requestId = (data['requestId'] as String? ?? '').trim();
+        final threadId = (data['threadId'] as String? ?? '').trim();
+        final channelType = (data['channelType'] as String? ?? '').trim().toLowerCase();
+        if (requestId.isEmpty) return;
+        if (channelType.isNotEmpty && channelType != 'chat') return;
+
+        final rawQ = data['questionsToAsk'];
+        final questions = rawQ is List
+            ? rawQ.whereType<String>().where((s) => s.trim().isNotEmpty).toList()
+            : <String>[];
+        final hilSource = (data['hilSource'] as String? ?? 'ask_human').trim();
+
+        _hilGate = AgUiHilGate(
+          requestId: requestId,
+          threadId: threadId,
+          question: (data['question'] as String? ?? data['message'] as String? ?? '').trim(),
+          title: (data['title'] as String? ?? 'Input required').trim(),
+          questionsToAsk: questions,
+        );
+        _isRunning = false;
+
+        // Only inject a QuestionForm widget for explicit ask_human calls.
+        // For qualification-path HIL the question is already in the preceding text.
+        if (hilSource != 'qualification' && questions.isNotEmpty && threadId.isNotEmpty) {
+          _items = [
+            ..._items,
+            AgUiComponentItem(
+              component: 'QuestionForm',
+              props: {
+                'title': _hilGate!.title,
+                'questions': questions.asMap().entries.map((e) => {'id': 'q${e.key}', 'label': e.value}).toList(),
+              },
+            ),
+          ];
+        }
+        notifyListeners();
+
+      case 'CHAT_HIL_RESOLVED' || 'HIL_RESOLVED':
+        _hilGate = null;
+        notifyListeners();
     }
   }
 
@@ -400,6 +542,10 @@ class AgUiGenerativeController extends ChangeNotifier {
     } catch (_) {}
     return const {};
   }
+
+  /// Manually injects an event — use when you manage your own SSE channel
+  /// and want to forward events without rewiring the constructor stream.
+  void feedEvent(AgUiEvent event) => _onEvent(event);
 
   /// Remove all items and cancel pending state. Does not cancel the stream.
   void clear() {
