@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Live demo](https://img.shields.io/badge/Live%20demo-labs.agentivity.io-6366f1)](https://labs.agentivity.io/agentivity_artifacts/example/)
 
-**14 Flutter widgets for rendering AI agent artifacts — charts, metrics, code, JSON, math, SVG and status cards.**
+**20 Flutter widgets for rendering AI agent artifacts and human-in-the-loop interactions — charts, metrics, code, JSON, math, SVG, status cards, and interactive forms.**
 
 Drop them into any Flutter app standalone, or wire them into a live [AG-UI](https://github.com/ag-ui-protocol/ag-ui) agent stream so your agent decides at runtime what to render and with what data.
 
@@ -41,8 +41,17 @@ That is what this package provides. Your agent says *"render a BarChart with thi
 | | `AgTimeline` | `Timeline` | Step timeline with status icons |
 | **Math** | `AgLatex` | `Latex` | LaTeX math via `flutter_math_fork` |
 | **SVG** | `AgSvg` | `Svg` | Inline SVG diagram |
+| **Interaction** | `AgQuestionForm` | `QuestionForm` | Multi-field form for a human-in-the-loop request |
+| | `AgChoiceCard` | `ChoiceCard` | Pick one of several labeled options |
+| | `AgConfirmCard` | `ConfirmCard` | Yes/no confirmation prompt |
+| | `AgRatingCard` | `RatingCard` | Star / numeric rating input |
+| | `AgDatePickerCard` | `DatePickerCard` | Date (or date range) picker |
+| | `AgSummaryCard` | `SummaryCard` | Read-only recap of a submitted response |
 
-Every widget accepts a plain `Map<String, dynamic> props` — no custom data classes required.
+Every widget accepts a plain `Map<String, dynamic> props` — no custom data classes required. The
+**Interaction** group is what `AgUiChatDiscussion` (from `agentivity_ag_ui`) renders for a pending
+human-in-the-loop gate — pass this package's registry to it the same way you would to
+`AgUiGenerativeView` (see below).
 
 ---
 
@@ -123,6 +132,29 @@ Your agent then emits a `CUSTOM ag-ui:render` event:
 ```
 
 Flutter receives it and renders `AgBarChart` — no redeploy, no hardcoded routes.
+
+### With `AgUiChatDiscussion` (interaction widgets in a chat thread)
+
+The same registry also renders the **Interaction** widgets (`QuestionForm`, `ChoiceCard`, ...)
+inline in a chat conversation when a human-in-the-loop gate is open — pass it to
+`AgUiChatDiscussion.widgetRegistry`:
+
+```dart
+import 'package:agentivity_ag_ui/agentivity_ag_ui.dart';
+import 'package:agentivity_artifacts/agentivity_artifacts.dart';
+
+AgUiChatDiscussion(
+  controller: chatController,
+  widgetRegistry: AgArtifactsBundle.registry(),
+  onHilResponse: (gate, text, source) async {
+    await api.postInteraction(runId: runId, requestId: gate.requestId, text: text);
+  },
+)
+```
+
+When the agent's next message carries a `QuestionForm`/`ChoiceCard`/... content block, it renders
+as an interactive card right in the message list; submitting it calls `onHilResponse` with
+`source: 'widget'` so the reply isn't also echoed back as a redundant plain-text bubble.
 
 ---
 
