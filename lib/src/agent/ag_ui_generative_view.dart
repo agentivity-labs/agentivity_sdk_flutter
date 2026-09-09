@@ -27,6 +27,7 @@ class AgUiGenerativeView extends StatelessWidget {
     this.emptyBuilder,
     this.padding,
     this.reverse = false,
+    this.onComponentSubmit,
   });
 
   final AgUiGenerativeController controller;
@@ -63,6 +64,11 @@ class AgUiGenerativeView extends StatelessWidget {
   /// If `true`, newest items appear at the bottom (ListView reversed).
   final bool reverse;
 
+  /// Called when an interactive component (QuestionForm, ChoiceCard, ConfirmCard…)
+  /// submits its response. Injected as `__onSubmit` into the component's props.
+  /// When null, interactive widgets are rendered read-only.
+  final void Function(String response)? onComponentSubmit;
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -97,9 +103,14 @@ class AgUiGenerativeView extends StatelessWidget {
   }
 
   Widget _buildComponent(BuildContext context, AgUiComponentItem item) {
-    final widget = registry.build(context, item.component, item.props);
+    // Inject __onSubmit so interactive widgets (QuestionForm, ChoiceCard, etc.)
+    // can call back when the user submits a response.
+    final props = onComponentSubmit != null
+        ? {...item.props, '__onSubmit': onComponentSubmit}
+        : item.props;
+    final widget = registry.build(context, item.component, props);
     if (widget != null) return widget;
-    return fallbackBuilder?.call(context, item.component, item.props) ??
+    return fallbackBuilder?.call(context, item.component, props) ??
         _UnknownComponent(name: item.component);
   }
 }

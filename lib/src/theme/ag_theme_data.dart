@@ -45,13 +45,17 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
     this.bubbleRadius = 16.0,
     this.bubblePaddingH = 14.0,
     this.bubblePaddingV = 10.0,
+
     /// Optional full TextStyle for user message text (fontScale applied via
     /// [effectiveBubbleUserTextStyle]).
     this.bubbleUserTextStyle,
+
     /// Optional full TextStyle for agent message text.
     this.bubbleAgentTextStyle,
 
     // ── Chat input ────────────────────────────────────────────────────────────
+    this.accentColor,
+    this.onAccentColor,
     this.inputDecoration,
     this.sendIconColor,
 
@@ -115,6 +119,14 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
   final TextStyle? bubbleAgentTextStyle;
 
   // ── Chat input ───────────────────────────────────────────────────────────────
+  /// App accent color used for the input border and send button.
+  /// Falls back to [ColorScheme.primary] when null.
+  final Color? accentColor;
+
+  /// Foreground color on top of [accentColor] (e.g. icon on send button).
+  /// Falls back to [ColorScheme.onPrimary] when null.
+  final Color? onAccentColor;
+
   final InputDecoration? inputDecoration;
   final Color? sendIconColor;
 
@@ -190,8 +202,7 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
     const defaultSize = 16.0;
     final base = formTitleStyle;
     final size = (base?.fontSize ?? defaultSize) * fontScale;
-    return (base ?? const TextStyle(fontSize: defaultSize, fontWeight: FontWeight.w600))
-        .copyWith(fontSize: size);
+    return (base ?? const TextStyle(fontSize: defaultSize, fontWeight: FontWeight.w600)).copyWith(fontSize: size);
   }
 
   /// Form description/body style with [fontScale] applied (default 14 sp).
@@ -207,8 +218,7 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
     const defaultSize = 12.0;
     final base = formFieldLabelStyle;
     final size = (base?.fontSize ?? defaultSize) * fontScale;
-    return (base ?? const TextStyle(fontSize: defaultSize, fontWeight: FontWeight.w600))
-        .copyWith(fontSize: size);
+    return (base ?? const TextStyle(fontSize: defaultSize, fontWeight: FontWeight.w600)).copyWith(fontSize: size);
   }
 
   // ── Font-size helpers ────────────────────────────────────────────────────────
@@ -245,10 +255,10 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
   /// Scales an arbitrary [base] spacing value by [spacingScale].
   double spacing(double base) => base * spacingScale;
 
-  double get gap2  =>  2 * spacingScale;
-  double get gap4  =>  4 * spacingScale;
-  double get gap6  =>  6 * spacingScale;
-  double get gap8  =>  8 * spacingScale;
+  double get gap2 => 2 * spacingScale;
+  double get gap4 => 4 * spacingScale;
+  double get gap6 => 6 * spacingScale;
+  double get gap8 => 8 * spacingScale;
   double get gap10 => 10 * spacingScale;
   double get gap12 => 12 * spacingScale;
   double get gap14 => 14 * spacingScale;
@@ -262,8 +272,7 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
 
   /// Reads the nearest [AgThemeData] from [context].
   /// Returns a default instance if none is registered.
-  static AgThemeData of(BuildContext context) =>
-      Theme.of(context).extension<AgThemeData>() ?? const AgThemeData();
+  static AgThemeData of(BuildContext context) => Theme.of(context).extension<AgThemeData>() ?? const AgThemeData();
 
   // ── ThemeExtension ───────────────────────────────────────────────────────────
 
@@ -280,6 +289,8 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
     double? bubblePaddingV,
     TextStyle? bubbleUserTextStyle,
     TextStyle? bubbleAgentTextStyle,
+    Color? accentColor,
+    Color? onAccentColor,
     InputDecoration? inputDecoration,
     Color? sendIconColor,
     Color? streamingColor,
@@ -309,44 +320,46 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
     double? iconSizeMd,
   }) {
     return AgThemeData(
-      bubbleUserColor:       bubbleUserColor       ?? this.bubbleUserColor,
-      bubbleUserTextColor:   bubbleUserTextColor   ?? this.bubbleUserTextColor,
-      bubbleAgentColor:      bubbleAgentColor      ?? this.bubbleAgentColor,
-      bubbleAgentTextColor:  bubbleAgentTextColor  ?? this.bubbleAgentTextColor,
-      bubbleSystemColor:     bubbleSystemColor     ?? this.bubbleSystemColor,
+      bubbleUserColor: bubbleUserColor ?? this.bubbleUserColor,
+      bubbleUserTextColor: bubbleUserTextColor ?? this.bubbleUserTextColor,
+      bubbleAgentColor: bubbleAgentColor ?? this.bubbleAgentColor,
+      bubbleAgentTextColor: bubbleAgentTextColor ?? this.bubbleAgentTextColor,
+      bubbleSystemColor: bubbleSystemColor ?? this.bubbleSystemColor,
       bubbleSystemTextColor: bubbleSystemTextColor ?? this.bubbleSystemTextColor,
-      bubbleRadius:          bubbleRadius          ?? this.bubbleRadius,
-      bubblePaddingH:        bubblePaddingH        ?? this.bubblePaddingH,
-      bubblePaddingV:        bubblePaddingV        ?? this.bubblePaddingV,
-      bubbleUserTextStyle:   bubbleUserTextStyle   ?? this.bubbleUserTextStyle,
-      bubbleAgentTextStyle:  bubbleAgentTextStyle  ?? this.bubbleAgentTextStyle,
-      inputDecoration:       inputDecoration       ?? this.inputDecoration,
-      sendIconColor:         sendIconColor         ?? this.sendIconColor,
-      streamingColor:        streamingColor        ?? this.streamingColor,
-      runnableAccentColor:   runnableAccentColor   ?? this.runnableAccentColor,
-      runnableAvatarRadius:  runnableAvatarRadius  ?? this.runnableAvatarRadius,
-      hilColor:              hilColor              ?? this.hilColor,
-      hilBorderWidth:        hilBorderWidth        ?? this.hilBorderWidth,
-      formCardColor:         formCardColor         ?? this.formCardColor,
-      formApproveColor:      formApproveColor      ?? this.formApproveColor,
-      formRejectColor:       formRejectColor       ?? this.formRejectColor,
-      formSubmitColor:       formSubmitColor       ?? this.formSubmitColor,
-      formTitleStyle:        formTitleStyle        ?? this.formTitleStyle,
-      formDescriptionStyle:  formDescriptionStyle  ?? this.formDescriptionStyle,
-      formFieldLabelStyle:   formFieldLabelStyle   ?? this.formFieldLabelStyle,
-      formBorderRadius:      formBorderRadius      ?? this.formBorderRadius,
-      typingIndicatorColor:  typingIndicatorColor  ?? this.typingIndicatorColor,
-      onlineColor:           onlineColor           ?? this.onlineColor,
-      offlineColor:          offlineColor          ?? this.offlineColor,
-      sidebarWidth:          sidebarWidth          ?? this.sidebarWidth,
-      sidebarColor:          sidebarColor          ?? this.sidebarColor,
-      cardRadius:            cardRadius            ?? this.cardRadius,
-      fontFamily:            fontFamily            ?? this.fontFamily,
-      fontScale:             fontScale             ?? this.fontScale,
-      bodyLineHeight:        bodyLineHeight        ?? this.bodyLineHeight,
-      spacingScale:          spacingScale          ?? this.spacingScale,
-      iconSizeSm:            iconSizeSm            ?? this.iconSizeSm,
-      iconSizeMd:            iconSizeMd            ?? this.iconSizeMd,
+      bubbleRadius: bubbleRadius ?? this.bubbleRadius,
+      bubblePaddingH: bubblePaddingH ?? this.bubblePaddingH,
+      bubblePaddingV: bubblePaddingV ?? this.bubblePaddingV,
+      bubbleUserTextStyle: bubbleUserTextStyle ?? this.bubbleUserTextStyle,
+      bubbleAgentTextStyle: bubbleAgentTextStyle ?? this.bubbleAgentTextStyle,
+      accentColor: accentColor ?? this.accentColor,
+      onAccentColor: onAccentColor ?? this.onAccentColor,
+      inputDecoration: inputDecoration ?? this.inputDecoration,
+      sendIconColor: sendIconColor ?? this.sendIconColor,
+      streamingColor: streamingColor ?? this.streamingColor,
+      runnableAccentColor: runnableAccentColor ?? this.runnableAccentColor,
+      runnableAvatarRadius: runnableAvatarRadius ?? this.runnableAvatarRadius,
+      hilColor: hilColor ?? this.hilColor,
+      hilBorderWidth: hilBorderWidth ?? this.hilBorderWidth,
+      formCardColor: formCardColor ?? this.formCardColor,
+      formApproveColor: formApproveColor ?? this.formApproveColor,
+      formRejectColor: formRejectColor ?? this.formRejectColor,
+      formSubmitColor: formSubmitColor ?? this.formSubmitColor,
+      formTitleStyle: formTitleStyle ?? this.formTitleStyle,
+      formDescriptionStyle: formDescriptionStyle ?? this.formDescriptionStyle,
+      formFieldLabelStyle: formFieldLabelStyle ?? this.formFieldLabelStyle,
+      formBorderRadius: formBorderRadius ?? this.formBorderRadius,
+      typingIndicatorColor: typingIndicatorColor ?? this.typingIndicatorColor,
+      onlineColor: onlineColor ?? this.onlineColor,
+      offlineColor: offlineColor ?? this.offlineColor,
+      sidebarWidth: sidebarWidth ?? this.sidebarWidth,
+      sidebarColor: sidebarColor ?? this.sidebarColor,
+      cardRadius: cardRadius ?? this.cardRadius,
+      fontFamily: fontFamily ?? this.fontFamily,
+      fontScale: fontScale ?? this.fontScale,
+      bodyLineHeight: bodyLineHeight ?? this.bodyLineHeight,
+      spacingScale: spacingScale ?? this.spacingScale,
+      iconSizeSm: iconSizeSm ?? this.iconSizeSm,
+      iconSizeMd: iconSizeMd ?? this.iconSizeMd,
     );
   }
 
@@ -354,50 +367,51 @@ class AgThemeData extends ThemeExtension<AgThemeData> {
   AgThemeData lerp(AgThemeData? other, double t) {
     if (other == null) return this;
     return AgThemeData(
-      bubbleUserColor:       Color.lerp(bubbleUserColor, other.bubbleUserColor, t),
-      bubbleUserTextColor:   Color.lerp(bubbleUserTextColor, other.bubbleUserTextColor, t),
-      bubbleAgentColor:      Color.lerp(bubbleAgentColor, other.bubbleAgentColor, t),
-      bubbleAgentTextColor:  Color.lerp(bubbleAgentTextColor, other.bubbleAgentTextColor, t),
-      bubbleSystemColor:     Color.lerp(bubbleSystemColor, other.bubbleSystemColor, t),
+      bubbleUserColor: Color.lerp(bubbleUserColor, other.bubbleUserColor, t),
+      bubbleUserTextColor: Color.lerp(bubbleUserTextColor, other.bubbleUserTextColor, t),
+      bubbleAgentColor: Color.lerp(bubbleAgentColor, other.bubbleAgentColor, t),
+      bubbleAgentTextColor: Color.lerp(bubbleAgentTextColor, other.bubbleAgentTextColor, t),
+      bubbleSystemColor: Color.lerp(bubbleSystemColor, other.bubbleSystemColor, t),
       bubbleSystemTextColor: Color.lerp(bubbleSystemTextColor, other.bubbleSystemTextColor, t),
-      bubbleRadius:          lerpDouble(bubbleRadius, other.bubbleRadius, t)!,
-      bubblePaddingH:        lerpDouble(bubblePaddingH, other.bubblePaddingH, t)!,
-      bubblePaddingV:        lerpDouble(bubblePaddingV, other.bubblePaddingV, t)!,
-      bubbleUserTextStyle:   TextStyle.lerp(bubbleUserTextStyle, other.bubbleUserTextStyle, t),
-      bubbleAgentTextStyle:  TextStyle.lerp(bubbleAgentTextStyle, other.bubbleAgentTextStyle, t),
-      inputDecoration:       t < 0.5 ? inputDecoration : other.inputDecoration,
-      sendIconColor:         Color.lerp(sendIconColor, other.sendIconColor, t),
-      streamingColor:        Color.lerp(streamingColor, other.streamingColor, t),
-      runnableAccentColor:   Color.lerp(runnableAccentColor, other.runnableAccentColor, t),
-      runnableAvatarRadius:  lerpDouble(runnableAvatarRadius, other.runnableAvatarRadius, t)!,
-      hilColor:              Color.lerp(hilColor, other.hilColor, t),
-      hilBorderWidth:        lerpDouble(hilBorderWidth, other.hilBorderWidth, t)!,
-      formCardColor:         Color.lerp(formCardColor, other.formCardColor, t),
-      formApproveColor:      Color.lerp(formApproveColor, other.formApproveColor, t),
-      formRejectColor:       Color.lerp(formRejectColor, other.formRejectColor, t),
-      formSubmitColor:       Color.lerp(formSubmitColor, other.formSubmitColor, t),
-      formTitleStyle:        TextStyle.lerp(formTitleStyle, other.formTitleStyle, t),
-      formDescriptionStyle:  TextStyle.lerp(formDescriptionStyle, other.formDescriptionStyle, t),
-      formFieldLabelStyle:   TextStyle.lerp(formFieldLabelStyle, other.formFieldLabelStyle, t),
-      formBorderRadius:      BorderRadius.lerp(formBorderRadius, other.formBorderRadius, t),
-      typingIndicatorColor:  Color.lerp(typingIndicatorColor, other.typingIndicatorColor, t),
-      onlineColor:           Color.lerp(onlineColor, other.onlineColor, t),
-      offlineColor:          Color.lerp(offlineColor, other.offlineColor, t),
-      sidebarWidth:          lerpDouble(sidebarWidth, other.sidebarWidth, t)!,
-      sidebarColor:          Color.lerp(sidebarColor, other.sidebarColor, t),
-      cardRadius:            lerpDouble(cardRadius, other.cardRadius, t)!,
-      fontFamily:            t < 0.5 ? fontFamily : other.fontFamily,
-      fontScale:             lerpDouble(fontScale, other.fontScale, t)!,
-      bodyLineHeight:        lerpDouble(bodyLineHeight, other.bodyLineHeight, t)!,
-      spacingScale:          lerpDouble(spacingScale, other.spacingScale, t)!,
-      iconSizeSm:            lerpDouble(iconSizeSm, other.iconSizeSm, t)!,
-      iconSizeMd:            lerpDouble(iconSizeMd, other.iconSizeMd, t)!,
+      bubbleRadius: lerpDouble(bubbleRadius, other.bubbleRadius, t)!,
+      bubblePaddingH: lerpDouble(bubblePaddingH, other.bubblePaddingH, t)!,
+      bubblePaddingV: lerpDouble(bubblePaddingV, other.bubblePaddingV, t)!,
+      bubbleUserTextStyle: TextStyle.lerp(bubbleUserTextStyle, other.bubbleUserTextStyle, t),
+      bubbleAgentTextStyle: TextStyle.lerp(bubbleAgentTextStyle, other.bubbleAgentTextStyle, t),
+      accentColor: Color.lerp(accentColor, other.accentColor, t),
+      onAccentColor: Color.lerp(onAccentColor, other.onAccentColor, t),
+      inputDecoration: t < 0.5 ? inputDecoration : other.inputDecoration,
+      sendIconColor: Color.lerp(sendIconColor, other.sendIconColor, t),
+      streamingColor: Color.lerp(streamingColor, other.streamingColor, t),
+      runnableAccentColor: Color.lerp(runnableAccentColor, other.runnableAccentColor, t),
+      runnableAvatarRadius: lerpDouble(runnableAvatarRadius, other.runnableAvatarRadius, t)!,
+      hilColor: Color.lerp(hilColor, other.hilColor, t),
+      hilBorderWidth: lerpDouble(hilBorderWidth, other.hilBorderWidth, t)!,
+      formCardColor: Color.lerp(formCardColor, other.formCardColor, t),
+      formApproveColor: Color.lerp(formApproveColor, other.formApproveColor, t),
+      formRejectColor: Color.lerp(formRejectColor, other.formRejectColor, t),
+      formSubmitColor: Color.lerp(formSubmitColor, other.formSubmitColor, t),
+      formTitleStyle: TextStyle.lerp(formTitleStyle, other.formTitleStyle, t),
+      formDescriptionStyle: TextStyle.lerp(formDescriptionStyle, other.formDescriptionStyle, t),
+      formFieldLabelStyle: TextStyle.lerp(formFieldLabelStyle, other.formFieldLabelStyle, t),
+      formBorderRadius: BorderRadius.lerp(formBorderRadius, other.formBorderRadius, t),
+      typingIndicatorColor: Color.lerp(typingIndicatorColor, other.typingIndicatorColor, t),
+      onlineColor: Color.lerp(onlineColor, other.onlineColor, t),
+      offlineColor: Color.lerp(offlineColor, other.offlineColor, t),
+      sidebarWidth: lerpDouble(sidebarWidth, other.sidebarWidth, t)!,
+      sidebarColor: Color.lerp(sidebarColor, other.sidebarColor, t),
+      cardRadius: lerpDouble(cardRadius, other.cardRadius, t)!,
+      fontFamily: t < 0.5 ? fontFamily : other.fontFamily,
+      fontScale: lerpDouble(fontScale, other.fontScale, t)!,
+      bodyLineHeight: lerpDouble(bodyLineHeight, other.bodyLineHeight, t)!,
+      spacingScale: lerpDouble(spacingScale, other.spacingScale, t)!,
+      iconSizeSm: lerpDouble(iconSizeSm, other.iconSizeSm, t)!,
+      iconSizeMd: lerpDouble(iconSizeMd, other.iconSizeMd, t)!,
     );
   }
 }
 
 /// Convenience accessor — `context.agTheme`.
 extension AgThemeDataContext on BuildContext {
-  AgThemeData get agTheme =>
-      Theme.of(this).extension<AgThemeData>() ?? const AgThemeData();
+  AgThemeData get agTheme => Theme.of(this).extension<AgThemeData>() ?? const AgThemeData();
 }
