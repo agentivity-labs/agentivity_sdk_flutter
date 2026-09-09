@@ -71,7 +71,7 @@ export 'src/ag_ui/panels/forms/form_theme.dart';
 export 'src/ag_ui/panels/forms/ag_ui_form_panel.dart';
 
 // ── AG-UI: agent ──────────────────────────────────────────────────────────────
-export 'src/ag_ui/agent/agent_run_models.dart';
+export 'src/ag_ui/agent/agent_run_models.dart' hide AgentEntity, AgentEntityPort;
 export 'src/ag_ui/agent/agent_run_controller.dart';
 export 'src/ag_ui/agent/i_agent_run_provider.dart';
 export 'src/ag_ui/agent/ag_ui_run_status.dart';
