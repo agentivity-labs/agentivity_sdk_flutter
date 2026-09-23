@@ -5,12 +5,14 @@ import 'api/entities_api.dart';
 import 'api/runs_api.dart';
 import 'api/conversations_api.dart';
 import 'api/agentic_folders_api.dart';
+import 'api/data_tables_api.dart';
 
 export '../core/http_core.dart';
 export 'api/entities_api.dart';
 export 'api/runs_api.dart';
 export 'api/conversations_api.dart';
 export 'api/agentic_folders_api.dart';
+export 'api/data_tables_api.dart';
 
 /// Lightweight Agentivity client intended for publication on pub.dev.
 ///
@@ -30,6 +32,7 @@ class AgentivityClient {
     runs = RunsApi(_http);
     conversations = ConversationsApi(_http);
     agenticFolders = AgenticFoldersApi(_http);
+    dataTables = DataTablesApi(_http);
   }
 
   final AgentivityHttpCore _http;
@@ -49,4 +52,8 @@ class AgentivityClient {
 
   /// Agentic folder management: create, rename, move, and delete folders.
   late final AgenticFoldersApi agenticFolders;
+
+  /// Shared Data Table rows — read what a Team's workflow wrote, or write back
+  /// where the app owns the data. Schema/folders/versions are Studio-only.
+  late final DataTablesApi dataTables;
 }

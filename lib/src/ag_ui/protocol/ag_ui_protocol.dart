@@ -27,8 +27,8 @@ sealed class AgUiEvent {
       'RUN_FINISHED' => RunFinishedEvent._(type: type, timestamp: ts, executionId: executionId, threadId: _opt(json, 'threadId'), runId: _str(json, 'runId'), outcome: _parseOutcome(json['outcome']), result: json['result']),
       'RUN_ERROR' => RunErrorEvent._(type: type, timestamp: ts, executionId: executionId, message: _str(json, 'message'), code: _opt(json, 'code')),
       // Steps
-      'STEP_STARTED' => StepStartedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName')),
-      'STEP_FINISHED' => StepFinishedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName')),
+      'STEP_STARTED' => StepStartedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName')),
+      'STEP_FINISHED' => StepFinishedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName')),
       // Text messages — streaming
       'TEXT_MESSAGE_START' => TextMessageStartEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), role: _str(json, 'role').isEmpty ? 'assistant' : _str(json, 'role'), name: _opt(json, 'name')),
       'TEXT_MESSAGE_CONTENT' => TextMessageContentEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), delta: _str(json, 'delta')),
@@ -166,13 +166,25 @@ class AgUiInterrupt {
 // ── Step lifecycle ────────────────────────────────────────────────────────────
 
 final class StepStartedEvent extends AgUiEvent {
-  const StepStartedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName});
+  const StepStartedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName, this.memberEntityId, this.memberEntityKind, this.displayName});
   final String stepName;
+
+  /// Present when the step belongs to a Team member — the entity id of that member.
+  final String? memberEntityId;
+
+  /// Present when the step belongs to a Team member — 'agent' | 'workflow' | ...
+  final String? memberEntityKind;
+
+  /// Human-friendly name for the active member, falls back to [memberEntityId] when unset.
+  final String? displayName;
 }
 
 final class StepFinishedEvent extends AgUiEvent {
-  const StepFinishedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName});
+  const StepFinishedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName, this.memberEntityId, this.memberEntityKind, this.displayName});
   final String stepName;
+  final String? memberEntityId;
+  final String? memberEntityKind;
+  final String? displayName;
 }
 
 // ── Text messages — streaming ─────────────────────────────────────────────────

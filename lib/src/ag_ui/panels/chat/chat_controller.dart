@@ -46,6 +46,7 @@ import 'i_chat_provider.dart';
 /// | `CUSTOM(CHAT_HIL_RESOLVED)` | Clears [pendingHilGate] |
 /// | `TEXT_MESSAGE_START/CONTENT/END` | Streams an assistant message into the active thread |
 /// | `RunFinishedEvent(interrupted, reason:'chat_hil_gate')` | Sets [pendingHilGate] from the interrupt |
+/// | `StepStartedEvent`/`StepFinishedEvent` (Team member identity present) | Sets/clears [activeMember] |
 ///
 /// ## Injecting events manually
 ///
@@ -57,6 +58,13 @@ import 'i_chat_provider.dart';
 ///   if (raw is AgUiEvent) controller.feedEvent(raw);
 /// });
 /// ```
+/// The Team member currently taking its turn — set from [StepStartedEvent], cleared on [StepFinishedEvent].
+class ActiveChatMember {
+  const ActiveChatMember({this.memberEntityId, this.displayName});
+  final String? memberEntityId;
+  final String? displayName;
+}
+
 class ChatController extends ChangeNotifier {
   /// Pull-based constructor: delegates to [provider] for all data.
   ChatController({required IChatProvider provider, required String contextId}) : _provider = provider, _contextId = contextId;
@@ -88,6 +96,7 @@ class ChatController extends ChangeNotifier {
   String _searchQuery = '';
   ChatHilGate? _pendingHilGate;
   bool _isAwaitingResponse = false;
+  ActiveChatMember? _activeMember;
 
   List<ChatThread> get threads => _threads;
   bool get isLoading => _isLoading;
@@ -107,6 +116,10 @@ class ChatController extends ChangeNotifier {
   /// Set when a `CHAT_HIL_GATE_REACHED` event or an AG-UI interrupt with
   /// `reason == 'chat_hil_gate'` is received. Cleared by [clearHilGate].
   ChatHilGate? get pendingHilGate => _pendingHilGate;
+
+  /// The Team member currently taking its turn, or `null` when nobody is (a
+  /// standalone Agent run, or between turns). Powers `AgUiChatActiveMemberIndicator`.
+  ActiveChatMember? get activeMember => _activeMember;
 
   List<ChatThread> get filteredThreads {
     if (_searchQuery.isEmpty) return _threads;
@@ -176,6 +189,7 @@ class ChatController extends ChangeNotifier {
     _messagesByThread.clear();
     _pendingHilGate = null;
     _isAwaitingResponse = false;
+    _activeMember = null;
     _errorMessage = null;
     _inProgressThreadId.clear();
     notifyListeners();
@@ -190,6 +204,7 @@ class ChatController extends ChangeNotifier {
 
       case RunFinishedEvent e:
         _isAwaitingResponse = false;
+        _activeMember = null;
         if (e.isInterrupted) {
           final interrupts = (e.outcome as AgUiInterruptOutcome).interrupts;
           for (final interrupt in interrupts) {
@@ -204,11 +219,26 @@ class ChatController extends ChangeNotifier {
 
       case RunErrorEvent _:
         _isAwaitingResponse = false;
+        _activeMember = null;
         notifyListeners();
 
       // ── CUSTOM events ───────────────────────────────────────────────────
       case CustomEvent e:
         _handleCustomEvent(e);
+
+      // ── Team member turn boundaries → drive activeMember (only set on events
+      // that carry member identity; a standalone Agent's step events never do). ──
+      case StepStartedEvent e:
+        if (e.memberEntityId != null || e.displayName != null) {
+          _activeMember = ActiveChatMember(memberEntityId: e.memberEntityId, displayName: e.displayName);
+          notifyListeners();
+        }
+
+      case StepFinishedEvent _:
+        if (_activeMember != null) {
+          _activeMember = null;
+          notifyListeners();
+        }
 
       // ── Streaming text messages → accumulate into thread ────────────────
       case TextMessageStartEvent e:
@@ -274,6 +304,8 @@ class ChatController extends ChangeNotifier {
             runId: (data['runId'] as String? ?? '').trim(),
             text: (data['text'] as String? ?? '').trim(),
             blocks: ChatContentBlock.listFromRaw(data['blocks']),
+            authorId: data['memberEntityId'] as String?,
+            authorName: data['displayName'] as String?,
             metadata: data['source'] is String ? {'interaction.source': data['source']} : null,
             createdAt: DateTime.now(),
           ),

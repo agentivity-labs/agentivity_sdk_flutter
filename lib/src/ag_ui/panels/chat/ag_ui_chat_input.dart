@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:record/record.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 
 import '../../theme/ag_theme_data.dart';
@@ -78,6 +78,7 @@ class AgUiChatInput extends StatefulWidget {
     this.loading = false,
     this.isHil = false,
     this.enableVoice = true,
+    this.onTranscribeAudio,
     this.enableAttachments = true,
     this.acceptedExtensions,
     this.actionBar,
@@ -112,8 +113,18 @@ class AgUiChatInput extends StatefulWidget {
   /// uses [hilHint] and applies a tertiary-tinted border and fill.
   final bool isHil;
 
-  /// Shows a microphone button and enables speech-to-text transcription.
+  /// Shows a microphone button. Actual dictation only works when
+  /// [onTranscribeAudio] is also provided — see its doc for why.
   final bool enableVoice;
+
+  /// Uploads the recorded audio for server-side transcription and returns the
+  /// transcribed text (or `null`/throws on failure). `null` (the default) means
+  /// voice transcription isn't available — the mic is shown disabled with an
+  /// explanatory tooltip rather than hidden outright, so it's clear the feature
+  /// exists but isn't configured. The widget stays IO-free itself (like [onSend]):
+  /// the host app owns the actual network call, typically gated on a capability
+  /// check (e.g. `client.voice.checkStatus()`) rather than passed unconditionally.
+  final Future<String?> Function(Uint8List audioBytes, String mimeType)? onTranscribeAudio;
 
   /// Shows the [+] attachment button and accepts drag-and-drop.
   final bool enableAttachments;
@@ -149,36 +160,28 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   final List<AgUiInputAttachment> _attachments = [];
   bool _isDragOver = false;
 
-  // Voice
-  final SpeechToText _stt = SpeechToText();
-  bool _sttAvailable = false;
-  bool _isListening = false;
+  // Voice — one capture only: `record` is used both for the live waveform
+  // (real dBFS amplitude, via onAmplitudeChanged) and for the audio itself
+  // (raw PCM, wrapped into a WAV file on stop and handed to
+  // widget.onTranscribeAudio for server-side transcription). There is
+  // deliberately no local/on-device speech engine and no second concurrent
+  // capture — an earlier attempt to run a second capture just for amplitude
+  // alongside a separate on-device recognizer measurably degraded that
+  // recognizer's accuracy (two sessions competing for the same input device).
+  final AudioRecorder _recorder = AudioRecorder();
+  bool _isRecording = false;
+  bool _isTranscribing = false;
   bool _voiceOverlayOpen = false;
   BuildContext? _voiceOverlayContext;
-  String? _voiceSessionBaseText;
-  final ValueNotifier<String> _liveTranscript = ValueNotifier<String>('');
+  BytesBuilder? _pcmChunks;
+  StreamSubscription<Uint8List>? _audioStreamSub;
+  StreamSubscription<Amplitude>? _amplitudeSub;
   static const int _waveformBarCount = 24;
+  static const int _sampleRate = 16000;
   final ValueNotifier<List<double>> _waveform = ValueNotifier<List<double>>(List<double>.filled(_waveformBarCount, 0.0));
   Stopwatch? _recordingStopwatch;
   Timer? _recordingTimer;
   final ValueNotifier<Duration> _recordingElapsed = ValueNotifier<Duration>(Duration.zero);
-
-  // Waveform: speech_to_text's onSoundLevelChange isn't implemented on Windows or
-  // web (confirmed against its plugin source — neither backend ever calls it), and
-  // running a second concurrent microphone capture (e.g. via the `record` package)
-  // purely for real amplitude turned out to degrade the actual speech recognition
-  // itself (two simultaneous mic sessions competing for the same input device) —
-  // so the waveform is a synthetic "breathing" animation, not real amplitude. It's
-  // an activity indicator, not a meter; transcription accuracy takes priority.
-  Timer? _syntheticWaveformTimer;
-  double _syntheticLevel = 0.3;
-  final math.Random _syntheticRandom = math.Random();
-
-  // Speech recognition locale: explicitly resolved from the system locale rather
-  // than left to speech_to_text's own default, since an unmatched locale (e.g.
-  // recognizing English against French speech) produces exactly the kind of
-  // unrelated/garbled transcription this was added to fix.
-  String? _localeId;
 
   // Animations
   // _pulseCtrl: breathing for voice mic (reverse repeat, 1 s)
@@ -199,8 +202,6 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _voicePulseAnim = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
 
     _focusNode.addListener(() => setState(() {}));
-
-    if (widget.enableVoice) _initStt();
   }
 
   @override
@@ -213,7 +214,6 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       }
       _ctrl = widget.controller!;
     }
-    if (widget.enableVoice && !old.enableVoice) _initStt();
   }
 
   @override
@@ -221,144 +221,136 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     if (_ownsController) _ctrl.dispose();
     _focusNode.dispose();
     _pulseCtrl.dispose();
-    _liveTranscript.dispose();
     _waveform.dispose();
     _recordingElapsed.dispose();
     _recordingTimer?.cancel();
-    _syntheticWaveformTimer?.cancel();
-    if (_isListening) _stt.stop();
+    _amplitudeSub?.cancel();
+    _audioStreamSub?.cancel();
+    _recorder.dispose();
     super.dispose();
   }
 
-  // ── Speech-to-text ──────────────────────────────────────────────────────────
+  // ── Voice recording ─────────────────────────────────────────────────────────
 
-  Future<void> _initStt() async {
-    bool available;
-    try {
-      available = await _stt.initialize(
-        onError: (error) {
-          developer.log('speech_to_text error: $error', name: 'AgUiChatInput');
-          if (mounted) setState(() => _isListening = false);
-        },
-        onStatus: (status) => developer.log('speech_to_text status: $status', name: 'AgUiChatInput'),
-      );
-    } catch (error, stackTrace) {
-      developer.log('speech_to_text initialize() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
-      available = false;
-    }
-    if (!available) {
-      developer.log(
-        'speech_to_text unavailable on this platform/browser — the mic button will be shown disabled. '
-        'On web this requires a browser with Web Speech API support (Chrome) and microphone permission; '
-        'on Windows this requires the OS speech recognition feature to be installed and enabled.',
-        name: 'AgUiChatInput',
-      );
-    } else {
-      try {
-        final systemLocale = await _stt.systemLocale();
-        final available = await _stt.locales();
-        developer.log('speech_to_text available locales: ${available.map((l) => l.localeId).join(', ')}', name: 'AgUiChatInput');
-        // Only use the system locale if the plugin actually lists it as supported —
-        // systemLocale()'s id format isn't guaranteed to match what listen() accepts
-        // on every platform, and passing an unrecognized id can make listen() silently
-        // produce no results at all rather than falling back to a working default.
-        final matches = systemLocale != null && available.any((l) => l.localeId == systemLocale.localeId);
-        _localeId = matches ? systemLocale.localeId : null;
-        developer.log(
-          matches
-              ? 'speech_to_text using system locale: ${_localeId}'
-              : 'speech_to_text system locale (${systemLocale?.localeId}) not in the supported list — using the plugin default instead',
-          name: 'AgUiChatInput',
-        );
-      } catch (error, stackTrace) {
-        developer.log('speech_to_text locale lookup threw — using the plugin default', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
-      }
-    }
-    if (mounted) setState(() => _sttAvailable = available);
-  }
-
-  Future<void> _toggleListening() async {
-    if (_isListening) {
-      await _stopListening(keepText: true);
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      await _finishRecording(keepAudio: true);
       return;
     }
-    if (!_sttAvailable) {
+    if (widget.onTranscribeAudio == null) {
       _showVoiceUnavailableMessage();
       return;
     }
-    _voiceSessionBaseText = _ctrl.text;
-    _liveTranscript.value = '';
+    _pcmChunks = BytesBuilder();
     _waveform.value = List<double>.filled(_waveformBarCount, 0.0);
     _recordingStopwatch = Stopwatch()..start();
     _recordingElapsed.value = Duration.zero;
     _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       _recordingElapsed.value = _recordingStopwatch?.elapsed ?? Duration.zero;
     });
-    setState(() => _isListening = true);
+    setState(() => _isRecording = true);
     _openVoiceOverlay();
-    _startSyntheticWaveform();
-    developer.log('speech_to_text: starting listen() with localeId=${_localeId ?? '(default)'}', name: 'AgUiChatInput');
     try {
-      await _stt.listen(
-        onResult: (result) {
-          if (!mounted) return;
-          final text = result.recognizedWords;
-          developer.log('speech_to_text onResult: "$text" (final=${result.finalResult}, confidence=${result.confidence})', name: 'AgUiChatInput');
-          _liveTranscript.value = text;
-          final base = _voiceSessionBaseText ?? '';
-          final merged = base.isEmpty ? text : (text.isEmpty ? base : '$base $text');
-          _ctrl.value = _ctrl.value.copyWith(text: merged, selection: TextSelection.collapsed(offset: merged.length));
-          if (result.finalResult) _stopListening(keepText: true);
-        },
-        listenOptions: SpeechListenOptions(listenFor: const Duration(seconds: 60), pauseFor: const Duration(seconds: 5), partialResults: true, localeId: _localeId),
-      );
+      final stream = await _recorder.startStream(const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: _sampleRate, numChannels: 1));
+      _audioStreamSub = stream.listen((chunk) => _pcmChunks?.add(chunk));
+      _amplitudeSub = _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen(_onAmplitude);
     } catch (error, stackTrace) {
-      developer.log('speech_to_text.listen() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+      developer.log('record.startStream() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+      await _finishRecording(keepAudio: false);
+      _showVoiceUnavailableMessage();
     }
   }
 
-  void _pushWaveformLevel(double normalized) {
+  /// dBFS: roughly -60 (quiet) to 0 (loudest) for normal speech — mapped
+  /// linearly onto a 0..1 bar height, clamped so silence still shows a faint
+  /// baseline. This is the only microphone capture in the widget, so there's
+  /// nothing else competing for the input device — the waveform is real.
+  void _onAmplitude(Amplitude amplitude) {
+    if (!mounted || !_isRecording) return;
+    final db = amplitude.current.clamp(-60.0, 0.0);
+    final normalized = ((db + 60.0) / 60.0).clamp(0.05, 1.0);
     final next = List<double>.of(_waveform.value)
       ..removeAt(0)
       ..add(normalized);
     _waveform.value = next;
   }
 
-  /// A small random walk (not pure noise) so the waveform reads as organic
-  /// "recording activity" — see the field doc above for why this is synthetic
-  /// rather than a real amplitude meter.
-  void _startSyntheticWaveform() {
-    _syntheticWaveformTimer?.cancel();
-    _syntheticWaveformTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
-      if (!mounted || !_isListening) return;
-      _syntheticLevel = (_syntheticLevel + (_syntheticRandom.nextDouble() - 0.5) * 0.35).clamp(0.15, 0.85);
-      _pushWaveformLevel(_syntheticLevel);
-    });
-  }
-
-  Future<void> _stopListening({required bool keepText}) async {
-    if (_isListening) await _stt.stop();
-    _syntheticWaveformTimer?.cancel();
-    _syntheticWaveformTimer = null;
-    if (!keepText) {
-      final base = _voiceSessionBaseText;
-      if (base != null) {
-        _ctrl.value = TextEditingValue(text: base, selection: TextSelection.collapsed(offset: base.length));
-      }
-    }
-    _voiceSessionBaseText = null;
+  Future<void> _finishRecording({required bool keepAudio}) async {
+    await _amplitudeSub?.cancel();
+    _amplitudeSub = null;
+    await _audioStreamSub?.cancel();
+    _audioStreamSub = null;
+    if (await _recorder.isRecording()) await _recorder.stop();
     _recordingTimer?.cancel();
     _recordingTimer = null;
     _recordingStopwatch?.stop();
     _recordingStopwatch = null;
-    if (mounted) setState(() => _isListening = false);
+    final pcm = _pcmChunks?.toBytes();
+    _pcmChunks = null;
+    if (mounted) setState(() => _isRecording = false);
     _closeVoiceOverlay();
+
+    final onTranscribeAudio = widget.onTranscribeAudio;
+    if (!keepAudio || pcm == null || pcm.isEmpty || onTranscribeAudio == null) return;
+
+    final wavBytes = _pcm16ToWav(pcm, sampleRate: _sampleRate, numChannels: 1);
+    if (mounted) setState(() => _isTranscribing = true);
+    try {
+      final text = await onTranscribeAudio(wavBytes, 'audio/wav');
+      if (!mounted) return;
+      final trimmed = text?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) {
+        final current = _ctrl.text;
+        final merged = current.isEmpty ? trimmed : '$current $trimmed';
+        _ctrl.value = TextEditingValue(text: merged, selection: TextSelection.collapsed(offset: merged.length));
+      }
+    } catch (error, stackTrace) {
+      developer.log('onTranscribeAudio threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content: Text('Voice transcription failed.')));
+      }
+    } finally {
+      if (mounted) setState(() => _isTranscribing = false);
+    }
   }
 
   void _showVoiceUnavailableMessage() {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(content: Text('Voice input isn\'t available on this device or browser.')),
+      const SnackBar(content: Text('Voice input isn\'t available right now.')),
     );
+  }
+
+  /// Wraps raw 16-bit PCM (mono) into a minimal WAV container — `record`'s
+  /// pcm16bits stream encoder is the one format its own compatibility matrix
+  /// confirms works on every platform this app targets, including Windows and
+  /// web, but it's headerless; the backend's transcription endpoint (and
+  /// Whisper itself) expects a standard audio file.
+  static Uint8List _pcm16ToWav(Uint8List pcmBytes, {required int sampleRate, required int numChannels}) {
+    const bitsPerSample = 16;
+    final byteRate = sampleRate * numChannels * bitsPerSample ~/ 8;
+    final blockAlign = numChannels * bitsPerSample ~/ 8;
+    final dataLength = pcmBytes.length;
+
+    final header = BytesBuilder();
+    void writeAscii(String s) => header.add(s.codeUnits);
+    void writeUint32(int v) => header.add([v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF]);
+    void writeUint16(int v) => header.add([v & 0xFF, (v >> 8) & 0xFF]);
+
+    writeAscii('RIFF');
+    writeUint32(36 + dataLength);
+    writeAscii('WAVE');
+    writeAscii('fmt ');
+    writeUint32(16); // fmt chunk size
+    writeUint16(1); // PCM
+    writeUint16(numChannels);
+    writeUint32(sampleRate);
+    writeUint32(byteRate);
+    writeUint16(blockAlign);
+    writeUint16(bitsPerSample);
+    writeAscii('data');
+    writeUint32(dataLength);
+    header.add(pcmBytes);
+    return header.toBytes();
   }
 
   void _openVoiceOverlay() {
@@ -377,8 +369,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
           pulseAnim: _voicePulseAnim,
           waveform: _waveform,
           elapsed: _recordingElapsed,
-          onStop: () => _stopListening(keepText: true),
-          onCancel: () => _stopListening(keepText: false),
+          onStop: () => _finishRecording(keepAudio: true),
+          onCancel: () => _finishRecording(keepAudio: false),
         );
       },
     ).then((_) {
@@ -396,12 +388,24 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
 
   // ── File attachments ────────────────────────────────────────────────────────
 
+  static const _imageExtensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'};
+
   Future<void> _pickFiles() async {
-    final result = await FilePicker.pickFiles(allowMultiple: true, type: widget.acceptedExtensions != null ? FileType.custom : FileType.any, allowedExtensions: widget.acceptedExtensions);
+    // withData: true so picked images arrive as bytes (AgUiImageBytesAttachment)
+    // the same way clipboard-pasted ones already do — a bare `path` is
+    // meaningless on web, and the vision-attachment path needs raw bytes to
+    // base64-encode regardless of platform.
+    final result = await FilePicker.pickFiles(allowMultiple: true, type: widget.acceptedExtensions != null ? FileType.custom : FileType.any, allowedExtensions: widget.acceptedExtensions, withData: true);
     if (result == null || !mounted) return;
     setState(() {
       for (final f in result.files) {
-        if (f.path != null) _attachments.add(AgUiFileAttachment(path: f.path!, name: f.name));
+        final extension = f.extension?.toLowerCase() ?? f.name.split('.').last.toLowerCase();
+        if (f.bytes != null && _imageExtensions.contains(extension)) {
+          final mimeExtension = extension == 'jpg' ? 'jpeg' : extension;
+          _attachments.add(AgUiImageBytesAttachment(bytes: f.bytes!, name: f.name, mimeType: 'image/$mimeExtension'));
+        } else if (f.path != null) {
+          _attachments.add(AgUiFileAttachment(path: f.path!, name: f.name));
+        }
       }
     });
   }
@@ -520,18 +524,20 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
           // Leading actions (customizable via lib)
           if (widget.leadingActions != null && widget.leadingActions!.isNotEmpty) IconTheme(data: IconThemeData(size: 18, color: cs.onSurfaceVariant), child: Row(mainAxisSize: MainAxisSize.min, children: widget.leadingActions!)),
 
-          // Voice mic — shown (disabled, with an explanatory tooltip) even when speech
-          // recognition isn't available on this platform/browser, rather than hidden
-          // outright, so it's clear the feature exists but can't be used right now.
-          if (widget.enableVoice)
+          // Voice mic — shown disabled (with an explanatory tooltip) when
+          // onTranscribeAudio isn't provided, rather than hidden outright, so
+          // it's clear the feature exists but isn't configured/available.
+          if (widget.enableVoice && _isTranscribing)
+            const Padding(padding: EdgeInsets.all(5), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+          else if (widget.enableVoice)
             _VoiceButton(
-              isListening: _isListening,
+              isListening: _isRecording,
               pulseAnim: _voicePulseAnim,
-              // Stays tappable even when speech recognition is unavailable, so tapping
-              // it surfaces an explanation (a snackbar) instead of silently doing nothing.
+              // Stays tappable even when unavailable, so tapping it surfaces an
+              // explanation (a snackbar) instead of silently doing nothing.
               tappable: isEnabled,
-              unavailable: !_sttAvailable,
-              onTap: _toggleListening,
+              unavailable: widget.onTranscribeAudio == null,
+              onTap: _toggleRecording,
               color: cs.onSurfaceVariant,
             ),
 

@@ -6,7 +6,12 @@ enum WorkflowArgumentType {
   boolean('Boolean'),
   credentials('Credentials'),
   imageRef('ImageRef'),
-  choice('Choice');
+  choice('Choice'),
+
+  /// A reference, by id, to a workspace asset (a Data Table…) — the kind of asset travels in the
+  /// input's UI metadata. Set by the platform's own nodes; not offered as a type for user-defined
+  /// variables (so deliberately absent from [WorkflowArgumentTypes.primary]).
+  assetRef('AssetRef');
 
   const WorkflowArgumentType(this.label);
 
@@ -42,6 +47,7 @@ class WorkflowArgumentTypes {
   static const credentials = 'Credentials';
   static const imageRef = 'ImageRef';
   static const choice = 'Choice';
+  static const assetRef = 'AssetRef';
 
   static const List<String> primary = <String>[text, textList, structured, number, boolean, credentials, imageRef, choice];
 }
