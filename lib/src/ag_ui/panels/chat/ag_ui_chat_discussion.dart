@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../theme/ag_theme_data.dart';
@@ -6,6 +8,7 @@ import '../../widgets/ag_ui_markdown_body.dart';
 import 'ag_ui_chat_input.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
+import 'member_avatar.dart';
 
 /// A complete chat discussion — message list + composer, orchestrated as one
 /// widget — backed by a [ChatController].
@@ -62,8 +65,12 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.autoLoad = true,
     this.onAttach,
     this.onHilResponse,
+    this.showActiveMemberIndicator = false,
+    this.showSpeakerLabels = false,
+    this.resolveMemberAvatar,
     // AgUiChatInput passthrough
     this.enableVoice = true,
+    this.onTranscribeAudio,
     this.enableAttachments = true,
     this.acceptedAttachmentExtensions,
     this.inputActionBar,
@@ -127,10 +134,30 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// for history but not rendered as a redundant user bubble.
   final Future<void> Function(ChatHilGate gate, String text, String source)? onHilResponse;
 
+  /// Shows a "member at work" indicator (avatar + name + animated dots) above the input
+  /// while a Team member is taking its turn (driven by [ChatController.activeMember]).
+  /// Off by default; has no effect for a standalone Agent, which never sets [ChatController.activeMember].
+  final bool showActiveMemberIndicator;
+
+  /// Shows an avatar+name header above each assistant bubble, identifying which Team
+  /// member sent it. Off by default; has no effect for a standalone Agent's messages
+  /// (they carry no author identity).
+  final bool showSpeakerLabels;
+
+  /// Maps a member's identity ([AgUiChatMember]) to an avatar (image/emoji/color).
+  /// Shared by both [showActiveMemberIndicator] and [showSpeakerLabels]. Falls back to a
+  /// deterministic initials+color avatar when omitted or returning `null`.
+  final AgUiMemberAvatar? Function(AgUiChatMember member)? resolveMemberAvatar;
+
   // ── AgUiChatInput passthrough ──────────────────────────────────────────────
 
   /// Shows a microphone button in [AgUiChatInput]. Forwarded to [AgUiChatInput.enableVoice].
   final bool enableVoice;
+
+  /// Uploads recorded audio for transcription. Forwarded to
+  /// [AgUiChatInput.onTranscribeAudio] — `null` shows the mic disabled with a
+  /// tooltip (e.g. no speech-to-text credential configured).
+  final Future<String?> Function(Uint8List audioBytes, String mimeType)? onTranscribeAudio;
 
   /// Shows the file attachment button in [AgUiChatInput]. Forwarded to [AgUiChatInput.enableAttachments].
   final bool enableAttachments;
@@ -346,14 +373,20 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
                     if (gate != null) _submitHilResponse(response, source: 'widget');
                   }
                 : null,
+            showSpeakerLabel: widget.showSpeakerLabels,
+            resolveMemberAvatar: widget.resolveMemberAvatar,
           );
         },
       );
     }
 
+    final activeMember = widget.controller.activeMember;
     return Column(
       children: [
         Expanded(child: messagesArea),
+
+        if (widget.showActiveMemberIndicator && activeMember != null)
+          _ActiveMemberIndicator(member: AgUiChatMember(memberEntityId: activeMember.memberEntityId, displayName: activeMember.displayName), resolver: widget.resolveMemberAvatar),
 
         // No HIL gate banner: the agent's question (with questions_to_ask) is already
         // published as a chat message, so the thread itself is the source of truth.
@@ -372,6 +405,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
                   hint: widget.inputHint,
                   hilHint: widget.hilInputHint,
                   enableVoice: widget.enableVoice,
+                  onTranscribeAudio: widget.onTranscribeAudio,
                   enableAttachments: widget.enableAttachments,
                   acceptedExtensions: widget.acceptedAttachmentExtensions,
                   actionBar: widget.inputActionBar,
@@ -385,13 +419,43 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
   }
 }
 
+/// "Team member at work" indicator (Option A) — an avatar, the active member's name, and an
+/// animated ellipsis. Optional, opt-in via [AgUiChatDiscussion.showActiveMemberIndicator].
+/// Rendered only while [ChatController.activeMember] is set — i.e. only during a Team
+/// conversation where the backend reports which member is currently taking its turn; a
+/// standalone Agent run never sets this, so the indicator never appears for it.
+class _ActiveMemberIndicator extends StatelessWidget {
+  const _ActiveMemberIndicator({required this.member, this.resolver});
+
+  final AgUiChatMember member;
+  final AgUiMemberAvatar? Function(AgUiChatMember member)? resolver;
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurfaceVariant);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MemberAvatarWidget(member: member, resolver: resolver, size: 20),
+          const SizedBox(width: 8),
+          Flexible(child: Text('${member.displayName ?? member.memberEntityId} is working on it…', style: textStyle, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+}
+
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({super.key, required this.message, required this.theme, this.widgetRegistry, this.onWidgetSubmit, this.enabled = false});
+  const _MessageBubble({super.key, required this.message, required this.theme, this.widgetRegistry, this.onWidgetSubmit, this.enabled = false, this.showSpeakerLabel = false, this.resolveMemberAvatar});
 
   final ChatMessage message;
   final AgThemeData theme;
   final AgUiWidgetRegistry? widgetRegistry;
   final void Function(String response)? onWidgetSubmit;
+  final bool showSpeakerLabel;
+  final AgUiMemberAvatar? Function(AgUiChatMember member)? resolveMemberAvatar;
 
   /// Whether this message's widget (if any) is still awaiting a response.
   /// When `false`, the widget is rendered read-only (dimmed, inputs ignored) —
@@ -413,6 +477,25 @@ class _MessageBubble extends StatelessWidget {
     return IgnorePointer(
       ignoring: !enabled,
       child: Opacity(opacity: enabled ? 1.0 : 0.55, child: built),
+    );
+  }
+
+  /// Avatar+name header shown above this bubble when [showSpeakerLabel] is on and the
+  /// message carries author identity ([ChatMessage.authorId]/`.authorName` — populated
+  /// for a Team member's turn, left unset for a standalone Agent).
+  Widget? _speakerLabel(BuildContext context) {
+    final name = message.authorName ?? message.authorId;
+    if (!showSpeakerLabel || name == null) return null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MemberAvatarWidget(member: AgUiChatMember(memberEntityId: message.authorId, displayName: message.authorName), resolver: resolveMemberAvatar, size: 18),
+          const SizedBox(width: 6),
+          Text(name, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 
@@ -456,6 +539,7 @@ class _MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_speakerLabel(context) case final label?) label,
             for (final block in blocks)
               if (block.type == 'text')
                 if ((block.text ?? '').isNotEmpty)
@@ -497,14 +581,23 @@ class _MessageBubble extends StatelessWidget {
       };
       final built = widgetRegistry!.build(context, widgetType, props);
       if (built != null) {
-        return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: _dimIfDisabled(built));
+        final label = _speakerLabel(context);
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: label == null ? _dimIfDisabled(built) : Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [label, _dimIfDisabled(built)]),
+        );
       }
     }
 
     // Assistant messages: plain text / markdown, no box, left-aligned.
     final textStyle = theme.bubbleAgentTextStyle;
     final textColor = textStyle?.color ?? Theme.of(context).colorScheme.onSurface;
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: message.text.isNotEmpty ? AgUiMarkdownBody(data: message.text, textColor: textColor, textStyle: textStyle) : const SizedBox.shrink());
+    final body = message.text.isNotEmpty ? AgUiMarkdownBody(data: message.text, textColor: textColor, textStyle: textStyle) : const SizedBox.shrink();
+    final label = _speakerLabel(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: label == null ? body : Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [label, body]),
+    );
   }
 }
 

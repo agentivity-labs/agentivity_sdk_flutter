@@ -132,7 +132,10 @@ class AgentivityRunStream implements PlatformStream {
             }
             // Mark the channel as terminated on clean run end so it does not
             // reconnect and re-deliver RUN_STARTED (which would reset isAwaitingResponse).
-            if (event is RunFinishedEvent || event is RunErrorEvent) {
+            // A RunFinishedEvent with isInterrupted means a HIL gate opened, not that the
+            // run is over — terminating here would permanently block reconnection on the
+            // next disconnect, however healthy the server is.
+            if (event is RunErrorEvent || (event is RunFinishedEvent && !event.isInterrupted)) {
               channel.markTerminated();
             }
           case _SignalFrame(:final signal):
@@ -175,6 +178,11 @@ class AgentivityRunStream implements PlatformStream {
 
   @override
   ValueListenable<bool> get connected => _channel.connectedNotifier;
+
+  /// Structured connection state — see [AgUiConnectionState]. Prefer this over [connected]
+  /// to show an honest "reconnecting, attempt 3, retrying in 12s" status instead of a
+  /// generic error.
+  ValueListenable<AgUiConnectionState> get connectionState => _channel.connectionStateNotifier;
 
   @override
   void start() => _channel.start();

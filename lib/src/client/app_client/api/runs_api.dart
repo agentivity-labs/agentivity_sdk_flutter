@@ -22,6 +22,9 @@ class RunsApi {
     String? executionId,
     bool enableHil = false,
     int? maxAgentIterations,
+    /// Images attached to this turn (vision) — agent-kind executions only for
+    /// now. Each entry: `{'base64Data': ..., 'mimeType': ...}`.
+    List<Map<String, String>>? images,
   }) async {
     final normalizedEntityId = _c.requireNormalizedId(entityId, label: 'Entity id');
     final body = <String, dynamic>{
@@ -30,6 +33,7 @@ class RunsApi {
       'executionId': executionId?.trim().isEmpty ?? true ? null : executionId!.trim(),
       'enableHil': enableHil,
       if (maxAgentIterations != null) 'maxAgentIterations': maxAgentIterations,
+      if (images != null && images.isNotEmpty) 'images': images,
     };
     final response = await _c.post<Map<String, dynamic>>(
       AgentivityHttpCore.v1('/executions'),
@@ -58,7 +62,7 @@ class RunsApi {
 
   // ---------------------------------------------------------------------------
   // HIL — GET /api/v1/executions/{executionId}/hil/pending
-  //         POST /api/v1/executions/{executionId}/respond
+  //         POST /api/v1/runs/{runId}/resume (see submitHilResponse below)
   // ---------------------------------------------------------------------------
 
   Future<HilPendingResponse> fetchPendingHil(String executionId) async {
@@ -69,21 +73,44 @@ class RunsApi {
     return HilPendingResponse.fromJson(response.data ?? const <String, dynamic>{});
   }
 
+  /// Submits a reply to a pending HIL gate. Internally calls `POST /runs/{runId}/resume` — NOT
+  /// `POST /executions/{executionId}/respond` (the latter resumes the run but never persists the
+  /// reply as a chat message, so it silently vanishes from any chat transcript rendered from
+  /// `CHAT_MESSAGE_RECEIVED` events). The route's `{runId}` segment is resolved server-side by the
+  /// request's `interruptId` regardless of what's passed — the backend's own doc comment on that
+  /// endpoint confirms this is intended ("may need lookup when the frontend only knows the
+  /// streamId") — so `executionId` is used there directly; callers of this method never need a
+  /// real run id. Return shape is unchanged from the previous implementation; the only signature
+  /// addition is the optional `source`, needed so the backend can tag a widget-submitted reply as
+  /// such (the chat UI hides widget-sourced messages — the widget itself already displays the
+  /// answer inline, so without this tag a widget submission renders as a second, duplicate
+  /// bubble now that replies are actually persisted to the chat).
   Future<HilRespondResult> submitHilResponse({
     required String executionId,
     required String requestId,
     required String response,
+    String? source,
   }) async {
     final normalizedExecution = _c.requireNormalizedId(executionId, label: 'Execution id');
     final normalizedRequest = _c.requireNormalizedId(requestId, label: 'Request id');
     final result = await _c.post<Map<String, dynamic>>(
-      AgentivityHttpCore.v1('/executions/$normalizedExecution/respond'),
+      AgentivityHttpCore.v1('/runs/$normalizedExecution/resume'),
       data: <String, dynamic>{
-        'requestId': normalizedRequest,
-        'response': response,
+        'interruptId': normalizedRequest,
+        'response': <String, dynamic>{'text': response, if (source != null) 'source': source},
       },
     );
-    return HilRespondResult.fromJson(result.data ?? const <String, dynamic>{});
+    // /runs/{runId}/resume responds with {runId, status}, not the {executionId, requestId,
+    // runId, state} shape HilRespondResult callers expect — executionId/requestId are already
+    // known here (they're this method's own inputs), so the result is built locally instead of
+    // parsed wholesale from the response body.
+    final data = result.data ?? const <String, dynamic>{};
+    return HilRespondResult(
+      executionId: executionId,
+      runId: (data['runId'] as String? ?? executionId).trim(),
+      requestId: requestId,
+      state: (data['status'] as String? ?? 'resumed').trim().toLowerCase(),
+    );
   }
 
   // ---------------------------------------------------------------------------

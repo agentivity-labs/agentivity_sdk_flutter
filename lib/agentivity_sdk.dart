@@ -26,6 +26,7 @@ library agentivity_sdk;
 
 // ── AG-UI: json helpers ─────────────────────────────────────────────────────
 export 'src/ag_ui/shared/json_helpers.dart';
+export 'src/util/retry.dart';
 
 // ── AG-UI: theme ─────────────────────────────────────────────────────────────
 export 'src/ag_ui/theme/ag_theme_data.dart';
@@ -47,6 +48,7 @@ export 'src/ag_ui/tools/ag_ui_widget_registry.dart';
 
 // ── AG-UI: widgets ───────────────────────────────────────────────────────────
 export 'src/ag_ui/widgets/ag_ui_markdown_body.dart';
+export 'src/ag_ui/widgets/ag_ui_connection_status_banner.dart';
 
 // ── AG-UI: panels — chat ─────────────────────────────────────────────────────
 export 'src/ag_ui/panels/chat/chat_models.dart';
@@ -55,6 +57,7 @@ export 'src/ag_ui/panels/chat/i_chat_provider.dart';
 export 'src/ag_ui/panels/chat/chat_theme.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_input.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_discussion.dart';
+export 'src/ag_ui/panels/chat/member_avatar.dart';
 
 // ── AG-UI: panels — assistant ────────────────────────────────────────────────
 export 'src/ag_ui/panels/assistant/assistant_models.dart';
@@ -140,6 +143,7 @@ export 'src/client/app_client/api/agentic_folders_api.dart';
 export 'src/client/app_client/api/conversations_api.dart';
 export 'src/client/app_client/api/entities_api.dart';
 export 'src/client/app_client/api/runs_api.dart';
+export 'src/client/app_client/api/voice_api.dart';
 export 'src/client/app_client/domain/agent_models.dart';
 export 'src/client/app_client/domain/agentivity_entity.dart';
 export 'src/client/app_client/domain/canvas_annotation_shared.dart';
@@ -159,6 +163,7 @@ export 'src/client/extras/api/svg_icons_api.dart';
 export 'src/client/extras/domain/ag_ui_bundle_models.dart';
 
 import 'src/client/app_client/agentivity_client.dart';
+import 'src/client/app_client/api/voice_api.dart';
 import 'src/client/extras/api/ag_ui_bundles_api.dart';
 import 'src/client/extras/api/chat_context_api.dart';
 import 'src/client/extras/api/svg_icons_api.dart';
@@ -182,6 +187,7 @@ class AgentivityPlatformClient extends AgentivityClient {
     chat = ChatContextApi(http);
     agUiBundles = AgUiBundlesApi(http);
     svgIcons = SvgIconsApi(http);
+    voice = VoiceApi(http);
   }
 
   /// AG-UI chat channel: open a streaming run against a chat context/thread.
@@ -192,4 +198,7 @@ class AgentivityPlatformClient extends AgentivityClient {
 
   /// Icon assets (node icons, brand icons, embedded icons) as SVG.
   late final SvgIconsApi svgIcons;
+
+  /// Server-side voice transcription for chat dictation.
+  late final VoiceApi voice;
 }
