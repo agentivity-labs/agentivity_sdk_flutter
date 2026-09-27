@@ -46,7 +46,7 @@ import 'i_chat_provider.dart';
 /// | `CUSTOM(CHAT_HIL_RESOLVED)` | Clears [pendingHilGate] |
 /// | `TEXT_MESSAGE_START/CONTENT/END` | Streams an assistant message into the active thread |
 /// | `RunFinishedEvent(interrupted, reason:'chat_hil_gate')` | Sets [pendingHilGate] from the interrupt |
-/// | `StepStartedEvent`/`StepFinishedEvent` (Team member identity present) | Sets/clears [activeMember] |
+/// | `StepStartedEvent`/`StepFinishedEvent` (Team member identity present) | Sets/clears [activeMember], updates [memberStatuses] |
 ///
 /// ## Injecting events manually
 ///
@@ -58,6 +58,11 @@ import 'i_chat_provider.dart';
 ///   if (raw is AgUiEvent) controller.feedEvent(raw);
 /// });
 /// ```
+/// Where a Team member stands in the conversation, from its own `StepStartedEvent`/`StepFinishedEvent`:
+/// [working] while it takes its turn, [waiting] if the run paused (a human question) while it was mid-turn,
+/// [done] once its turn ended. A member that has not appeared yet has no entry.
+enum TeamMemberStatus { working, waiting, done }
+
 /// The Team member currently taking its turn — set from [StepStartedEvent], cleared on [StepFinishedEvent].
 class ActiveChatMember {
   const ActiveChatMember({this.memberEntityId, this.displayName});
@@ -67,7 +72,9 @@ class ActiveChatMember {
 
 class ChatController extends ChangeNotifier {
   /// Pull-based constructor: delegates to [provider] for all data.
-  ChatController({required IChatProvider provider, required String contextId}) : _provider = provider, _contextId = contextId;
+  ChatController({required IChatProvider provider, required String contextId})
+    : _provider = provider,
+      _contextId = contextId;
 
   /// Push-based constructor: state is driven entirely by [events].
   ///
@@ -75,8 +82,17 @@ class ChatController extends ChangeNotifier {
   /// the initial [loadThreads] call. Omit it when the backend is purely
   /// event-driven and responses are sent via an [onHilResponse] callback on
   /// the panel.
-  ChatController.fromStream({required Stream<AgUiEvent> events, IChatProvider? provider, String contextId = ''}) : _provider = provider ?? const NullChatProvider(), _contextId = contextId {
-    _eventSub = events.listen(_onAgUiEvent, onError: (_) {}, cancelOnError: false);
+  ChatController.fromStream({
+    required Stream<AgUiEvent> events,
+    IChatProvider? provider,
+    String contextId = '',
+  }) : _provider = provider ?? const NullChatProvider(),
+       _contextId = contextId {
+    _eventSub = events.listen(
+      _onAgUiEvent,
+      onError: (_) {},
+      cancelOnError: false,
+    );
   }
 
   final IChatProvider _provider;
@@ -97,6 +113,7 @@ class ChatController extends ChangeNotifier {
   ChatHilGate? _pendingHilGate;
   bool _isAwaitingResponse = false;
   ActiveChatMember? _activeMember;
+  Map<String, TeamMemberStatus> _memberStatuses = const {};
 
   List<ChatThread> get threads => _threads;
   bool get isLoading => _isLoading;
@@ -121,10 +138,43 @@ class ChatController extends ChangeNotifier {
   /// standalone Agent run, or between turns). Powers `AgUiChatActiveMemberIndicator`.
   ActiveChatMember? get activeMember => _activeMember;
 
+  /// Status of every Team member seen so far, keyed by `memberEntityId` — empty for a standalone Agent.
+  /// Powers `AgUiTeamRoster` and `AgUiTeamGraph`. A new unmodifiable map on every change.
+  Map<String, TeamMemberStatus> get memberStatuses => _memberStatuses;
+
+  void _setMemberStatus(String memberEntityId, TeamMemberStatus status) {
+    _memberStatuses = Map.unmodifiable({
+      ..._memberStatuses,
+      memberEntityId: status,
+    });
+  }
+
+  // A run that ends mid-turn leaves its member 'working' with nothing to show for it: paused on a human
+  // question it is 'waiting', otherwise (finished, errored) its turn is over.
+  void _settleWorkingMembers({required bool interrupted}) {
+    if (!_memberStatuses.containsValue(TeamMemberStatus.working)) return;
+    _memberStatuses = Map.unmodifiable({
+      for (final entry in _memberStatuses.entries)
+        entry.key:
+            entry.value == TeamMemberStatus.working
+                ? (interrupted
+                    ? TeamMemberStatus.waiting
+                    : TeamMemberStatus.done)
+                : entry.value,
+    });
+  }
+
   List<ChatThread> get filteredThreads {
     if (_searchQuery.isEmpty) return _threads;
     final q = _searchQuery.toLowerCase();
-    return _threads.where((t) => t.threadId.toLowerCase().contains(q) || t.title.toLowerCase().contains(q) || t.status.toLowerCase().contains(q)).toList();
+    return _threads
+        .where(
+          (t) =>
+              t.threadId.toLowerCase().contains(q) ||
+              t.title.toLowerCase().contains(q) ||
+              t.status.toLowerCase().contains(q),
+        )
+        .toList();
   }
 
   // ── Push-based event handling ──────────────────────────────────────────────
@@ -162,7 +212,8 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Returns locally-cached messages for [threadId].
-  List<ChatMessage> localMessages(String threadId) => List.unmodifiable(_messagesByThread[threadId] ?? []);
+  List<ChatMessage> localMessages(String threadId) =>
+      List.unmodifiable(_messagesByThread[threadId] ?? []);
 
   /// Directly sets the pending HIL gate.
   ///
@@ -190,6 +241,7 @@ class ChatController extends ChangeNotifier {
     _pendingHilGate = null;
     _isAwaitingResponse = false;
     _activeMember = null;
+    _memberStatuses = const {};
     _errorMessage = null;
     _inProgressThreadId.clear();
     notifyListeners();
@@ -205,12 +257,19 @@ class ChatController extends ChangeNotifier {
       case RunFinishedEvent e:
         _isAwaitingResponse = false;
         _activeMember = null;
+        _settleWorkingMembers(interrupted: e.isInterrupted);
         if (e.isInterrupted) {
           final interrupts = (e.outcome as AgUiInterruptOutcome).interrupts;
           for (final interrupt in interrupts) {
-            if (interrupt.reason == 'chat_hil_gate' || interrupt.reason.startsWith('chat')) {
+            if (interrupt.reason == 'chat_hil_gate' ||
+                interrupt.reason.startsWith('chat')) {
               final meta = interrupt.metadata ?? {};
-              _pendingHilGate = ChatHilGate(requestId: interrupt.id, threadId: (meta['threadId'] as String? ?? '').trim(), question: interrupt.message ?? interrupt.reason, title: (meta['title'] as String? ?? 'Input required').trim());
+              _pendingHilGate = ChatHilGate(
+                requestId: interrupt.id,
+                threadId: (meta['threadId'] as String? ?? '').trim(),
+                question: interrupt.message ?? interrupt.reason,
+                title: (meta['title'] as String? ?? 'Input required').trim(),
+              );
               break;
             }
           }
@@ -220,6 +279,7 @@ class ChatController extends ChangeNotifier {
       case RunErrorEvent _:
         _isAwaitingResponse = false;
         _activeMember = null;
+        _settleWorkingMembers(interrupted: false);
         notifyListeners();
 
       // ── CUSTOM events ───────────────────────────────────────────────────
@@ -230,20 +290,28 @@ class ChatController extends ChangeNotifier {
       // that carry member identity; a standalone Agent's step events never do). ──
       case StepStartedEvent e:
         if (e.memberEntityId != null || e.displayName != null) {
-          _activeMember = ActiveChatMember(memberEntityId: e.memberEntityId, displayName: e.displayName);
+          _activeMember = ActiveChatMember(
+            memberEntityId: e.memberEntityId,
+            displayName: e.displayName,
+          );
+          if (e.memberEntityId != null)
+            _setMemberStatus(e.memberEntityId!, TeamMemberStatus.working);
           notifyListeners();
         }
 
-      case StepFinishedEvent _:
-        if (_activeMember != null) {
+      case StepFinishedEvent e:
+        if (_activeMember != null || e.memberEntityId != null) {
           _activeMember = null;
+          if (e.memberEntityId != null)
+            _setMemberStatus(e.memberEntityId!, TeamMemberStatus.done);
           notifyListeners();
         }
 
       // ── Streaming text messages → accumulate into thread ────────────────
       case TextMessageStartEvent e:
         // Associate the in-progress message with the active thread (last thread).
-        final threadId = _pendingHilGate?.threadId ?? _threads.lastOrNull?.threadId;
+        final threadId =
+            _pendingHilGate?.threadId ?? _threads.lastOrNull?.threadId;
         if (threadId != null) {
           _inProgress[e.messageId] = StringBuffer();
           _inProgressThreadId[e.messageId] = threadId;
@@ -255,7 +323,9 @@ class ChatController extends ChangeNotifier {
 
       case TextMessageChunkEvent e:
         if (e.messageId != null && e.delta != null) {
-          _inProgress.putIfAbsent(e.messageId!, StringBuffer.new).write(e.delta);
+          _inProgress
+              .putIfAbsent(e.messageId!, StringBuffer.new)
+              .write(e.delta);
           notifyListeners();
         }
 
@@ -263,7 +333,18 @@ class ChatController extends ChangeNotifier {
         final buffer = _inProgress.remove(e.messageId);
         final threadId = _inProgressThreadId.remove(e.messageId);
         if (buffer != null && threadId != null && buffer.isNotEmpty) {
-          addMessage(threadId: threadId, message: ChatMessage(id: e.messageId, role: ChatMessageRole.assistant, contextId: _contextId, threadId: threadId, runId: '', text: buffer.toString(), createdAt: DateTime.now()));
+          addMessage(
+            threadId: threadId,
+            message: ChatMessage(
+              id: e.messageId,
+              role: ChatMessageRole.assistant,
+              contextId: _contextId,
+              threadId: threadId,
+              runId: '',
+              text: buffer.toString(),
+              createdAt: DateTime.now(),
+            ),
+          );
         }
 
       default:
@@ -284,7 +365,16 @@ class ChatController extends ChangeNotifier {
       case 'CHAT_THREAD_CREATED':
         final threadId = (data['threadId'] as String? ?? '').trim();
         if (threadId.isEmpty) return;
-        addThread(ChatThread(threadId: threadId, contextId: _contextId, runId: (data['runId'] as String? ?? '').trim(), title: (data['title'] as String? ?? '').trim(), isDefault: data['isDefault'] as bool? ?? false, status: (data['status'] as String? ?? 'active').trim()));
+        addThread(
+          ChatThread(
+            threadId: threadId,
+            contextId: _contextId,
+            runId: (data['runId'] as String? ?? '').trim(),
+            title: (data['title'] as String? ?? '').trim(),
+            isDefault: data['isDefault'] as bool? ?? false,
+            status: (data['status'] as String? ?? 'active').trim(),
+          ),
+        );
 
       case 'CHAT_MESSAGE_RECEIVED':
         final threadId = (data['threadId'] as String? ?? '').trim();
@@ -292,13 +382,24 @@ class ChatController extends ChangeNotifier {
         if (threadId.isEmpty || messageId.isEmpty) return;
         // Auto-create the thread if a CHAT_THREAD_CREATED was never received.
         if (!_threads.any((t) => t.threadId == threadId)) {
-          addThread(ChatThread(threadId: threadId, contextId: _contextId, runId: (data['runId'] as String? ?? '').trim(), title: '', isDefault: true, status: 'active'));
+          addThread(
+            ChatThread(
+              threadId: threadId,
+              contextId: _contextId,
+              runId: (data['runId'] as String? ?? '').trim(),
+              title: '',
+              isDefault: true,
+              status: 'active',
+            ),
+          );
         }
         addMessage(
           threadId: threadId,
           message: ChatMessage(
             id: messageId,
-            role: ChatMessageRole.fromRaw(data['role'] as String? ?? 'assistant'),
+            role: ChatMessageRole.fromRaw(
+              data['role'] as String? ?? 'assistant',
+            ),
             contextId: _contextId,
             threadId: threadId,
             runId: (data['runId'] as String? ?? '').trim(),
@@ -306,7 +407,10 @@ class ChatController extends ChangeNotifier {
             blocks: ChatContentBlock.listFromRaw(data['blocks']),
             authorId: data['memberEntityId'] as String?,
             authorName: data['displayName'] as String?,
-            metadata: data['source'] is String ? {'interaction.source': data['source']} : null,
+            metadata:
+                data['source'] is String
+                    ? {'interaction.source': data['source']}
+                    : null,
             createdAt: DateTime.now(),
           ),
         );
@@ -317,14 +421,22 @@ class ChatController extends ChangeNotifier {
       case 'HIL_GATE_REACHED':
         final requestId = (data['requestId'] as String? ?? '').trim();
         final threadId = (data['threadId'] as String? ?? '').trim();
-        final channelType = (data['channelType'] as String? ?? '').trim().toLowerCase();
+        final channelType =
+            (data['channelType'] as String? ?? '').trim().toLowerCase();
         if (requestId.isEmpty) return;
         // Skip HIL gates for non-chat channels (e.g. "forms") — they are handled by their own UI.
         if (channelType.isNotEmpty && channelType != 'chat') return;
         // The widget itself (if any) already arrived as its own CUSTOM event and is rendered
         // via the widget registry (see the `default` branch below) — this gate only records
         // which request/thread a widget's `__onSubmit` (or a plain-text reply) should resume.
-        _pendingHilGate = ChatHilGate(requestId: requestId, threadId: threadId, question: (data['question'] as String? ?? data['message'] as String? ?? '').trim(), title: (data['title'] as String? ?? 'Input required').trim());
+        _pendingHilGate = ChatHilGate(
+          requestId: requestId,
+          threadId: threadId,
+          question:
+              (data['question'] as String? ?? data['message'] as String? ?? '')
+                  .trim(),
+          title: (data['title'] as String? ?? 'Input required').trim(),
+        );
         _isAwaitingResponse = false;
 
         notifyListeners();
@@ -337,11 +449,13 @@ class ChatController extends ChangeNotifier {
         // as a widget invocation from the agent. Store it as a ChatMessage so the
         // panel can render it via the widget registry.
         if (!event.name.startsWith('CHAT_') && !event.name.startsWith('HIL_')) {
-          final threadId = _pendingHilGate?.threadId ?? _threads.lastOrNull?.threadId;
+          final threadId =
+              _pendingHilGate?.threadId ?? _threads.lastOrNull?.threadId;
           if (threadId != null) {
-            final props = value is Map<String, dynamic>
-                ? value
-                : value is Map
+            final props =
+                value is Map<String, dynamic>
+                    ? value
+                    : value is Map
                     ? Map<String, dynamic>.from(value)
                     : <String, dynamic>{};
             addMessage(
@@ -372,7 +486,9 @@ class ChatController extends ChangeNotifier {
     try {
       final loaded = await _provider.listThreads(contextId: _contextId);
       // Merge: keep push-injected threads that REST didn't return.
-      final merged = Map<String, ChatThread>.fromEntries(_threads.map((t) => MapEntry(t.threadId, t)));
+      final merged = Map<String, ChatThread>.fromEntries(
+        _threads.map((t) => MapEntry(t.threadId, t)),
+      );
       for (final t in loaded) {
         merged[t.threadId] = t;
       }
@@ -390,12 +506,29 @@ class ChatController extends ChangeNotifier {
     // Prefer locally cached messages (populated by push events).
     final cached = _messagesByThread[threadId];
     if (cached != null && cached.isNotEmpty) {
-      final thread = _threads.firstWhere((t) => t.threadId == threadId, orElse: () => ChatThread(threadId: threadId, contextId: _contextId, runId: '', title: '', isDefault: false, status: 'active'));
+      final thread = _threads.firstWhere(
+        (t) => t.threadId == threadId,
+        orElse:
+            () => ChatThread(
+              threadId: threadId,
+              contextId: _contextId,
+              runId: '',
+              title: '',
+              isDefault: false,
+              status: 'active',
+            ),
+      );
       return ChatThreadDetail(thread: thread, messages: cached);
     }
     // Fall back to REST.
-    final thread = await _provider.fetchThread(contextId: _contextId, threadId: threadId);
-    final messages = await _provider.listMessages(contextId: _contextId, threadId: threadId);
+    final thread = await _provider.fetchThread(
+      contextId: _contextId,
+      threadId: threadId,
+    );
+    final messages = await _provider.listMessages(
+      contextId: _contextId,
+      threadId: threadId,
+    );
     // Push events may have populated the cache while the REST call was in flight.
     // Prefer push messages over REST response to avoid overwriting them.
     if ((_messagesByThread[threadId] ?? []).isEmpty) {
@@ -408,13 +541,25 @@ class ChatController extends ChangeNotifier {
   Future<List<ChatMessage>> loadMessages({required String threadId}) async {
     final cached = _messagesByThread[threadId];
     if (cached != null && cached.isNotEmpty) return cached;
-    final messages = await _provider.listMessages(contextId: _contextId, threadId: threadId);
+    final messages = await _provider.listMessages(
+      contextId: _contextId,
+      threadId: threadId,
+    );
     _messagesByThread[threadId] = messages;
     return messages;
   }
 
-  Future<void> sendMessage({String? threadId, required String text, List<ChatAttachment>? attachments}) async {
-    await _provider.sendMessage(contextId: _contextId, threadId: threadId, text: text, attachments: attachments);
+  Future<void> sendMessage({
+    String? threadId,
+    required String text,
+    List<ChatAttachment>? attachments,
+  }) async {
+    await _provider.sendMessage(
+      contextId: _contextId,
+      threadId: threadId,
+      text: text,
+      attachments: attachments,
+    );
     await loadThreads(forceRefresh: true);
   }
 

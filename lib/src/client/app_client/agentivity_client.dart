@@ -6,6 +6,7 @@ import 'api/runs_api.dart';
 import 'api/conversations_api.dart';
 import 'api/agentic_folders_api.dart';
 import 'api/data_tables_api.dart';
+import 'api/icons_api.dart';
 
 export '../core/http_core.dart';
 export 'api/entities_api.dart';
@@ -13,6 +14,7 @@ export 'api/runs_api.dart';
 export 'api/conversations_api.dart';
 export 'api/agentic_folders_api.dart';
 export 'api/data_tables_api.dart';
+export 'api/icons_api.dart';
 
 /// Lightweight Agentivity client intended for publication on pub.dev.
 ///
@@ -33,6 +35,7 @@ class AgentivityClient {
     conversations = ConversationsApi(_http);
     agenticFolders = AgenticFoldersApi(_http);
     dataTables = DataTablesApi(_http);
+    icons = IconsApi(_http);
   }
 
   final AgentivityHttpCore _http;
@@ -43,6 +46,9 @@ class AgentivityClient {
 
   /// Entity discovery: list and browse agents, teams, and workflows.
   late final EntitiesApi entities;
+
+  /// The catalog of icons a user can choose from (any icon picker reads it).
+  late final IconsApi icons;
 
   /// Run lifecycle: start runs, manage HIL, send interactions, open SSE streams.
   late final RunsApi runs;

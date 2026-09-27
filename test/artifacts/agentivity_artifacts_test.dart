@@ -268,6 +268,93 @@ void main() {
       // is unrelated and expected, so only opacity < 1.0 is checked.
       expect(find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1.0), findsNothing);
     });
+
+    testWidgets('a date question opens a native date picker instead of a text field, and reports the ISO date', (tester) async {
+      String? submitted;
+      await tester.pumpWidget(_wrap(
+        AgQuestionForm(
+          props: {
+            'questions': [
+              {'id': 'start', 'label': 'Departure date', 'type': 'date'},
+            ],
+            '__onSubmit': (String value) => submitted = value,
+          },
+        ),
+      ));
+
+      // No plain text entry — tapping the field opens the date picker.
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      expect(submitted, matches(RegExp(r'^• Departure date → \d{4}-\d{2}-\d{2}$')));
+    });
+
+    testWidgets('a number question only accepts digits', (tester) async {
+      String? submitted;
+      await tester.pumpWidget(_wrap(
+        AgQuestionForm(
+          props: {
+            'questions': [
+              {'id': 'travelers', 'label': 'Travelers', 'type': 'number'},
+            ],
+            '__onSubmit': (String value) => submitted = value,
+          },
+        ),
+      ));
+
+      await tester.enterText(find.byType(TextField), '2abc');
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      expect(submitted, '• Travelers → 2');
+    });
+
+    testWidgets('a boolean question is two Yes/No buttons, no text field at all', (tester) async {
+      String? submitted;
+      await tester.pumpWidget(_wrap(
+        AgQuestionForm(
+          props: {
+            'questions': [
+              {'id': 'car', 'label': 'Need a rental car?', 'type': 'boolean'},
+            ],
+            '__onSubmit': (String value) => submitted = value,
+          },
+        ),
+      ));
+
+      expect(find.byType(TextField), findsNothing);
+      await tester.tap(find.text('No'));
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      expect(submitted, '• Need a rental car? → No');
+    });
+
+    testWidgets('an unknown type falls back to text, so a client ahead of an older SDK never breaks', (tester) async {
+      String? submitted;
+      await tester.pumpWidget(_wrap(
+        AgQuestionForm(
+          props: {
+            'questions': [
+              {'id': 'x', 'label': 'X', 'type': 'currency'},
+            ],
+            '__onSubmit': (String value) => submitted = value,
+          },
+        ),
+      ));
+
+      await tester.enterText(find.byType(TextField), 'EUR');
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      expect(submitted, '• X → EUR');
+    });
   });
 
   group('AgChoiceCard', () {

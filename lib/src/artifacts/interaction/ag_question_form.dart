@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../shell/ag_artifact_card.dart';
 
@@ -7,19 +8,28 @@ import '../shell/ag_artifact_card.dart';
 /// Agent props:
 /// ```json
 /// {
-///   "title": "Quelques questions",
+///   "title": "A few questions",
 ///   "questions": [
-///     {"id": "type", "label": "S'agit-il d'un achat pro ou perso ?", "hint": "Ex: Personnel"},
-///     {"id": "budget", "label": "Quel est votre budget ?", "hint": "Ex: 1500€", "required": false}
+///     {"id": "dest", "label": "Destination", "hint": "e.g. Barcelona"},
+///     {"id": "start", "label": "Departure date", "type": "date"},
+///     {"id": "travelers", "label": "Travelers", "type": "number"},
+///     {"id": "car", "label": "Need a rental car?", "type": "boolean"},
+///     {"id": "budget", "label": "Budget", "hint": "e.g. 1500", "required": false}
 ///   ],
-///   "submitLabel": "Envoyer"
+///   "submitLabel": "Send"
 /// }
 /// ```
 ///
-/// When submitted, calls `props['__onSubmit']` with a structured text response:
+/// `type` is `'text'` (default), `'date'` (a native date picker — always use this for a question about
+/// a date, never a free-text field), `'number'`, or `'boolean'` (Yes/No).
+///
+/// When submitted, calls `props['__onSubmit']` with a structured text response — a boolean answer reads
+/// as "Yes"/"No", a date answer as its ISO date (`2027-07-01`):
 /// ```
-/// • S'agit-il d'un achat pro ou perso ? → Personnel, gaming
-/// • Quel est votre budget ? → 1500€
+/// • Destination → Barcelona
+/// • Departure date → 2027-07-01
+/// • Travelers → 2
+/// • Need a rental car? → No
 /// ```
 class AgQuestionForm extends StatefulWidget {
   const AgQuestionForm({super.key, required this.props});
@@ -30,9 +40,23 @@ class AgQuestionForm extends StatefulWidget {
   State<AgQuestionForm> createState() => _AgQuestionFormState();
 }
 
+enum _QuestionType { text, date, number, boolean }
+
+_QuestionType _typeOf(Map<String, dynamic> q) => switch (q['type']) {
+  'date' => _QuestionType.date,
+  'number' => _QuestionType.number,
+  'boolean' => _QuestionType.boolean,
+  _ => _QuestionType.text, // covers 'text' and anything an older/unknown SDK might send.
+};
+
 class _AgQuestionFormState extends State<AgQuestionForm> {
   late final List<Map<String, dynamic>> _questions;
+  late final List<_QuestionType> _types;
   late final List<TextEditingController> _controllers;
+  // Canonical answer per question — what is actually submitted. For text/number it mirrors the
+  // controller; for date it is the ISO date the controller only displays formatted; for boolean
+  // there is no controller at all.
+  late final List<String?> _answers;
   bool _submitted = false;
 
   @override
@@ -42,7 +66,9 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
     _questions = raw is List
         ? raw.map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{}).toList()
         : <Map<String, dynamic>>[];
+    _types = _questions.map(_typeOf).toList();
     _controllers = List.generate(_questions.length, (_) => TextEditingController());
+    _answers = List.generate(_questions.length, (_) => null);
   }
 
   @override
@@ -53,6 +79,18 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
     super.dispose();
   }
 
+  Future<void> _pickDate(int i) async {
+    if (_submitted) return;
+    final now = DateTime.now();
+    final picked = await showDatePicker(context: context, initialDate: now, firstDate: DateTime(now.year - 1), lastDate: DateTime(now.year + 5));
+    if (picked == null) return;
+    final iso = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    setState(() {
+      _answers[i] = iso;
+      _controllers[i].text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+    });
+  }
+
   void _submit() {
     final onSubmit = widget.props['__onSubmit'] as Function?;
     if (onSubmit == null || _submitted) return;
@@ -60,7 +98,7 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
     final lines = <String>[];
     for (var i = 0; i < _questions.length; i++) {
       final label = _questions[i]['label'] as String? ?? 'Q${i + 1}';
-      final answer = _controllers[i].text.trim();
+      final answer = (_answers[i] ?? _controllers[i].text).trim();
       if (answer.isNotEmpty) {
         lines.add('• $label → $answer');
       }
@@ -70,6 +108,77 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
 
     setState(() => _submitted = true);
     onSubmit(lines.join('\n'));
+  }
+
+  InputDecoration _decoration(ColorScheme cs, {String? hint, Widget? suffixIcon}) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.4)),
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    suffixIcon: suffixIcon,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: cs.outlineVariant)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: cs.outlineVariant)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: cs.primary, width: 1.5)),
+  );
+
+  Widget _field(ColorScheme cs, int i, String? hint, bool isLast) {
+    switch (_types[i]) {
+      case _QuestionType.boolean:
+        Widget option(String label) {
+          final selected = _answers[i] == label;
+          return Expanded(
+            child: OutlinedButton(
+              onPressed: _submitted ? null : () => setState(() => _answers[i] = label),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: selected ? cs.primary : null,
+                foregroundColor: selected ? cs.onPrimary : cs.onSurface,
+                side: BorderSide(color: selected ? cs.primary : cs.outlineVariant),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                minimumSize: const Size.fromHeight(34),
+              ),
+              child: Text(label, style: const TextStyle(fontSize: 13)),
+            ),
+          );
+        }
+
+        return Row(children: [option('Yes'), const SizedBox(width: 8), option('No')]);
+
+      case _QuestionType.date:
+        return TextField(
+          controller: _controllers[i],
+          enabled: !_submitted,
+          readOnly: true,
+          onTap: () => _pickDate(i),
+          decoration: _decoration(cs, hint: hint ?? 'Select a date', suffixIcon: const Icon(Icons.calendar_today_outlined, size: 16)),
+          style: const TextStyle(fontSize: 13),
+        );
+
+      case _QuestionType.number:
+        return TextField(
+          controller: _controllers[i],
+          enabled: !_submitted,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+          decoration: _decoration(cs, hint: hint),
+          style: const TextStyle(fontSize: 13),
+          onChanged: (v) => _answers[i] = v,
+          onSubmitted: (_) {
+            if (isLast) _submit();
+          },
+        );
+
+      case _QuestionType.text:
+        return TextField(
+          controller: _controllers[i],
+          enabled: !_submitted,
+          decoration: _decoration(cs, hint: hint),
+          style: const TextStyle(fontSize: 13),
+          onChanged: (v) => _answers[i] = v,
+          onSubmitted: (_) {
+            if (isLast) _submit();
+          },
+        );
+    }
   }
 
   @override
@@ -129,35 +238,7 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  TextField(
-                    controller: _controllers[i],
-                    enabled: !_submitted,
-                    decoration: InputDecoration(
-                      hintText: hint,
-                      hintStyle: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.4),
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: cs.outlineVariant),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: cs.outlineVariant),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: cs.primary, width: 1.5),
-                      ),
-                    ),
-                    style: const TextStyle(fontSize: 13),
-                    onSubmitted: (_) {
-                      if (i == _questions.length - 1) _submit();
-                    },
-                  ),
+                  _field(cs, i, hint, i == _questions.length - 1),
                 ],
               ),
             );

@@ -1,6 +1,7 @@
 import '../../core/http_core.dart';
 import '../domain/agent_models.dart';
 import '../domain/entity_models.dart';
+import '../domain/team_definition_models.dart';
 import '../domain/team_folder_models.dart';
 import '../domain/workflow_models.dart';
 
@@ -104,6 +105,15 @@ class EntitiesApi {
               e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map),
             ))
         .toList(growable: false);
+  }
+
+  /// A team's saved definition — members (with the icon and group set in the team editor), connections and manager.
+  /// GET /api/v1/agentic/teams/{teamId}
+  Future<TeamStructure> fetchTeam(String teamId) async {
+    final response = await _c.get<Map<String, dynamic>>(
+      AgentivityHttpCore.v1('/agentic/teams/${teamId.trim()}'),
+    );
+    return TeamStructure.fromJson(response.data ?? const <String, dynamic>{});
   }
 
   Future<List<WorkflowEntity>> fetchWorkflows() async {
