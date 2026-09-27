@@ -58,6 +58,7 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
     this.badgeForeground,
 
     // ── Typography ───────────────────────────────────────────────────────────
+    this.fontFamily,
     this.labelFontSize = 10.0,
     this.headerFontSize = 12.0,
     this.valueFontSize = 28.0,
@@ -104,6 +105,16 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
   final Color? badgeForeground;
 
   // ── Typography ─────────────────────────────────────────────────────────────
+
+  /// Base font family for every artifact widget's body/label/header text — the React SDK's
+  /// `ArtifactsThemeData.fontFamily` counterpart. `null` (the default for every preset except
+  /// [AgArtifactsThemes.terminal]) leaves the ambient `Theme.of(context).textTheme` alone, so a
+  /// preset that doesn't care about typography never fights the host app's own font choice.
+  /// [AgArtifactsThemes.themeDataFor] applies this to the [ThemeData] it builds; a caller that
+  /// registers a preset directly via `ThemeData(...).copyWith(extensions: [...])` instead should
+  /// apply it the same way (`textTheme: textTheme.apply(fontFamily: preset.fontFamily)`) to get
+  /// the same result — this field only carries the intent, same as every other token here.
+  final String? fontFamily;
 
   /// Base font size for axis labels, legend dots, subtitles. Default: 10.
   final double labelFontSize;
@@ -182,6 +193,7 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
     List<BoxShadow>? cardShadow,
     Color? badgeBackground,
     Color? badgeForeground,
+    String? fontFamily,
     double? labelFontSize,
     double? headerFontSize,
     double? valueFontSize,
@@ -200,6 +212,7 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
         cardShadow: cardShadow ?? this.cardShadow,
         badgeBackground: badgeBackground ?? this.badgeBackground,
         badgeForeground: badgeForeground ?? this.badgeForeground,
+        fontFamily: fontFamily ?? this.fontFamily,
         labelFontSize: labelFontSize ?? this.labelFontSize,
         headerFontSize: headerFontSize ?? this.headerFontSize,
         valueFontSize: valueFontSize ?? this.valueFontSize,
@@ -229,6 +242,7 @@ class AgArtifactsThemeData extends ThemeExtension<AgArtifactsThemeData> {
             Color.lerp(badgeBackground, other.badgeBackground, t),
         badgeForeground:
             Color.lerp(badgeForeground, other.badgeForeground, t),
+        fontFamily: t < 0.5 ? fontFamily : other.fontFamily,
         labelFontSize:
             lerpDouble(labelFontSize, other.labelFontSize, t) ?? labelFontSize,
         headerFontSize:

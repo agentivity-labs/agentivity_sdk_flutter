@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../shell/ag_artifact_card.dart';
+import '../theme/ag_artifacts_theme.dart';
 
 /// Date or date-range picker widget.
 ///
@@ -33,10 +34,27 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
 
   DateTime? _parseDate(String? s) {
     if (s == null) return null;
-    try { return DateTime.parse(s); } catch (_) { return null; }
+    try {
+      return DateTime.parse(s);
+    } catch (_) {
+      return null;
+    }
   }
 
-  static const _months = ['jan', 'fév', 'mar', 'avr', 'mai', 'jun', 'jul', 'aoû', 'sep', 'oct', 'nov', 'déc'];
+  static const _months = [
+    'jan',
+    'fév',
+    'mar',
+    'avr',
+    'mai',
+    'jun',
+    'jul',
+    'aoû',
+    'sep',
+    'oct',
+    'nov',
+    'déc',
+  ];
   String _fmt(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
 
   /// Clamps [date] inside [min, max] — the agent may send stale or inconsistent
@@ -48,8 +66,12 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
   Future<void> _pickDate() async {
     final mode = widget.props['mode'] as String? ?? 'single';
     final now = DateTime.now();
-    var minDate = _parseDate(widget.props['minDate'] as String?) ?? DateTime(now.year - 2);
-    var maxDate = _parseDate(widget.props['maxDate'] as String?) ?? DateTime(now.year + 3);
+    var minDate =
+        _parseDate(widget.props['minDate'] as String?) ??
+        DateTime(now.year - 2);
+    var maxDate =
+        _parseDate(widget.props['maxDate'] as String?) ??
+        DateTime(now.year + 3);
     if (maxDate.isBefore(minDate)) (minDate, maxDate) = (maxDate, minDate);
 
     if (mode == 'range') {
@@ -57,11 +79,19 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
         context: context,
         firstDate: minDate,
         lastDate: maxDate,
-        initialDateRange: (_start != null && _end != null)
-            ? DateTimeRange(start: _clamp(_start!, minDate, maxDate), end: _clamp(_end!, minDate, maxDate))
-            : null,
+        initialDateRange:
+            (_start != null && _end != null)
+                ? DateTimeRange(
+                  start: _clamp(_start!, minDate, maxDate),
+                  end: _clamp(_end!, minDate, maxDate),
+                )
+                : null,
       );
-      if (picked != null) setState(() { _start = picked.start; _end = picked.end; });
+      if (picked != null)
+        setState(() {
+          _start = picked.start;
+          _end = picked.end;
+        });
     } else {
       final picked = await showDatePicker(
         context: context,
@@ -69,7 +99,11 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
         firstDate: minDate,
         lastDate: maxDate,
       );
-      if (picked != null) setState(() { _start = picked; _end = null; });
+      if (picked != null)
+        setState(() {
+          _start = picked;
+          _end = null;
+        });
     }
   }
 
@@ -77,9 +111,10 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
     final onSubmit = widget.props['__onSubmit'] as Function?;
     if (onSubmit == null || _submitted || _start == null) return;
     final mode = widget.props['mode'] as String? ?? 'single';
-    final response = mode == 'range' && _end != null
-        ? 'Période : ${_fmt(_start!)} → ${_fmt(_end!)}'
-        : 'Date : ${_fmt(_start!)}';
+    final response =
+        mode == 'range' && _end != null
+            ? 'Période : ${_fmt(_start!)} → ${_fmt(_end!)}'
+            : 'Date : ${_fmt(_start!)}';
     setState(() => _submitted = true);
     onSubmit(response);
   }
@@ -87,16 +122,21 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // A button's own Text label doesn't inherit AgArtifactCard's DefaultTextStyle.merge — see
+    // ag_choice_card.dart's identical note.
+    final fontFamily = AgArtifactsThemeData.of(context).fontFamily;
     final title = widget.props['title'] as String? ?? 'Date';
     final question = widget.props['question'] as String?;
     final mode = widget.props['mode'] as String? ?? 'single';
     final submitLabel = widget.props['submitLabel'] as String? ?? 'Confirmer';
 
-    String selectionText = mode == 'range' ? 'Sélectionner une période' : 'Sélectionner une date';
+    String selectionText =
+        mode == 'range' ? 'Sélectionner une période' : 'Sélectionner une date';
     if (_start != null) {
-      selectionText = mode == 'range' && _end != null
-          ? '${_fmt(_start!)} → ${_fmt(_end!)}'
-          : _fmt(_start!);
+      selectionText =
+          mode == 'range' && _end != null
+              ? '${_fmt(_start!)} → ${_fmt(_end!)}'
+              : _fmt(_start!);
     }
 
     return AgArtifactCard(
@@ -129,20 +169,33 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_month_rounded, size: 18,
-                      color: _start != null ? cs.primary : cs.onSurface.withValues(alpha: 0.4)),
+                  Icon(
+                    Icons.calendar_month_rounded,
+                    size: 18,
+                    color:
+                        _start != null
+                            ? cs.primary
+                            : cs.onSurface.withValues(alpha: 0.4),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       selectionText,
                       style: TextStyle(
                         fontSize: 13,
-                        color: _start != null ? cs.onSurface : cs.onSurface.withValues(alpha: 0.45),
+                        color:
+                            _start != null
+                                ? cs.onSurface
+                                : cs.onSurface.withValues(alpha: 0.45),
                       ),
                     ),
                   ),
                   if (!_submitted)
-                    Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.4)),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
                 ],
               ),
             ),
@@ -152,9 +205,14 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
             onPressed: (_submitted || _start == null) ? null : _submit,
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 36),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
-            child: Text(submitLabel, style: const TextStyle(fontSize: 13)),
+            child: Text(
+              submitLabel,
+              style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+            ),
           ),
         ],
       ),

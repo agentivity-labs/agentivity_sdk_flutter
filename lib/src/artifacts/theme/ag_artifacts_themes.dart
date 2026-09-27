@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../shared/color_utils.dart';
 import 'ag_artifacts_theme.dart';
 
 /// Pre-built [AgArtifactsThemeData] presets.
@@ -206,10 +207,135 @@ abstract class AgArtifactsThemes {
     cardShadow: [],
     badgeBackground: Color(0xFF161b22),
     badgeForeground: Color(0xFF39d353),
+    fontFamily: 'monospace',
     codeFontFamily: 'monospace',
     codeFontSize: 11.5,
     labelFontSize: 9.5,
     headerFontSize: 11.0,
+  );
+
+  // ── Riviera showcase set ─────────────────────────────────────────────────
+  // Ported from `agentivity_sdk_showcase_tripagency/src/theme/themes.ts` — same five curated
+  // looks, kept to what this Dart theme extension can actually carry: card shape/color, badge
+  // color, chart palette, code font. The showcase's app-chrome tokens (ink/paper, pill/bubble
+  // radius, the hero gradient, and a *display* font per theme) have no home here — this class has
+  // no general fontFamily field (only codeFontFamily), unlike its React counterpart
+  // (ArtifactsThemeData.fontFamily) — so Techno and Ledger arrive with matching colors/radius but
+  // without their shared JetBrains Mono display face; only their code blocks pick it up. Adding a
+  // display-font field is a real, separate API change (it would need threading through every
+  // artifact widget's Text/RichText, not just this file) — flagged, not silently done here.
+
+  /// **Light** — clean neutral default, indigo accent. Pairs with [dark] below (same accent
+  /// family and radius, inverted surfaces).
+  static const AgArtifactsThemeData light = AgArtifactsThemeData(
+    chartPalette: [
+      '#4F46E5', '#E4483D', '#10B981',
+      '#F59E0B', '#06B6D4', '#EC4899',
+      '#8B5CF6', '#14161A',
+    ],
+    cardRadius: 12.0,
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorderColor: Color(0xFFE4E6EA),
+    cardBorderWidth: 1.0,
+    cardShadow: [
+      BoxShadow(
+        color: Color(0x24141614),
+        blurRadius: 20,
+        offset: Offset(0, 8),
+        spreadRadius: -10,
+      ),
+    ],
+    badgeBackground: Color(0xFFEEF0FF),
+    badgeForeground: Color(0xFF4F46E5),
+    fontFamily: 'Karla',
+    labelFontSize: 10.0,
+    headerFontSize: 12.5,
+  );
+
+  /// **Dark** — [light]'s exact pair: same indigo accent family and radius, inverted surfaces.
+  /// The standard dark default, not the showy one — see [techno] for that.
+  static const AgArtifactsThemeData dark = AgArtifactsThemeData(
+    chartPalette: [
+      '#818CF8', '#F87171', '#34D399',
+      '#FBBF24', '#38BDF8', '#F472B6',
+      '#A78BFA', '#F2F3F5',
+    ],
+    cardRadius: 12.0,
+    cardBackground: Color(0xFF1A1C20),
+    cardBorderColor: Color(0xFF2A2D33),
+    cardBorderWidth: 1.0,
+    cardShadow: [
+      BoxShadow(color: Color(0x80000000), blurRadius: 24, offset: Offset(0, 10)),
+    ],
+    badgeBackground: Color(0xFF23263A),
+    badgeForeground: Color(0xFFA5B4FC),
+    fontFamily: 'Karla',
+    labelFontSize: 10.0,
+    headerFontSize: 12.5,
+  );
+
+  /// **Riviera** — this SDK's original showcase identity. Light, editorial: warm off-white
+  /// surfaces, a gold accent, generous rounded corners.
+  static const AgArtifactsThemeData riviera = AgArtifactsThemeData(
+    chartPalette: [
+      '#E3A94F', '#F1633B', '#4E7D5E',
+      '#3C6E82', '#C97F49', '#6B6270',
+      '#A6572F', '#171A1D',
+    ],
+    cardRadius: 16.0,
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorderColor: Color(0xFFEDEBE5),
+    cardBorderWidth: 1.5,
+    cardShadow: [
+      BoxShadow(color: Color(0x2E171A1D), blurRadius: 24, offset: Offset(0, 10), spreadRadius: -12),
+    ],
+    badgeBackground: Color(0xFFFDF7EC),
+    badgeForeground: Color(0xFF171A1D),
+    fontFamily: 'Karla',
+  );
+
+  /// **Techno** — modern and vibrant, kept in check: one cool accent duo (violet + teal), not
+  /// several competing neons, tighter corners than [riviera]/[light]/[dark].
+  static const AgArtifactsThemeData techno = AgArtifactsThemeData(
+    chartPalette: [
+      '#7C7CFF', '#34D5C4', '#F5A623',
+      '#FF6F91', '#5EEAD4', '#C7C4FF',
+      '#4ADE80', '#E8EAED',
+    ],
+    cardRadius: 5.0,
+    cardBackground: Color(0xFF16181C),
+    cardBorderColor: Color(0xFF262A31),
+    cardShadow: [
+      BoxShadow(color: Color(0x8C000000), blurRadius: 26, offset: Offset(0, 10)),
+    ],
+    badgeBackground: Color(0xFF201C3E),
+    badgeForeground: Color(0xFF7C7CFF),
+    fontFamily: 'JetBrains Mono',
+    codeFontFamily: 'JetBrains Mono',
+  );
+
+  /// **Ledger** — the odd one out on purpose: sharp-cornered, print/boarding-pass counterpoint to
+  /// the other four's rounding. Warm paper white, a burnt-orange "ink stamp" accent.
+  static const AgArtifactsThemeData ledger = AgArtifactsThemeData(
+    chartPalette: [
+      '#B34700', '#B3261E', '#3A5A40',
+      '#1A1A18', '#8C8C82', '#6B4F2A',
+      '#D8D6CC', '#5A5A52',
+    ],
+    cardRadius: 3.0,
+    cardBackground: Color(0xFFFAF9F5),
+    cardBorderColor: Color(0xFFD8D6CC),
+    cardBorderWidth: 1.0,
+    cardShadow: [
+      BoxShadow(color: Color(0x331A1A18), blurRadius: 16, offset: Offset(0, 6), spreadRadius: -10),
+    ],
+    badgeBackground: Color(0xFFF1EFE6),
+    badgeForeground: Color(0xFFB34700),
+    fontFamily: 'JetBrains Mono',
+    labelFontSize: 9.5,
+    headerFontSize: 11.5,
+    valueFontSize: 26.0,
+    codeFontFamily: 'JetBrains Mono',
   );
 
   // ── Official ──────────────────────────────────────────────────────────────
@@ -282,6 +408,11 @@ abstract class AgArtifactsThemes {
     'Agentivity':       agentivity,
     'Agentivity Light': agentivityLight,
     'Agentivity Dark':  agentivityDark,
+    'Light':            light,
+    'Dark':             dark,
+    'Riviera':          riviera,
+    'Techno':           techno,
+    'Ledger':           ledger,
   };
 
   /// Recommended [Brightness] for each theme.
@@ -299,10 +430,27 @@ abstract class AgArtifactsThemes {
     'Agentivity':       Brightness.light,
     'Agentivity Light': Brightness.light,
     'Agentivity Dark':  Brightness.dark,
+    'Light':            Brightness.light,
+    'Dark':             Brightness.dark,
+    'Riviera':          Brightness.light,
+    'Techno':           Brightness.dark,
+    'Ledger':           Brightness.light,
   };
 
   /// Returns the recommended [ThemeData] (light or dark, Material 3)
   /// for the preset with the given [name].
+  ///
+  /// Unlike a plain `ThemeData.light()/.dark().copyWith(extensions: [ext])`, this also seeds a
+  /// matching [ColorScheme] from the preset's own accent (`badgeForeground`, or its first
+  /// `chartPalette` entry) via [ColorScheme.fromSeed] — Material 3's own harmonious-palette
+  /// algorithm, not a hand-picked scheme per preset. Without this, every preset's card/badge
+  /// looked distinct but every *ambient* Material color (a button, a selection highlight,
+  /// anything a widget outside `agentivity_artifacts` pulls from `Theme.of(context).colorScheme`)
+  /// stayed the same generic Material purple regardless of which of these presets was active —
+  /// confirmed: this was the actual reason two very different-looking React themes (e.g. Techno's
+  /// violet vs. Ledger's burnt orange) rendered with identical button/accent colors in Flutter.
+  /// [fontFamily] is applied the same way — see that field's own doc for why a direct
+  /// `ThemeExtension` registration needs the same two lines to match.
   ///
   /// ```dart
   /// MaterialApp(
@@ -316,6 +464,20 @@ abstract class AgArtifactsThemes {
     final base = brightness == Brightness.dark
         ? ThemeData.dark(useMaterial3: true)
         : ThemeData.light(useMaterial3: true);
-    return base.copyWith(extensions: [ext]);
+    final seed = ext.badgeForeground ??
+        (ext.chartPalette?.isNotEmpty == true
+            ? parseColor(ext.chartPalette!.first, base.colorScheme.primary)
+            : null);
+    final colorScheme = seed == null
+        ? base.colorScheme
+        : ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
+    final textTheme = ext.fontFamily == null
+        ? base.textTheme
+        : base.textTheme.apply(fontFamily: ext.fontFamily);
+    return base.copyWith(
+      colorScheme: colorScheme,
+      textTheme: textTheme,
+      extensions: [ext],
+    );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../shell/ag_artifact_card.dart';
+import '../theme/ag_artifacts_theme.dart';
 
 /// Single or multi-select choice widget.
 ///
@@ -41,9 +42,17 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
   void initState() {
     super.initState();
     final raw = widget.props['options'];
-    _options = raw is List
-        ? raw.map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{}).toList()
-        : <Map<String, dynamic>>[];
+    _options =
+        raw is List
+            ? raw
+                .map(
+                  (e) =>
+                      e is Map
+                          ? Map<String, dynamic>.from(e)
+                          : <String, dynamic>{},
+                )
+                .toList()
+            : <Map<String, dynamic>>[];
     _multiple = widget.props['multiple'] as bool? ?? false;
   }
 
@@ -68,10 +77,15 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
     final onSubmit = widget.props['__onSubmit'] as Function?;
     if (onSubmit == null || _submitted || _selected.isEmpty) return;
 
-    final labels = _selected.map((id) {
-      final opt = _options.firstWhere((o) => o['id'] == id, orElse: () => {'label': id});
-      return opt['label'] as String? ?? id;
-    }).join(', ');
+    final labels = _selected
+        .map((id) {
+          final opt = _options.firstWhere(
+            (o) => o['id'] == id,
+            orElse: () => {'label': id},
+          );
+          return opt['label'] as String? ?? id;
+        })
+        .join(', ');
 
     setState(() => _submitted = true);
     onSubmit('Choix : $labels');
@@ -80,6 +94,11 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // A button's own child Text does not inherit AgArtifactCard's DefaultTextStyle.merge (a
+    // button resolves its label style from its own ButtonStyle, not the ambient DefaultTextStyle)
+    // — confirmed by test, and the reason every FilledButton/OutlinedButton label below sets
+    // fontFamily explicitly instead of relying on inheritance like the plain Text widgets here do.
+    final fontFamily = AgArtifactsThemeData.of(context).fontFamily;
     final title = widget.props['title'] as String? ?? 'Choix';
     final question = widget.props['question'] as String?;
     final submitLabel = widget.props['submitLabel'] as String? ?? 'Confirmer';
@@ -119,11 +138,15 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? cs.primaryContainer.withValues(alpha: 0.5)
-                      : cs.surfaceContainerLow,
+                  color:
+                      isSelected
+                          ? cs.primaryContainer.withValues(alpha: 0.5)
+                          : cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isSelected ? cs.primary : cs.outlineVariant,
@@ -134,10 +157,17 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
                   children: [
                     Icon(
                       _multiple
-                          ? (isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded)
-                          : (isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded),
+                          ? (isSelected
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded)
+                          : (isSelected
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_unchecked_rounded),
                       size: 18,
-                      color: isSelected ? cs.primary : cs.onSurface.withValues(alpha: 0.4),
+                      color:
+                          isSelected
+                              ? cs.primary
+                              : cs.onSurface.withValues(alpha: 0.4),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -174,9 +204,14 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
             onPressed: (_submitted || _selected.isEmpty) ? null : _submit,
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 36),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
-            child: Text(submitLabel, style: const TextStyle(fontSize: 13)),
+            child: Text(
+              submitLabel,
+              style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+            ),
           ),
         ],
       ),

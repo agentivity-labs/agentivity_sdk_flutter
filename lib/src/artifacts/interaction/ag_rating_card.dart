@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../shell/ag_artifact_card.dart';
+import '../theme/ag_artifacts_theme.dart';
 
 /// Star or scale rating widget.
 ///
@@ -36,8 +37,12 @@ class _AgRatingCardState extends State<AgRatingCard> {
     final onSubmit = widget.props['__onSubmit'] as Function?;
     if (onSubmit == null || _submitted || _selected == null) return;
     final max = widget.props['max'] as int? ?? 5;
-    final labels = (widget.props['labels'] as List?)?.map((e) => e.toString()).toList();
-    final label = (labels != null && _selected! - 1 < labels.length) ? ' — ${labels[_selected! - 1]}' : '';
+    final labels =
+        (widget.props['labels'] as List?)?.map((e) => e.toString()).toList();
+    final label =
+        (labels != null && _selected! - 1 < labels.length)
+            ? ' — ${labels[_selected! - 1]}'
+            : '';
     setState(() => _submitted = true);
     onSubmit('Note : $_selected/$max$label');
   }
@@ -45,11 +50,15 @@ class _AgRatingCardState extends State<AgRatingCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // A button's own Text label doesn't inherit AgArtifactCard's DefaultTextStyle.merge — see
+    // ag_choice_card.dart's identical note.
+    final fontFamily = AgArtifactsThemeData.of(context).fontFamily;
     final title = widget.props['title'] as String? ?? 'Évaluation';
     final question = widget.props['question'] as String?;
     final mode = widget.props['mode'] as String? ?? 'stars';
     final max = widget.props['max'] as int? ?? 5;
-    final labels = (widget.props['labels'] as List?)?.map((e) => e.toString()).toList();
+    final labels =
+        (widget.props['labels'] as List?)?.map((e) => e.toString()).toList();
     final submitLabel = widget.props['submitLabel'] as String? ?? 'Envoyer';
 
     return AgArtifactCard(
@@ -81,7 +90,10 @@ class _AgRatingCardState extends State<AgRatingCard> {
                     child: Icon(
                       active ? Icons.star_rounded : Icons.star_outline_rounded,
                       size: 32,
-                      color: active ? const Color(0xFFf59e0b) : cs.onSurface.withValues(alpha: 0.3),
+                      color:
+                          active
+                              ? const Color(0xFFf59e0b)
+                              : cs.onSurface.withValues(alpha: 0.3),
                     ),
                   ),
                 );
@@ -104,7 +116,9 @@ class _AgRatingCardState extends State<AgRatingCard> {
                       decoration: BoxDecoration(
                         color: active ? cs.primary : cs.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: active ? cs.primary : cs.outlineVariant),
+                        border: Border.all(
+                          color: active ? cs.primary : cs.outlineVariant,
+                        ),
                       ),
                       alignment: Alignment.center,
                       child: Text(
@@ -120,12 +134,18 @@ class _AgRatingCardState extends State<AgRatingCard> {
                 );
               }),
             ),
-          if (_selected != null && labels != null && _selected! - 1 < labels.length) ...[
+          if (_selected != null &&
+              labels != null &&
+              _selected! - 1 < labels.length) ...[
             const SizedBox(height: 8),
             Center(
               child: Text(
                 labels[_selected! - 1],
-                style: TextStyle(fontSize: 12, color: cs.primary, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.primary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -134,9 +154,14 @@ class _AgRatingCardState extends State<AgRatingCard> {
             onPressed: (_submitted || _selected == null) ? null : _submit,
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 36),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
-            child: Text(submitLabel, style: const TextStyle(fontSize: 13)),
+            child: Text(
+              submitLabel,
+              style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+            ),
           ),
         ],
       ),
