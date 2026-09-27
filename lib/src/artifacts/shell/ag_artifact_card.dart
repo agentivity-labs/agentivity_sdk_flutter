@@ -43,13 +43,15 @@ class AgArtifactCard extends StatelessWidget {
 
     final bgColor = t.cardBackground ?? cs.surface;
     final borderColor = t.cardBorderColor ?? cs.outlineVariant;
-    final badgeBg = t.badgeBackground ?? cs.primaryContainer.withValues(alpha: 0.4);
+    final badgeBg =
+        t.badgeBackground ?? cs.primaryContainer.withValues(alpha: 0.4);
     final badgeFg = t.badgeForeground ?? cs.primary;
 
     // The on-surface color adapts to the card background brightness.
-    final onBg = ThemeData.estimateBrightnessForColor(bgColor) == Brightness.dark
-        ? Colors.white
-        : Colors.black;
+    final onBg =
+        ThemeData.estimateBrightnessForColor(bgColor) == Brightness.dark
+            ? Colors.white
+            : Colors.black;
 
     return Container(
       decoration: BoxDecoration(
@@ -58,56 +60,75 @@ class AgArtifactCard extends StatelessWidget {
         borderRadius: radius,
         boxShadow: t.cardShadow,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── Header ─────────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 13, color: onBg.withValues(alpha: 0.5)),
-                  const SizedBox(width: 6),
-                ],
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: t.headerFontSize,
-                    fontWeight: FontWeight.w600,
-                    color: onBg.withValues(alpha: 0.85),
-                  ),
-                ),
-                if (type != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: BorderRadius.circular(3),
+      // Applies t.fontFamily to every Text inside this card — including `child`, which belongs
+      // to whichever of the ~20 artifact widgets is using this shell, none of which set their own
+      // fontFamily (confirmed: they all leave TextStyle.fontFamily unset, relying on inheriting
+      // this). Doing it here, once, is what makes every artifact widget respect the theme's font
+      // without editing each one individually — and unlike relying on Theme.of(context).textTheme
+      // (only correct when the app builds its ThemeData via AgArtifactsThemes.themeDataFor),
+      // merging it directly from this extension's own field works no matter how the app
+      // registered the theme, including the plain `ThemeData(...).copyWith(extensions: [...])`
+      // pattern this class's own doc comment shows first (confirmed by test: that path left
+      // DefaultTextStyle at the Material default, Roboto, ignoring fontFamily entirely, before
+      // this fix).
+      child: DefaultTextStyle.merge(
+        style: TextStyle(fontFamily: t.fontFamily),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Header ─────────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 13, color: onBg.withValues(alpha: 0.5)),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: t.fontFamily,
+                      fontSize: t.headerFontSize,
+                      fontWeight: FontWeight.w600,
+                      color: onBg.withValues(alpha: 0.85),
                     ),
-                    child: Text(
-                      type!,
-                      style: TextStyle(
-                        fontSize: t.labelFontSize,
-                        color: badgeFg,
-                        fontWeight: FontWeight.w500,
+                  ),
+                  if (type != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        type!,
+                        style: TextStyle(
+                          fontFamily: t.fontFamily,
+                          fontSize: t.labelFontSize,
+                          color: badgeFg,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
+                  const Spacer(),
+                  ...actions,
+                  if (copyValue != null)
+                    _CopyButton(value: copyValue!, onBg: onBg, accent: badgeFg),
                 ],
-                const Spacer(),
-                ...actions,
-                if (copyValue != null)
-                  _CopyButton(value: copyValue!, onBg: onBg, accent: badgeFg),
-              ],
+              ),
             ),
-          ),
-          Divider(height: 1, color: borderColor),
-          // ── Content ────────────────────────────────────────────────────────
-          Padding(padding: padding ?? t.cardPadding, child: child),
-        ],
+            Divider(height: 1, color: borderColor),
+            // ── Content ────────────────────────────────────────────────────────
+            Padding(padding: padding ?? t.cardPadding, child: child),
+          ],
+        ),
       ),
     );
   }
@@ -149,9 +170,7 @@ class _CopyButtonState extends State<_CopyButton> {
           _copied ? Icons.check_rounded : Icons.copy_rounded,
           key: ValueKey(_copied),
           size: 13,
-          color: _copied
-              ? widget.accent
-              : widget.onBg.withValues(alpha: 0.4),
+          color: _copied ? widget.accent : widget.onBg.withValues(alpha: 0.4),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../shell/ag_artifact_card.dart';
+import '../theme/ag_artifacts_theme.dart';
 
 /// Confirmation / approval card.
 ///
@@ -38,6 +39,9 @@ class _AgConfirmCardState extends State<AgConfirmCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // A button's own Text label doesn't inherit AgArtifactCard's DefaultTextStyle.merge — see
+    // ag_choice_card.dart's identical note.
+    final fontFamily = AgArtifactsThemeData.of(context).fontFamily;
     final title = widget.props['title'] as String? ?? 'Confirmation';
     final message = widget.props['message'] as String? ?? '';
     final context_ = widget.props['context'] as String?;
@@ -110,9 +114,14 @@ class _AgConfirmCardState extends State<AgConfirmCard> {
                     onPressed: () => _choose(cancelLabel),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 36),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
-                    child: Text(cancelLabel, style: const TextStyle(fontSize: 13)),
+                    child: Text(
+                      cancelLabel,
+                      style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -121,9 +130,14 @@ class _AgConfirmCardState extends State<AgConfirmCard> {
                     onPressed: () => _choose(confirmLabel),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 36),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
-                    child: Text(confirmLabel, style: const TextStyle(fontSize: 13)),
+                    child: Text(
+                      confirmLabel,
+                      style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+                    ),
                   ),
                 ),
               ],
