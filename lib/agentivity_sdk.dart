@@ -58,6 +58,9 @@ export 'src/ag_ui/panels/chat/chat_theme.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_input.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_discussion.dart';
 export 'src/ag_ui/panels/chat/member_avatar.dart';
+export 'src/ag_ui/panels/chat/team_appearance.dart';
+export 'src/icons/icon_ref.dart';
+export 'src/ag_ui/panels/chat/team_views.dart';
 
 // ── AG-UI: panels — assistant ────────────────────────────────────────────────
 export 'src/ag_ui/panels/assistant/assistant_models.dart';
@@ -151,6 +154,8 @@ export 'src/client/app_client/domain/chat_models.dart';
 export 'src/client/app_client/domain/entity_models.dart';
 export 'src/client/app_client/domain/execution_models.dart';
 export 'src/client/app_client/domain/interaction_models.dart';
+export 'src/client/app_client/domain/team_definition_models.dart';
+export 'src/client/app_client/domain/icon_catalog_models.dart';
 export 'src/client/app_client/domain/team_folder_models.dart';
 export 'src/client/app_client/domain/workflow_annotation_palette.dart';
 export 'src/client/app_client/domain/workflow_argument_type.dart';
