@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../client/app_client/domain/team_definition_models.dart';
 import '../../../icons/icon_ref.dart';
 import 'chat_controller.dart';
+import 'execution_statuses_controller.dart';
 import 'member_avatar.dart';
 import 'team_appearance.dart';
 
@@ -114,17 +115,20 @@ class AgUiTeamPalette {
     this.working = const Color(0xFFF1633B),
     this.waiting = const Color(0xFFE3A94F),
     this.done = const Color(0xFF10B981),
+    this.failed = const Color(0xFFDC2626),
     this.idle = const Color(0xFFCBD5E1),
   });
   final Color working;
   final Color waiting;
   final Color done;
+  final Color failed;
   final Color idle;
 
   Color of(TeamMemberStatus? status) => switch (status) {
     TeamMemberStatus.working => working,
     TeamMemberStatus.waiting => waiting,
     TeamMemberStatus.done => done,
+    TeamMemberStatus.failed => failed,
     null => idle,
   };
 }
@@ -145,6 +149,7 @@ String teamMemberStatusText(TeamMemberStatus? status) => switch (status) {
   TeamMemberStatus.working => 'working now',
   TeamMemberStatus.waiting => 'waiting for your answer',
   TeamMemberStatus.done => 'done',
+  TeamMemberStatus.failed => 'failed',
   null => 'not needed yet',
 };
 
@@ -159,9 +164,16 @@ class AgUiTeamRoster extends StatelessWidget {
     this.resolveMemberAvatar,
     this.palette = const AgUiTeamPalette(),
     this.avatarSize = 28,
+    this.statusSource,
   });
 
   final ChatController controller;
+  /// Where member statuses come from — an [ExecutionStatusesController] reading the execution's own inspector (right on a
+  /// fresh run, after a reconnect and when reopening an old execution). When omitted it falls back to what [controller]
+  /// has seen on the stream ([ChatController.memberStatuses]), which is empty for anything that happened before this
+  /// screen was open.
+  final ExecutionStatusesController? statusSource;
+
 
   /// Every member of the Team, in the order to show them.
   final List<AgUiTeamMember> members;
@@ -172,9 +184,9 @@ class AgUiTeamRoster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([controller, if (statusSource != null) statusSource!]),
       builder: (context, _) {
-        final statuses = controller.memberStatuses;
+        final statuses = statusSource?.memberStatuses ?? controller.memberStatuses;
         final groupColors = agUiTeamGroupColors(
           members.map((m) => m.group),
           custom: _colorOverrides(members),
@@ -289,9 +301,16 @@ class AgUiTeamGraph extends StatefulWidget {
     this.resolveMemberAvatar,
     this.palette = const AgUiTeamPalette(),
     this.restingColors = false,
+    this.statusSource,
   });
 
   final ChatController controller;
+  /// Where member statuses come from — an [ExecutionStatusesController] reading the execution's own inspector (right on a
+  /// fresh run, after a reconnect and when reopening an old execution). When omitted it falls back to what [controller]
+  /// has seen on the stream ([ChatController.memberStatuses]), which is empty for anything that happened before this
+  /// screen was open.
+  final ExecutionStatusesController? statusSource;
+
   final List<AgUiTeamMember> members;
 
   /// Show the members in their group colors while nothing is running (a still picture of the team). By default they are
@@ -334,6 +353,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
   void initState() {
     super.initState();
     widget.controller.addListener(_syncAnimation);
+    widget.statusSource?.addListener(_syncAnimation);
     _syncAnimation();
   }
 
@@ -344,21 +364,28 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
       oldWidget.controller.removeListener(_syncAnimation);
       widget.controller.addListener(_syncAnimation);
     }
+    if (oldWidget.statusSource != widget.statusSource) {
+      oldWidget.statusSource?.removeListener(_syncAnimation);
+      widget.statusSource?.addListener(_syncAnimation);
+    }
     _syncAnimation();
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_syncAnimation);
+    widget.statusSource?.removeListener(_syncAnimation);
     _view.dispose();
     _blink.dispose();
     _flow.dispose();
     super.dispose();
   }
 
+  Map<String, TeamMemberStatus> get _memberStatuses => widget.statusSource?.memberStatuses ?? widget.controller.memberStatuses;
+
   // The link animation only runs while someone is actually working.
   void _syncAnimation() {
-    final working = widget.controller.memberStatuses.containsValue(
+    final working = _memberStatuses.containsValue(
       TeamMemberStatus.working,
     );
     if (working && !_flow.isAnimating) {
@@ -562,11 +589,12 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                     child: ListenableBuilder(
                       listenable: Listenable.merge([
                         widget.controller,
+                        if (widget.statusSource != null) widget.statusSource!,
                         _flow,
                         _blink,
                       ]),
                       builder: (context, _) {
-                        final statuses = widget.controller.memberStatuses;
+                        final statuses = _memberStatuses;
                         final running = statuses.isNotEmpty;
                         // Nothing runs and the graph was asked for a still, colored picture of the team.
                         final resting = widget.restingColors && !running;
@@ -785,6 +813,7 @@ class _BranchPainter extends CustomPainter {
           ..strokeWidth = 2.4 * scale;
         _dashed(canvas, path, paint, 6 * scale, 4 * scale, flow);
       case TeamMemberStatus.done:
+      case TeamMemberStatus.failed:
         paint
           ..color = color
           ..strokeWidth = 1.8 * scale;

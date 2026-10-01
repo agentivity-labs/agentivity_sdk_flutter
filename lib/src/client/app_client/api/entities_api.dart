@@ -3,6 +3,7 @@ import '../domain/agent_models.dart';
 import '../domain/entity_models.dart';
 import '../domain/team_definition_models.dart';
 import '../domain/team_folder_models.dart';
+import '../domain/workflow_graph_models.dart';
 import '../domain/workflow_models.dart';
 
 /// Discovery endpoints for agents, teams, and workflows.
@@ -134,5 +135,12 @@ class EntitiesApi {
     final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/workflows/$id'));
     final data = response.data ?? const <String, dynamic>{};
     return WorkflowEntity.fromJson(data, fallbackId: id);
+  }
+
+  /// The same workflow definition as [fetchWorkflow], narrowed instead to a flow diagram's worth
+  /// of structure (nodes + the execution-flow edges between them). Powers [AgUiWorkflowGraph].
+  Future<WorkflowGraphStructure> fetchWorkflowGraph(String id) async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/workflows/$id'));
+    return WorkflowGraphStructure.fromJson(response.data ?? const <String, dynamic>{});
   }
 }

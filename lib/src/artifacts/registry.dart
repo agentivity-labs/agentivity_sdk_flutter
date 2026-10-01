@@ -16,6 +16,7 @@ import 'interaction/ag_date_picker_card.dart';
 import 'interaction/ag_question_form.dart';
 import 'interaction/ag_rating_card.dart';
 import 'interaction/ag_summary_card.dart';
+import 'interaction/ag_source_input.dart';
 import 'math/ag_latex.dart';
 import 'status/ag_status_card.dart';
 import 'status/ag_timeline.dart';
@@ -66,5 +67,6 @@ Map<String, AgUiComponentBuilder> buildArtifactsRegistry() {
     'RatingCard':     (context, p) => AgRatingCard(props: p),
     'DatePickerCard': (context, p) => AgDatePickerCard(props: p),
     'SummaryCard':    (context, p) => AgSummaryCard(props: p),
+    'SourceInput':    (context, p) => AgSourceInput(props: p),
   };
 }
