@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../../client/app_client/api/uploads_api.dart';
 import '../../theme/ag_theme_data.dart';
 import '../../tools/ag_ui_widget_registry.dart';
 import '../../widgets/ag_ui_markdown_body.dart';
@@ -65,6 +66,9 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.autoLoad = true,
     this.onAttach,
     this.onHilResponse,
+    this.onUploadFile,
+    this.onStop,
+    this.running,
     this.showActiveMemberIndicator = false,
     this.showSpeakerLabels = false,
     this.resolveMemberAvatar,
@@ -134,6 +138,20 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// for history but not rendered as a redundant user bubble.
   final Future<void> Function(ChatHilGate gate, String text, String source)? onHilResponse;
 
+  /// Lets an interactive widget hand a file to the platform — a `SourceInput` upload. Typically
+  /// `(name, bytes) => client.uploads.upload(bytes, name)`. Without it, `SourceInput` can only take a link or pasted text.
+  final Future<UploadedFile> Function(String fileName, Uint8List bytes)? onUploadFile;
+
+  /// Called when the user presses the stop button in the input box — the interrupt every chat app offers while a model is
+  /// working. Providing it turns the send button into a stop button for as long as a run is in progress; the app cancels
+  /// the run (e.g. `client.runs.cancelExecution`). Off by default: without it the input behaves as before.
+  final Future<void> Function()? onStop;
+
+  /// Whether the app knows a run is in progress (drives the stop button), e.g. from [ExecutionStatusesController], which is
+  /// right on a reopened execution too. Combined with what the stream reports ([ChatController.isAwaitingResponse]): either
+  /// one is enough, since an execution's status API does not always report a resumed team as running yet.
+  final bool? running;
+
   /// Shows a "member at work" indicator (avatar + name + animated dots) above the input
   /// while a Team member is taking its turn (driven by [ChatController.activeMember]).
   /// Off by default; has no effect for a standalone Agent, which never sets [ChatController.activeMember].
@@ -184,6 +202,18 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
   List<ChatMessage> _messages = const [];
   bool _loadingMessages = false;
   bool _submittingHil = false;
+  bool _stopping = false;
+
+  Future<void> _stop() async {
+    final onStop = widget.onStop;
+    if (onStop == null || _stopping) return;
+    setState(() => _stopping = true);
+    try {
+      await onStop();
+    } finally {
+      if (mounted) setState(() => _stopping = false);
+    }
+  }
 
   /// Resolved thread: [widget.threadId] if set, otherwise auto-selected.
   String? get _activeThreadId {
@@ -325,7 +355,11 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
       // via CHAT_MESSAGE_RECEIVED(role=user) SSE — no local optimistic add needed.
       // (Widget-sourced responses are flagged so the echo is not rendered.)
       await widget.onHilResponse?.call(gate, trimmed, source);
-      widget.controller.clearHilGate();
+      // Only the gate that was just answered: the response can return after the run has already reached its NEXT
+      // gate (the reply request resolves once the run suspends again), and clearing unconditionally wiped that new question.
+      if (widget.controller.pendingHilGate?.requestId == gate.requestId) {
+        widget.controller.clearHilGate();
+      }
     } finally {
       if (mounted) setState(() => _submittingHil = false);
     }
@@ -367,6 +401,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
             theme: theme,
             widgetRegistry: widget.widgetRegistry,
             enabled: isActiveWidget,
+            onUploadFile: widget.onUploadFile,
             onWidgetSubmit: isActiveWidget && widget.onHilResponse != null
                 ? (response) {
                     final gate = widget.controller.pendingHilGate;
@@ -394,7 +429,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
 
         // Input: HIL response field OR normal send input (always visible).
         if (isHilActive && widget.onHilResponse != null)
-          Padding(padding: const EdgeInsets.all(8), child: AgUiChatInput(controller: _inputController, hint: widget.hilInputHint, hilHint: widget.hilInputHint, isHil: true, loading: _submittingHil, enableAttachments: false, onSend: (text, _) => _submitHilResponse(text)))
+          Padding(padding: const EdgeInsets.all(8), child: AgUiChatInput(controller: _inputController, hint: widget.hilInputHint, hilHint: widget.hilInputHint, isHil: true, loading: _submittingHil, running: _submittingHil && ((widget.running ?? false) || widget.controller.isAwaitingResponse), onStop: widget.onStop == null ? null : _stop, stopping: _stopping, enableAttachments: false, onSend: (text, _) => _submitHilResponse(text)))
         else
           Padding(
             padding: const EdgeInsets.all(8),
@@ -411,6 +446,9 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
                   actionBar: widget.inputActionBar,
                   leadingActions: widget.inputLeadingActions,
                   trailingActions: widget.inputTrailingActions,
+                  running: (widget.running ?? false) || widget.controller.isAwaitingResponse,
+                  onStop: widget.onStop == null ? null : _stop,
+                  stopping: _stopping,
                   onSend: (text, attachments) => _send(text),
                 ),
           ),
@@ -448,12 +486,15 @@ class _ActiveMemberIndicator extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({super.key, required this.message, required this.theme, this.widgetRegistry, this.onWidgetSubmit, this.enabled = false, this.showSpeakerLabel = false, this.resolveMemberAvatar});
+  const _MessageBubble({super.key, required this.message, required this.theme, this.widgetRegistry, this.onWidgetSubmit, this.onUploadFile, this.enabled = false, this.showSpeakerLabel = false, this.resolveMemberAvatar});
 
   final ChatMessage message;
   final AgThemeData theme;
   final AgUiWidgetRegistry? widgetRegistry;
   final void Function(String response)? onWidgetSubmit;
+
+  /// Lets an interactive widget hand a file to the platform (a `SourceInput` upload); injected as `__upload`.
+  final Future<UploadedFile> Function(String fileName, Uint8List bytes)? onUploadFile;
   final bool showSpeakerLabel;
   final AgUiMemberAvatar? Function(AgUiChatMember member)? resolveMemberAvatar;
 
@@ -552,6 +593,8 @@ class _MessageBubble extends StatelessWidget {
                     final props = {
                       ...?block.widgetProps,
                       if (onWidgetSubmit != null) '__onSubmit': onWidgetSubmit,
+                      if (onUploadFile != null) '__upload': onUploadFile,
+        if (onUploadFile != null) '__upload': onUploadFile,
                     };
                     final built = widgetRegistry!.build(context, block.type, props);
                     if (built == null) return const SizedBox.shrink();
@@ -578,6 +621,7 @@ class _MessageBubble extends StatelessWidget {
       final props = {
         ...baseProps,
         if (onWidgetSubmit != null) '__onSubmit': onWidgetSubmit,
+        if (onUploadFile != null) '__upload': onUploadFile,
       };
       final built = widgetRegistry!.build(context, widgetType, props);
       if (built != null) {

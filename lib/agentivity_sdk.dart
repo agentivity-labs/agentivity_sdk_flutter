@@ -61,6 +61,9 @@ export 'src/ag_ui/panels/chat/member_avatar.dart';
 export 'src/ag_ui/panels/chat/team_appearance.dart';
 export 'src/icons/icon_ref.dart';
 export 'src/ag_ui/panels/chat/team_views.dart';
+export 'src/ag_ui/panels/chat/workflow_graph_layout.dart' show WorkflowLayout, layoutWorkflowGraph;
+export 'src/ag_ui/panels/chat/workflow_views.dart';
+export 'src/ag_ui/panels/chat/execution_statuses_controller.dart';
 
 // ── AG-UI: panels — assistant ────────────────────────────────────────────────
 export 'src/ag_ui/panels/assistant/assistant_models.dart';
@@ -127,6 +130,7 @@ export 'src/artifacts/interaction/ag_date_picker_card.dart';
 export 'src/artifacts/interaction/ag_question_form.dart';
 export 'src/artifacts/interaction/ag_rating_card.dart';
 export 'src/artifacts/interaction/ag_summary_card.dart';
+export 'src/artifacts/interaction/ag_source_input.dart';
 
 // ── Artifacts: status ─────────────────────────────────────────────────────────
 export 'src/artifacts/status/ag_status_card.dart';
@@ -147,6 +151,7 @@ export 'src/client/app_client/api/conversations_api.dart';
 export 'src/client/app_client/api/entities_api.dart';
 export 'src/client/app_client/api/runs_api.dart';
 export 'src/client/app_client/api/voice_api.dart';
+export 'src/client/app_client/api/uploads_api.dart';
 export 'src/client/app_client/domain/agent_models.dart';
 export 'src/client/app_client/domain/agentivity_entity.dart';
 export 'src/client/app_client/domain/canvas_annotation_shared.dart';
@@ -160,6 +165,8 @@ export 'src/client/app_client/domain/team_folder_models.dart';
 export 'src/client/app_client/domain/workflow_annotation_palette.dart';
 export 'src/client/app_client/domain/workflow_argument_type.dart';
 export 'src/client/app_client/domain/workflow_models.dart';
+export 'src/client/app_client/domain/workflow_graph_models.dart';
+export 'src/client/app_client/domain/execution_status_models.dart';
 export 'src/client/core/api_contract.dart';
 export 'src/client/core/http_core.dart';
 export 'src/client/extras/api/ag_ui_bundles_api.dart';
@@ -168,6 +175,7 @@ export 'src/client/extras/api/svg_icons_api.dart';
 export 'src/client/extras/domain/ag_ui_bundle_models.dart';
 
 import 'src/client/app_client/agentivity_client.dart';
+import 'src/client/app_client/api/uploads_api.dart';
 import 'src/client/app_client/api/voice_api.dart';
 import 'src/client/extras/api/ag_ui_bundles_api.dart';
 import 'src/client/extras/api/chat_context_api.dart';
@@ -193,6 +201,7 @@ class AgentivityPlatformClient extends AgentivityClient {
     agUiBundles = AgUiBundlesApi(http);
     svgIcons = SvgIconsApi(http);
     voice = VoiceApi(http);
+    uploads = UploadsApi(http);
   }
 
   /// AG-UI chat channel: open a streaming run against a chat context/thread.
@@ -206,4 +215,7 @@ class AgentivityPlatformClient extends AgentivityClient {
 
   /// Server-side voice transcription for chat dictation.
   late final VoiceApi voice;
+
+  /// File uploads: hand a run a document (a CV, a contract…) it can read later by id.
+  late final UploadsApi uploads;
 }

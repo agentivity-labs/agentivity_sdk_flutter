@@ -61,7 +61,13 @@ import 'i_chat_provider.dart';
 /// Where a Team member stands in the conversation, from its own `StepStartedEvent`/`StepFinishedEvent`:
 /// [working] while it takes its turn, [waiting] if the run paused (a human question) while it was mid-turn,
 /// [done] once its turn ended. A member that has not appeared yet has no entry.
-enum TeamMemberStatus { working, waiting, done }
+enum TeamMemberStatus { working, waiting, done, failed }
+
+/// Where a Workflow node stands in the run, from its own `StepStartedEvent`/`StepFinishedEvent`'s
+/// `stepName` (the node's id) — same three states as [TeamMemberStatus], kept as its own type
+/// since the two are unrelated concepts that happen to share a shape. A node not reached yet has
+/// no entry.
+enum WorkflowStepStatus { working, waiting, done, failed }
 
 /// The Team member currently taking its turn — set from [StepStartedEvent], cleared on [StepFinishedEvent].
 class ActiveChatMember {
@@ -114,6 +120,7 @@ class ChatController extends ChangeNotifier {
   bool _isAwaitingResponse = false;
   ActiveChatMember? _activeMember;
   Map<String, TeamMemberStatus> _memberStatuses = const {};
+  Map<String, WorkflowStepStatus> _stepStatuses = const {};
 
   List<ChatThread> get threads => _threads;
   bool get isLoading => _isLoading;
@@ -142,11 +149,19 @@ class ChatController extends ChangeNotifier {
   /// Powers `AgUiTeamRoster` and `AgUiTeamGraph`. A new unmodifiable map on every change.
   Map<String, TeamMemberStatus> get memberStatuses => _memberStatuses;
 
+  /// Status of every Workflow node reached so far, keyed by `stepName` (its node id) — empty for
+  /// a Team/Agent run. Powers `AgUiWorkflowGraph`. A new unmodifiable map on every change.
+  Map<String, WorkflowStepStatus> get stepStatuses => _stepStatuses;
+
   void _setMemberStatus(String memberEntityId, TeamMemberStatus status) {
     _memberStatuses = Map.unmodifiable({
       ..._memberStatuses,
       memberEntityId: status,
     });
+  }
+
+  void _setStepStatus(String stepName, WorkflowStepStatus status) {
+    _stepStatuses = Map.unmodifiable({..._stepStatuses, stepName: status});
   }
 
   // A run that ends mid-turn leaves its member 'working' with nothing to show for it: paused on a human
@@ -160,6 +175,20 @@ class ChatController extends ChangeNotifier {
                 ? (interrupted
                     ? TeamMemberStatus.waiting
                     : TeamMemberStatus.done)
+                : entry.value,
+    });
+  }
+
+  /// Same idea as [_settleWorkingMembers], for [_stepStatuses].
+  void _settleWorkingSteps({required bool interrupted}) {
+    if (!_stepStatuses.containsValue(WorkflowStepStatus.working)) return;
+    _stepStatuses = Map.unmodifiable({
+      for (final entry in _stepStatuses.entries)
+        entry.key:
+            entry.value == WorkflowStepStatus.working
+                ? (interrupted
+                    ? WorkflowStepStatus.waiting
+                    : WorkflowStepStatus.done)
                 : entry.value,
     });
   }
@@ -242,6 +271,7 @@ class ChatController extends ChangeNotifier {
     _isAwaitingResponse = false;
     _activeMember = null;
     _memberStatuses = const {};
+    _stepStatuses = const {};
     _errorMessage = null;
     _inProgressThreadId.clear();
     notifyListeners();
@@ -258,6 +288,7 @@ class ChatController extends ChangeNotifier {
         _isAwaitingResponse = false;
         _activeMember = null;
         _settleWorkingMembers(interrupted: e.isInterrupted);
+        _settleWorkingSteps(interrupted: e.isInterrupted);
         if (e.isInterrupted) {
           final interrupts = (e.outcome as AgUiInterruptOutcome).interrupts;
           for (final interrupt in interrupts) {
@@ -280,15 +311,20 @@ class ChatController extends ChangeNotifier {
         _isAwaitingResponse = false;
         _activeMember = null;
         _settleWorkingMembers(interrupted: false);
+        _settleWorkingSteps(interrupted: false);
         notifyListeners();
 
       // ── CUSTOM events ───────────────────────────────────────────────────
       case CustomEvent e:
         _handleCustomEvent(e);
 
-      // ── Team member turn boundaries → drive activeMember (only set on events
-      // that carry member identity; a standalone Agent's step events never do). ──
+      // ── Turn boundaries → drive activeMember (Team runs only — needs member
+      // identity) and stepStatuses (any run — stepName is always present, so this
+      // fires for a Workflow's node-by-node progress too, not just Team turns). ──
       case StepStartedEvent e:
+        if (e.stepName.isNotEmpty)
+          _setStepStatus(e.stepName, WorkflowStepStatus.working);
+        var changedMember = false;
         if (e.memberEntityId != null || e.displayName != null) {
           _activeMember = ActiveChatMember(
             memberEntityId: e.memberEntityId,
@@ -296,16 +332,20 @@ class ChatController extends ChangeNotifier {
           );
           if (e.memberEntityId != null)
             _setMemberStatus(e.memberEntityId!, TeamMemberStatus.working);
-          notifyListeners();
+          changedMember = true;
         }
+        if (e.stepName.isNotEmpty || changedMember) notifyListeners();
 
       case StepFinishedEvent e:
-        if (_activeMember != null || e.memberEntityId != null) {
+        if (e.stepName.isNotEmpty)
+          _setStepStatus(e.stepName, WorkflowStepStatus.done);
+        final hadActiveMember = _activeMember != null || e.memberEntityId != null;
+        if (hadActiveMember) {
           _activeMember = null;
           if (e.memberEntityId != null)
             _setMemberStatus(e.memberEntityId!, TeamMemberStatus.done);
-          notifyListeners();
         }
+        if (e.stepName.isNotEmpty || hadActiveMember) notifyListeners();
 
       // ── Streaming text messages → accumulate into thread ────────────────
       case TextMessageStartEvent e:

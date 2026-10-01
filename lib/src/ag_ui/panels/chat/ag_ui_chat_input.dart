@@ -76,6 +76,9 @@ class AgUiChatInput extends StatefulWidget {
     this.maxLines = 6,
     this.enabled = true,
     this.loading = false,
+    this.running = false,
+    this.onStop,
+    this.stopping = false,
     this.isHil = false,
     this.enableVoice = true,
     this.onTranscribeAudio,
@@ -108,6 +111,16 @@ class AgUiChatInput extends StatefulWidget {
 
   /// When `true`, the send button shows a spinner and the border pulses.
   final bool loading;
+
+  /// A run is in progress. With [onStop] the send button becomes a stop button — the way every chat app lets you interrupt a
+  /// model that is working — and Enter no longer sends.
+  final bool running;
+
+  /// Called when the stop button is pressed. Providing it is what enables the stop button while [running].
+  final VoidCallback? onStop;
+
+  /// The stop request is in flight: the stop button shows a spinner and cannot be pressed twice.
+  final bool stopping;
 
   /// Switches the input into HIL (human-in-the-loop) mode:
   /// uses [hilHint] and applies a tertiary-tinted border and fill.
@@ -445,7 +458,10 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
 
   // ── Send ────────────────────────────────────────────────────────────────────
 
+  bool get _stoppable => widget.running && widget.onStop != null;
+
   void _send() {
+    if (_stoppable) return;
     final text = _ctrl.text.trim();
     final atts = List<AgUiInputAttachment>.from(_attachments);
     if (text.isEmpty && atts.isEmpty) return;
@@ -547,7 +563,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
           if (widget.trailingActions != null && widget.trailingActions!.isNotEmpty) ...[IconTheme(data: IconThemeData(size: 18, color: cs.onSurfaceVariant), child: Row(mainAxisSize: MainAxisSize.min, children: widget.trailingActions!)), const SizedBox(width: 4)],
 
           // Send button — filled with accent color
-          _SendButton(loading: widget.loading, canSend: isEnabled && hasContent, hasFocus: hasFocus, onTap: _send, accentColor: accentColor, onAccentColor: onAccentColor),
+          _SendButton(loading: widget.loading, canSend: isEnabled && hasContent, hasFocus: hasFocus, onTap: _send, accentColor: accentColor, onAccentColor: onAccentColor, stoppable: _stoppable, stopping: widget.stopping, onStop: widget.onStop),
         ],
       ),
     );
@@ -596,7 +612,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SendButton extends StatelessWidget {
-  const _SendButton({required this.loading, required this.canSend, required this.hasFocus, required this.onTap, required this.accentColor, required this.onAccentColor});
+  const _SendButton({required this.loading, required this.canSend, required this.hasFocus, required this.onTap, required this.accentColor, required this.onAccentColor, this.stoppable = false, this.stopping = false, this.onStop});
 
   final bool loading;
   final bool canSend;
@@ -604,10 +620,29 @@ class _SendButton extends StatelessWidget {
   final VoidCallback onTap;
   final Color accentColor;
   final Color onAccentColor;
+  final bool stoppable;
+  final bool stopping;
+  final VoidCallback? onStop;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    // A run is working: the button is the way to interrupt it, not a disabled spinner.
+    if (stoppable) {
+      if (stopping) {
+        return SizedBox(width: 24, height: 24, child: Padding(padding: const EdgeInsets.all(5), child: CircularProgressIndicator(strokeWidth: 2, color: cs.onSurfaceVariant.withValues(alpha: 0.5))));
+      }
+      return Tooltip(
+        message: 'Stop',
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(6)),
+          child: Material(color: Colors.transparent, child: InkWell(onTap: onStop, borderRadius: BorderRadius.circular(6), child: Center(child: Icon(Icons.stop_rounded, size: 14, color: onAccentColor)))),
+        ),
+      );
+    }
 
     if (loading) {
       // Neutral spinner — accent is reserved for the "ready to act" state

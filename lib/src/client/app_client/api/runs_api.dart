@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../core/http_core.dart';
 import '../domain/entity_models.dart';
+import '../domain/execution_status_models.dart';
 
 /// Run lifecycle endpoints: start, HIL, interactions, and SSE streams.
 ///
@@ -198,6 +199,26 @@ class RunsApi {
       final data = response.data;
       if (data == null) return null;
       return ExecutionRecord.fromJson(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Live step statuses — GET /api/v1/executions/{executionId}/inspector
+  // The authoritative per-step state (workflow nodes, team members) of any execution: valid on a fresh run, after a reconnect
+  // and when reopening an old execution — unlike stream events, which are not replayed.
+  // ---------------------------------------------------------------------------
+
+  Future<ExecutionStatuses?> fetchExecutionStatuses(String executionId) async {
+    final normalized = _c.requireNormalizedId(executionId, label: 'Execution id');
+    try {
+      final response = await _c.get<Map<String, dynamic>>(
+        AgentivityHttpCore.v1('/executions/$normalized/inspector'),
+      );
+      final data = response.data;
+      if (data == null) return null;
+      return ExecutionStatuses.fromJson(data);
     } catch (_) {
       return null;
     }
