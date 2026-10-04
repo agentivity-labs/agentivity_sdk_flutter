@@ -445,7 +445,7 @@ abstract class AgArtifactsThemes {
   /// `chartPalette` entry) via [ColorScheme.fromSeed] — Material 3's own harmonious-palette
   /// algorithm, not a hand-picked scheme per preset. Without this, every preset's card/badge
   /// looked distinct but every *ambient* Material color (a button, a selection highlight,
-  /// anything a widget outside `agentivity_artifacts` pulls from `Theme.of(context).colorScheme`)
+  /// anything a widget outside the artifact widgets pulls from `Theme.of(context).colorScheme`)
   /// stayed the same generic Material purple regardless of which of these presets was active —
   /// confirmed: this was the actual reason two very different-looking React themes (e.g. Techno's
   /// violet vs. Ledger's burnt orange) rendered with identical button/accent colors in Flutter.

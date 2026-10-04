@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../shared/color_utils.dart';
 
-/// Styling configuration for all [agentivity_artifacts] widgets.
+/// Styling configuration for all artifact widgets.
 ///
 /// Registered as a Flutter [ThemeExtension] inside [MaterialApp] — no wrapper
 /// widget needed. Every artifact widget reads it automatically via
