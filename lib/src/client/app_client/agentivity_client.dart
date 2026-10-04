@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../core/connection_monitor.dart';
 import '../core/http_core.dart';
 import 'api/entities_api.dart';
 import 'api/runs_api.dart';
@@ -8,6 +9,7 @@ import 'api/agentic_folders_api.dart';
 import 'api/data_tables_api.dart';
 import 'api/icons_api.dart';
 
+export '../core/connection_monitor.dart';
 export '../core/http_core.dart';
 export 'api/entities_api.dart';
 export 'api/runs_api.dart';
@@ -29,7 +31,10 @@ export 'api/icons_api.dart';
 /// final run = await client.runs.startRun(entityId: entities.first.id, input: 'Hello');
 /// ```
 class AgentivityClient {
-  AgentivityClient({Dio? dio, required String baseUrl}) : _http = AgentivityHttpCore(dio: dio, baseUrl: baseUrl) {
+  AgentivityClient({Dio? dio, required String baseUrl}) : this._(dio, baseUrl, ConnectionMonitor());
+
+  AgentivityClient._(Dio? dio, String baseUrl, this.connection) : _http = AgentivityHttpCore(dio: dio, baseUrl: baseUrl, monitor: connection) {
+    connection.probe = _http.probe;
     entities = EntitiesApi(_http);
     runs = RunsApi(_http);
     conversations = ConversationsApi(_http);
@@ -39,6 +44,9 @@ class AgentivityClient {
   }
 
   final AgentivityHttpCore _http;
+
+  /// Whether the server can be reached, and when the next attempt is — what [AgUiConnectionNotice] shows.
+  final ConnectionMonitor connection;
 
   /// Exposes the underlying HTTP core for Studio sub-classes to initialize
   /// their additional [*Api] components using the same transport.

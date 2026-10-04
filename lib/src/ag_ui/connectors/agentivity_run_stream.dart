@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../protocol/ag_ui_protocol.dart';
+import '../../client/core/connection_monitor.dart';
 import '../protocol/ag_ui_sse_channel.dart';
 import '../protocol/platform_stream.dart';
 import 'agentivity_signals.dart';
@@ -186,6 +187,10 @@ class AgentivityRunStream implements PlatformStream {
 
   @override
   void start() => _channel.start();
+
+  /// Reports this stream's connection to [monitor] (`client.connection`), so the app-wide "can't reach the server" notice follows it
+  /// and its "Retry now" reconnects it. Returns the function that stops reporting.
+  VoidCallback reportConnectionTo(ConnectionMonitor monitor, {String? id}) => _channel.reportTo(monitor, id: id);
 
   @override
   Future<void> dispose() async {

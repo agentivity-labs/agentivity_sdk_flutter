@@ -215,6 +215,7 @@ class RunsApi {
     try {
       final response = await _c.get<Map<String, dynamic>>(
         AgentivityHttpCore.v1('/executions/$normalized/inspector'),
+        dataBody: true,
       );
       final data = response.data;
       if (data == null) return null;

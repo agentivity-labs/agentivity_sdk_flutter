@@ -10,6 +10,9 @@ import 'ag_ui_chat_input.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
 import 'member_avatar.dart';
+import 'run_error.dart';
+import 'connection_notice.dart';
+import '../../../client/core/connection_monitor.dart';
 
 /// A complete chat discussion — message list + composer, orchestrated as one
 /// widget — backed by a [ChatController].
@@ -69,6 +72,7 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.onUploadFile,
     this.onStop,
     this.running,
+    this.connection,
     this.showActiveMemberIndicator = false,
     this.showSpeakerLabels = false,
     this.resolveMemberAvatar,
@@ -156,6 +160,10 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// while a Team member is taking its turn (driven by [ChatController.activeMember]).
   /// Off by default; has no effect for a standalone Agent, which never sets [ChatController.activeMember].
   final bool showActiveMemberIndicator;
+
+  /// The client's connection monitor (`client.connection`). When given, the conversation says on its own when the server cannot be
+  /// reached — with a countdown to the next attempt and a "Retry now" button.
+  final ConnectionMonitor? connection;
 
   /// Shows an avatar+name header above each assistant bubble, identifying which Team
   /// member sent it. Off by default; has no effect for a standalone Agent's messages
@@ -416,9 +424,14 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
     }
 
     final activeMember = widget.controller.activeMember;
+    final runError = widget.controller.runError;
     return Column(
       children: [
         Expanded(child: messagesArea),
+
+        if (widget.connection != null) AgUiConnectionNotice(monitor: widget.connection!),
+
+        if (runError != null) AgUiChatRunError(error: runError, onDismiss: widget.controller.dismissRunError),
 
         if (widget.showActiveMemberIndicator && activeMember != null)
           _ActiveMemberIndicator(member: AgUiChatMember(memberEntityId: activeMember.memberEntityId, displayName: activeMember.displayName), resolver: widget.resolveMemberAvatar),
