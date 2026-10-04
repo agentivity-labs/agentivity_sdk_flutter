@@ -2,7 +2,7 @@ import '../../ag_ui/tools/ag_ui_widget_registry.dart';
 
 import '../registry.dart';
 
-/// One-line integration between [agentivity_artifacts] and [agentivity_ag_ui].
+/// One-line integration between the artifact widgets and the AG-UI chat.
 ///
 /// Call [AgArtifactsBundle.registry] to get an [AgUiWidgetRegistry] with all
 /// 13 built-in artifact widgets pre-registered. Pass it directly to
