@@ -249,6 +249,28 @@ class ChatController extends ChangeNotifier {
 
   /// Appends [message] to [threadId]'s local message list.
   void addMessage({required String threadId, required ChatMessage message}) {
+    // A message restored from history carries its widgets only as the raw `blocks` of its metadata: read them back, or the
+    // conversation reopens with empty bubbles where the cards and charts were.
+    if (message.blocks == null) {
+      final restored = ChatContentBlock.listFromRaw(message.metadata?['blocks']);
+      if (restored != null && restored.isNotEmpty) {
+        message = ChatMessage(
+          id: message.id,
+          role: message.role,
+          contextId: message.contextId,
+          threadId: message.threadId,
+          runId: message.runId,
+          text: message.text,
+          authorId: message.authorId,
+          authorName: message.authorName,
+          metadata: message.metadata,
+          blocks: restored,
+          createdAt: message.createdAt,
+          updatedAt: message.updatedAt,
+          deletedAt: message.deletedAt,
+        );
+      }
+    }
     final existing = List<ChatMessage>.from(_messagesByThread[threadId] ?? []);
     final idx = existing.indexWhere((m) => m.id == message.id);
     if (idx >= 0) {
