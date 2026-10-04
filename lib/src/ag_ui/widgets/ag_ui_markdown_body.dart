@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
+import '../../artifacts/shell/ag_artifact_image.dart';
+
 /// Renders Markdown text consistently across all AG-UI widgets.
 ///
 /// **Only use for completed messages.** While a message is still streaming,
@@ -77,6 +79,29 @@ class AgUiMarkdownBody extends StatelessWidget {
       softLineBreak: true,
       shrinkWrap: true,
       styleSheet: sheet,
+      // An image in a message must never be wider than the bubble nor blow up to its natural size: fit the
+      // width, keep the ratio, and show nothing for an address that is not http(s).
+      imageBuilder: (uri, title, alt) {
+        if (agSafeHttpUrl(uri.toString()) == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  uri.toString(),
+                  fit: BoxFit.contain,
+                  semanticLabel: alt,
+                  errorBuilder: (_, _, _) => AgArtifactImage(alt: alt, width: 96, aspectRatio: 1),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
       listItemCrossAxisAlignment: MarkdownListItemCrossAxisAlignment.start,
     );
   }

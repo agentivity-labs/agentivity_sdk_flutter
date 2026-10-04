@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../../client/core/connection_monitor.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 
 /// Opens a raw SSE byte stream at [path].
@@ -246,6 +247,40 @@ class AgUiSseChannel<T> with WidgetsBindingObserver {
         unawaited(_connect());
       }
     });
+  }
+
+  /// Reconnects now instead of waiting out the backoff — the user asked to retry. No effect while connected or after the run ended.
+  void reconnectNow() {
+    if (_disposed || _terminated || isConnected) return;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    connectionStateNotifier.value = AgUiConnectionState(status: AgUiConnectionStatus.connecting, attempt: _reconnectAttempts);
+    unawaited(_connect());
+  }
+
+  /// Reports this channel's connection to [monitor] (the app-wide "can't reach the server" notice): reconnecting = offline.
+  /// Returns the function that stops reporting (call it when the channel is closed).
+  VoidCallback reportTo(ConnectionMonitor monitor, {String? id}) {
+    final key = id ?? identityHashCode(this).toString();
+    void report() {
+      final state = connectionStateNotifier.value;
+      monitor.setStream(
+        key,
+        StreamConnection(
+          offline: state.status == AgUiConnectionStatus.reconnecting || (state.status == AgUiConnectionStatus.connecting && state.attempt > 0),
+          attempt: state.attempt,
+          nextRetryAt: state.nextRetryAt,
+          retry: reconnectNow,
+        ),
+      );
+    }
+
+    connectionStateNotifier.addListener(report);
+    report();
+    return () {
+      connectionStateNotifier.removeListener(report);
+      monitor.removeStream(key);
+    };
   }
 
   /// Called by the consumer when a terminal AG-UI event (RUN_FINISHED, RUN_ERROR)

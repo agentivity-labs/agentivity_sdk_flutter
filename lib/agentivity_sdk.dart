@@ -58,7 +58,10 @@ export 'src/ag_ui/panels/chat/chat_theme.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_input.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_discussion.dart';
 export 'src/ag_ui/panels/chat/member_avatar.dart';
+export 'src/ag_ui/panels/chat/run_error.dart';
+export 'src/ag_ui/panels/chat/connection_notice.dart';
 export 'src/ag_ui/panels/chat/team_appearance.dart';
+export 'src/ag_ui/panels/chat/team_topology.dart';
 export 'src/icons/icon_ref.dart';
 export 'src/ag_ui/panels/chat/team_views.dart';
 export 'src/ag_ui/panels/chat/workflow_graph_layout.dart' show WorkflowLayout, layoutWorkflowGraph;
@@ -131,6 +134,8 @@ export 'src/artifacts/interaction/ag_question_form.dart';
 export 'src/artifacts/interaction/ag_rating_card.dart';
 export 'src/artifacts/interaction/ag_summary_card.dart';
 export 'src/artifacts/interaction/ag_source_input.dart';
+export 'src/artifacts/media/ag_image_gallery.dart';
+export 'src/artifacts/shell/ag_artifact_image.dart';
 
 // ── Artifacts: status ─────────────────────────────────────────────────────────
 export 'src/artifacts/status/ag_status_card.dart';

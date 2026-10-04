@@ -28,7 +28,7 @@ sealed class AgUiEvent {
       'RUN_ERROR' => RunErrorEvent._(type: type, timestamp: ts, executionId: executionId, message: _str(json, 'message'), code: _opt(json, 'code')),
       // Steps
       'STEP_STARTED' => StepStartedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName')),
-      'STEP_FINISHED' => StepFinishedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName')),
+      'STEP_FINISHED' => StepFinishedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName'), error: _opt(json, 'error')),
       // Text messages — streaming
       'TEXT_MESSAGE_START' => TextMessageStartEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), role: _str(json, 'role').isEmpty ? 'assistant' : _str(json, 'role'), name: _opt(json, 'name')),
       'TEXT_MESSAGE_CONTENT' => TextMessageContentEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), delta: _str(json, 'delta')),
@@ -180,11 +180,14 @@ final class StepStartedEvent extends AgUiEvent {
 }
 
 final class StepFinishedEvent extends AgUiEvent {
-  const StepFinishedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName, this.memberEntityId, this.memberEntityKind, this.displayName});
+  const StepFinishedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName, this.memberEntityId, this.memberEntityKind, this.displayName, this.error});
   final String stepName;
   final String? memberEntityId;
   final String? memberEntityKind;
   final String? displayName;
+
+  /// Set when the step ended because it failed (the reason), null when it completed.
+  final String? error;
 }
 
 // ── Text messages — streaming ─────────────────────────────────────────────────

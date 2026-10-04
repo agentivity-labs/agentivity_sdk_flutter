@@ -8,6 +8,8 @@ import 'chat_controller.dart';
 import 'execution_statuses_controller.dart';
 import 'member_avatar.dart';
 import 'team_appearance.dart';
+import 'team_layouts.dart';
+import 'team_topology.dart';
 
 /// A member of the Team being shown by [AgUiTeamRoster] / [AgUiTeamGraph]. [memberEntityId] must match
 /// the id the backend reports on `STEP_STARTED`/`STEP_FINISHED`.
@@ -19,6 +21,7 @@ class AgUiTeamMember {
     this.icon,
     this.group,
     this.groupColor,
+    this.topology,
   });
   final String memberEntityId;
   final String displayName;
@@ -32,6 +35,10 @@ class AgUiTeamMember {
 
   /// The color the team editor chose for this member's group; null = the default color.
   final Color? groupColor;
+
+  /// The shape of the whole team, set by [AgUiTeamStructureMembers.toTeamMembers] on every member so [AgUiTeamGraph] can draw the
+  /// right layout from the members alone. An app that builds its members by hand can pass `topology` to [AgUiTeamGraph] instead.
+  final AgUiTeamTopology? topology;
 
   /// Short caption under the member in [AgUiTeamGraph]; defaults to [displayName] without its trailing role word
   /// ("Flight Specialist" → "Flight"), truncated to fit.
@@ -49,16 +56,20 @@ Map<String, Color> _colorOverrides(List<AgUiTeamMember> members) =>
 /// A team's saved definition, ready for [AgUiTeamRoster] / [AgUiTeamGraph]: one [AgUiTeamMember] per member, with the
 /// icon and group the team editor set.
 extension AgUiTeamStructureMembers on TeamStructure {
-  List<AgUiTeamMember> toTeamMembers() => [
-    for (final m in members)
-      AgUiTeamMember(
-        memberEntityId: m.memberEntityId,
-        displayName: m.displayName ?? m.memberEntityId,
-        icon: m.icon,
-        group: m.group,
-        groupColor: agUiParseHexColor(groupColors[agUiTeamGroupKey(m.group)]),
-      ),
-  ];
+  List<AgUiTeamMember> toTeamMembers() {
+    final topology = agUiTeamTopology(this);
+    return [
+      for (final m in members)
+        AgUiTeamMember(
+          memberEntityId: m.memberEntityId,
+          displayName: m.displayName ?? m.memberEntityId,
+          icon: m.icon,
+          group: m.group,
+          groupColor: agUiParseHexColor(groupColors[agUiTeamGroupKey(m.group)]),
+          topology: topology,
+        ),
+    ];
+  }
 
   /// The id to pass as `hubMemberId` — the manager of a manager-led team, otherwise null.
   String? get hubMemberEntityId => manager?.memberEntityId;
@@ -302,6 +313,7 @@ class AgUiTeamGraph extends StatefulWidget {
     this.palette = const AgUiTeamPalette(),
     this.restingColors = false,
     this.statusSource,
+    this.topology,
   });
 
   final ChatController controller;
@@ -312,6 +324,10 @@ class AgUiTeamGraph extends StatefulWidget {
   final ExecutionStatusesController? statusSource;
 
   final List<AgUiTeamMember> members;
+
+  /// The shape of the team. Defaults to the one carried by [members] ([AgUiTeamStructureMembers.toTeamMembers]); a manager-led
+  /// team, or one of unknown shape, is drawn as a constellation around its hub.
+  final AgUiTeamTopology? topology;
 
   /// Show the members in their group colors while nothing is running (a still picture of the team). By default they are
   /// switched off and light up as the run needs them.
@@ -335,6 +351,12 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
   static const _nodeRadius = 13.0;
   static const _hubRadius = 21.0;
   static const _labelMax = 16;
+
+  /// A box taller than this many times its width is a side panel.
+  static const _tallBox = 1.4;
+
+  /// The width, in design units, a tall narrow box is laid out in — three captions side by side, one design unit per pixel.
+  static const _narrowWidth = 280.0;
 
   final TransformationController _view = TransformationController();
 
@@ -406,13 +428,18 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
   /// the tighter of the two dimensions, and the ring stretches to the rest of the space (never past 1.4 : 1, so a tall
   /// narrow box gets a centered constellation, not a thread). Mirrors the React graph.
   static _Frame _frameFor(double width, double height) {
-    final scale = math.min(width / _width, height / _height);
+    final fitted = math.min(width / _width, height / _height);
+    // A tall, narrow box (a side panel) would make everything tiny that way, so there the scale follows the width — down to
+    // [_narrowWidth] units across — and the extra height is left to the layout.
+    final scale = height > width * _tallBox ? math.max(fitted, math.min(1.0, width / _narrowWidth)) : fitted;
     final w = math.min(width / scale, 1200.0);
     final h = math.min(height / scale, 1200.0);
     final ringX = math.max(w / 2 - 48, 100.0);
     final ringY = math.min(math.max(h / 2 - 58, 85.0), ringX * 1.4);
     return _Frame(
       scale: scale,
+      width: w,
+      height: h,
       center: Offset(w / 2, h / 2),
       ringX: ringX,
       ringY: ringY,
@@ -506,69 +533,129 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
         final frame = _frameFor(width, height);
         final scale = frame.scale;
         final branches = _layout(others, frame);
+
+        // Every topology but the manager-led one has its own layout; the manager-led one (and a team of unknown shape) keeps
+        // the constellation.
+        final topology =
+            widget.topology ??
+            members.map((m) => m.topology).whereType<AgUiTeamTopology>().firstOrNull;
+        final byId = {for (final m in members) m.memberEntityId: m};
+        TeamScene? scene;
+        var sceneGroups = const <SceneGroup>[];
+        if (topology != null && topology.kind != AgUiTeamTopologyKind.managerLed) {
+          final sceneFrame = SceneFrame(
+            width: frame.width,
+            height: frame.height,
+            center: frame.center,
+            ringX: frame.ringX,
+            ringY: frame.ringY,
+          );
+          // A chain keeps the order of the team; every other layout draws a group as one arc / one block.
+          final ordered =
+              topology.kind == AgUiTeamTopologyKind.sequential
+                  ? members
+                  : agUiOrderByGroup(members, (m) => m.group);
+          scene = sceneFor(
+            topology.kind,
+            [for (final m in ordered) m.memberEntityId],
+            topology.links,
+            sceneFrame,
+            (id) => agUiTeamGroupKey(byId[id]?.group),
+          );
+          // In a chain the order is the team's, so a group split by another is drawn once per run of consecutive members.
+          final runs = <String, String>{};
+          if (topology.kind == AgUiTeamTopologyKind.sequential) {
+            String? previous;
+            var run = 0;
+            for (final m in members) {
+              final key = agUiTeamGroupKey(m.group);
+              if (key != previous) run++;
+              previous = key;
+              if (key != null) runs[m.memberEntityId] = '$key#$run';
+            }
+          }
+          sceneGroups = groupsFor(scene!, (id) {
+            final member = byId[id];
+            final key = agUiTeamGroupKey(member?.group);
+            return key == null ? null : (key: runs[id] ?? key, name: member!.group!.trim());
+          }, sceneFrame);
+        }
+
         Widget node(
           AgUiTeamMember member,
           Offset at,
           double radius,
           TeamMemberStatus? status,
-          bool resting,
-        ) {
+          bool resting, {
+          int? order,
+          bool labelAbove = false,
+        }) {
           final hexSize = radius * 2 * scale * 1.18;
           final boxSize = hexSize + 10;
           final label = _truncate(
             member.label ?? agUiTeamMemberShortName(member.displayName),
           );
-          return Positioned(
-            left: at.dx * scale - 40,
-            top: at.dy * scale - boxSize / 2,
-            width: 80,
-            child: Semantics(
-              label: '${member.displayName}, ${teamMemberStatusText(status)}',
-              excludeSemantics: true,
-              child: Tooltip(
-                message:
-                    '${member.displayName} — ${teamMemberStatusText(status)}',
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _TeamHexNode(
-                      avatar: resolveMemberAvatar(
-                        member.asChatMember,
-                        _memberAvatar(
-                          member,
-                          groupColors[agUiTeamGroupKey(member.group)],
-                          widget.resolveMemberAvatar,
-                        ),
-                      ),
-                      size: hexSize,
-                      off: status == null && !resting,
-                      pulse:
-                          status == TeamMemberStatus.working ? _blink.value : 0,
-                      ringColor:
-                          status == null ? null : widget.palette.of(status),
-                    ),
-                    const SizedBox(height: 1),
-                    Opacity(
-                      opacity:
-                          status == null && !resting
-                              ? 0.5
-                              : (status == TeamMemberStatus.working
-                                  ? 1 - 0.45 * _blink.value
-                                  : 1.0),
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.labelSmall?.copyWith(fontSize: 8.5 * scale),
-                      ),
-                    ),
-                  ],
-                ),
+          final hex = _TeamHexNode(
+            avatar: resolveMemberAvatar(
+              member.asChatMember,
+              _memberAvatar(
+                member,
+                groupColors[agUiTeamGroupKey(member.group)],
+                widget.resolveMemberAvatar,
+              ),
+            ),
+            size: hexSize,
+            off: status == null && !resting,
+            pulse: status == TeamMemberStatus.working ? _blink.value : 0,
+            ringColor: status == null ? null : widget.palette.of(status),
+            order: order,
+            scale: scale,
+          );
+          final caption = Opacity(
+            opacity:
+                status == null && !resting
+                    ? 0.5
+                    : (status == TeamMemberStatus.working
+                        ? 1 - 0.45 * _blink.value
+                        : 1.0),
+            child: Text(
+              label,
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(fontSize: 8.5 * scale),
+            ),
+          );
+          final body = Semantics(
+            label: '${member.displayName}, ${teamMemberStatusText(status)}',
+            excludeSemantics: true,
+            child: Tooltip(
+              message:
+                  '${member.displayName} — ${teamMemberStatusText(status)}',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children:
+                    labelAbove
+                        ? [caption, const SizedBox(height: 1), hex]
+                        : [hex, const SizedBox(height: 1), caption],
               ),
             ),
           );
+          // A name above the member is anchored by its bottom edge, so the hexagon stays centered on `at` whatever the name's height.
+          return labelAbove
+              ? Positioned(
+                left: at.dx * scale - 40,
+                bottom: height - (at.dy * scale + boxSize / 2),
+                width: 80,
+                child: body,
+              )
+              : Positioned(
+                left: at.dx * scale - 40,
+                top: at.dy * scale - boxSize / 2,
+                width: 80,
+                child: body,
+              );
         }
 
         return SizedBox(
@@ -602,39 +689,80 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                           children: [
                             Positioned.fill(
                               child: CustomPaint(
-                                painter: _BranchPainter(
-                                  branches: branches,
-                                  hasHub: hub != null,
-                                  statuses: statuses,
-                                  colors: groupColors,
-                                  running: !resting,
-                                  flow: _flow.value,
-                                  scale: scale,
-                                  center: frame.center,
-                                  labelColor:
-                                      Theme.of(context).colorScheme.onSurface,
-                                  haloColor:
-                                      Theme.of(context).colorScheme.surface,
-                                ),
+                                painter:
+                                    scene != null
+                                        ? _ScenePainter(
+                                          scene: scene,
+                                          groups: sceneGroups,
+                                          members: byId,
+                                          statuses: statuses,
+                                          colors: groupColors,
+                                          palette: widget.palette,
+                                          running: !resting,
+                                          flow: _flow.value,
+                                          scale: scale,
+                                          labelColor:
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                          haloColor:
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.surface,
+                                        )
+                                        : _BranchPainter(
+                                          branches: branches,
+                                          hasHub: hub != null,
+                                          statuses: statuses,
+                                          colors: groupColors,
+                                          running: !resting,
+                                          flow: _flow.value,
+                                          scale: scale,
+                                          center: frame.center,
+                                          labelColor:
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                          haloColor:
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.surface,
+                                        ),
                               ),
                             ),
-                            for (final branch in branches)
-                              for (final placed in branch.members)
-                                node(
-                                  placed.member,
-                                  placed.at,
-                                  _nodeRadius,
-                                  statuses[placed.member.memberEntityId],
-                                  resting,
-                                ),
-                            if (hub != null)
-                              node(
-                                hub,
-                                frame.center,
-                                _hubRadius,
-                                statuses[hub.memberEntityId],
-                                resting,
-                              ),
+                            ...(scene != null
+                                ? [
+                                  for (final placed in scene.members)
+                                    if (byId[placed.id] case final member?)
+                                      node(
+                                        member,
+                                        placed.at,
+                                        _nodeRadius,
+                                        statuses[placed.id],
+                                        resting,
+                                        order: placed.order,
+                                        labelAbove: placed.labelAbove,
+                                      ),
+                                ]
+                                : [
+                                  for (final branch in branches)
+                                    for (final placed in branch.members)
+                                      node(
+                                        placed.member,
+                                        placed.at,
+                                        _nodeRadius,
+                                        statuses[placed.member.memberEntityId],
+                                        resting,
+                                      ),
+                                  if (hub != null)
+                                    node(
+                                      hub,
+                                      frame.center,
+                                      _hubRadius,
+                                      statuses[hub.memberEntityId],
+                                      resting,
+                                    ),
+                                ]),
                           ],
                         );
                       },
@@ -697,12 +825,18 @@ class _FitButton extends StatelessWidget {
 class _Frame {
   const _Frame({
     required this.scale,
+    required this.width,
+    required this.height,
     required this.center,
     required this.ringX,
     required this.ringY,
   });
 
   final double scale;
+
+  /// The drawing space in design units.
+  final double width;
+  final double height;
   final Offset center;
   final double ringX;
   final double ringY;
@@ -739,6 +873,177 @@ class _Branch {
   final List<_Placed> members;
 }
 
+// ── Drawing helpers shared by the constellation and the other topologies ─────────────────────────────────────────────────
+
+/// A curve from [a] to [b], bent sideways by [bend] × its length — every link of the graph is one.
+Path _curvePath(Offset a, Offset b, double bend) {
+  final control = _controlPoint(a, b, bend);
+  return Path()
+    ..moveTo(a.dx, a.dy)
+    ..quadraticBezierTo(control.dx, control.dy, b.dx, b.dy);
+}
+
+Offset _controlPoint(Offset a, Offset b, double bend) {
+  final mid = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
+  return Offset(mid.dx - (b.dy - a.dy) * bend, mid.dy + (b.dx - a.dx) * bend);
+}
+
+/// A small triangle at [tip], pointing the way the curve arrives there (from its control point).
+Path _arrowHead(Offset tip, Offset control, double size) {
+  final d = tip - control;
+  final length = d.distance == 0 ? 1.0 : d.distance;
+  final ux = d.dx / length;
+  final uy = d.dy / length;
+  final base = Offset(tip.dx - ux * size, tip.dy - uy * size);
+  final wing = Offset(-uy * size * 0.55, ux * size * 0.55);
+  return Path()
+    ..moveTo(tip.dx, tip.dy)
+    ..lineTo(base.dx + wing.dx, base.dy + wing.dy)
+    ..lineTo(base.dx - wing.dx, base.dy - wing.dy)
+    ..close();
+}
+
+// Dashes march along the curve toward the working member.
+void _dashedPath(Canvas canvas, Path path, Paint paint, double dash, double gap, double flow) {
+  for (final metric in path.computeMetrics()) {
+    var travelled = -flow * (dash + gap) * 2;
+    while (travelled < metric.length) {
+      final start = math.max(travelled, 0.0);
+      final end = math.min(travelled + dash, metric.length);
+      if (end > start) canvas.drawPath(metric.extractPath(start, end), paint);
+      travelled += dash + gap;
+    }
+  }
+}
+
+/// A link in its branch's color: faint and dotted once a run has started and its member is not in it, solid when done,
+/// animated while working; before any run ([running] false) every link is solid, as a plain picture of the team.
+void _drawLink(
+  Canvas canvas,
+  Path path,
+  Color color,
+  TeamMemberStatus? status, {
+  required bool trunk,
+  required bool running,
+  required double scale,
+  required double flow,
+}) {
+  final paint =
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+  if (!running) {
+    paint
+      ..color = color.withValues(alpha: 0.6)
+      ..strokeWidth = (trunk ? 2.4 : 1.5) * scale;
+    canvas.drawPath(path, paint);
+    return;
+  }
+  switch (status) {
+    case TeamMemberStatus.working:
+      paint
+        ..color = color
+        ..strokeWidth = 2.4 * scale;
+      _dashedPath(canvas, path, paint, 6 * scale, 4 * scale, flow);
+    case TeamMemberStatus.done:
+    case TeamMemberStatus.failed:
+      paint
+        ..color = color
+        ..strokeWidth = 1.8 * scale;
+      canvas.drawPath(path, paint);
+    case TeamMemberStatus.waiting:
+      paint
+        ..color = color.withValues(alpha: 0.75)
+        ..strokeWidth = 1.8 * scale;
+      canvas.drawPath(path, paint);
+    case null:
+      paint
+        ..color = color.withValues(alpha: 0.35)
+        ..strokeWidth = 1.0 * scale;
+      _dashedPath(canvas, path, paint, 1.5 * scale, 4 * scale, 0);
+  }
+}
+
+/// The soft zone behind a group: its members' [points] (in design units) thickened into one rounded shape in the group's color.
+void _drawZone(Canvas canvas, List<Offset> points, Color color, double scale) {
+  final px = [for (final p in points) p * scale];
+  final paint = Paint()..color = color.withValues(alpha: 0.11);
+  const width = 46.0;
+  if (px.length == 1) {
+    canvas.drawCircle(px.first, width / 2 * scale, paint);
+    return;
+  }
+  final path = Path()..moveTo(px.first.dx, px.first.dy);
+  for (final point in px.skip(1)) {
+    path.lineTo(point.dx, point.dy);
+  }
+  if (px.length > 2) {
+    path.close();
+    canvas.drawPath(path, paint..style = PaintingStyle.fill);
+  }
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = color.withValues(alpha: 0.11)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width * scale
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round,
+  );
+}
+
+/// A group's badge — a pill with its color, its name in capitals and its size. [centerFor] gives the pill's center (in pixels)
+/// from its width; [width] forces that width (in pixels) instead of measuring the text.
+void _drawPill(
+  Canvas canvas, {
+  required String name,
+  required int count,
+  required Color color,
+  required double scale,
+  required Color labelColor,
+  required Color haloColor,
+  required Offset Function(double width) centerFor,
+  double? width,
+}) {
+  TextPainter text(String value, Color textColor, FontWeight weight) =>
+      TextPainter(
+        text: TextSpan(
+          text: value,
+          style: TextStyle(
+            fontSize: 8.5 * scale,
+            fontWeight: weight,
+            letterSpacing: 8.5 * scale * 0.14,
+            color: textColor,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+  final label = text(name.toUpperCase(), color, FontWeight.w700);
+  final countText = text('$count', labelColor.withValues(alpha: 0.5), FontWeight.w500);
+  final height = 15.0 * scale;
+  final pillWidth =
+      width ??
+      9 * scale + 7 * scale + label.width + 8 * scale + countText.width + 8 * scale;
+  final centerPoint = centerFor(pillWidth);
+  final rect = RRect.fromRectAndRadius(
+    Rect.fromCenter(center: centerPoint, width: pillWidth, height: height),
+    Radius.circular(height / 2),
+  );
+  canvas.drawRRect(rect, Paint()..color = haloColor);
+  canvas.drawRRect(
+    rect,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = scale
+      ..color = color.withValues(alpha: 0.55),
+  );
+  final left = rect.left;
+  canvas.drawCircle(Offset(left + 9 * scale, centerPoint.dy), 2.4 * scale, Paint()..color = color);
+  label.paint(canvas, Offset(left + 16 * scale, centerPoint.dy - label.height / 2));
+  countText.paint(canvas, Offset(rect.right - 8 * scale - countText.width, centerPoint.dy - countText.height / 2));
+}
+
 /// Draws the constellation's links, junction dots and group names. A link is drawn in its branch's color: faint and dotted
 /// once a run has started and its member is not in it, solid when done, animated while working; before any run every link is
 /// solid, as a plain picture of the team.
@@ -767,17 +1072,6 @@ class _BranchPainter extends CustomPainter {
   final Color labelColor;
   final Color haloColor;
 
-  static Path _curve(Offset a, Offset b, double bend) {
-    final mid = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
-    final control = Offset(
-      mid.dx - (b.dy - a.dy) * bend,
-      mid.dy + (b.dx - a.dx) * bend,
-    );
-    return Path()
-      ..moveTo(a.dx, a.dy)
-      ..quadraticBezierTo(control.dx, control.dy, b.dx, b.dy);
-  }
-
   TeamMemberStatus? _litStatus(_Branch branch) {
     final all = [
       for (final p in branch.members) statuses[p.member.memberEntityId],
@@ -788,102 +1082,16 @@ class _BranchPainter extends CustomPainter {
     return null;
   }
 
-  void _link(
-    Canvas canvas,
-    Path path,
-    Color color,
-    TeamMemberStatus? status, {
-    required bool trunk,
-  }) {
-    final paint =
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round;
-    if (!running) {
-      paint
-        ..color = color.withValues(alpha: 0.6)
-        ..strokeWidth = (trunk ? 2.4 : 1.5) * scale;
-      canvas.drawPath(path, paint);
-      return;
-    }
-    switch (status) {
-      case TeamMemberStatus.working:
-        paint
-          ..color = color
-          ..strokeWidth = 2.4 * scale;
-        _dashed(canvas, path, paint, 6 * scale, 4 * scale, flow);
-      case TeamMemberStatus.done:
-      case TeamMemberStatus.failed:
-        paint
-          ..color = color
-          ..strokeWidth = 1.8 * scale;
-        canvas.drawPath(path, paint);
-      case TeamMemberStatus.waiting:
-        paint
-          ..color = color.withValues(alpha: 0.75)
-          ..strokeWidth = 1.8 * scale;
-        canvas.drawPath(path, paint);
-      case null:
-        paint
-          ..color = color.withValues(alpha: 0.35)
-          ..strokeWidth = 1.0 * scale;
-        _dashed(canvas, path, paint, 1.5 * scale, 4 * scale, 0);
-    }
-  }
-
-  // Dashes march along the curve toward the working member.
-  static void _dashed(
-    Canvas canvas,
-    Path path,
-    Paint paint,
-    double dash,
-    double gap,
-    double flow,
-  ) {
-    for (final metric in path.computeMetrics()) {
-      var travelled = -flow * (dash + gap) * 2;
-      while (travelled < metric.length) {
-        final start = math.max(travelled, 0.0);
-        final end = math.min(travelled + dash, metric.length);
-        if (end > start) canvas.drawPath(metric.extractPath(start, end), paint);
-        travelled += dash + gap;
-      }
-    }
-  }
-
-  // The soft zone behind a group: its members' positions thickened into one rounded shape in the group's color.
-  void _zone(Canvas canvas, _Branch branch, Color color) {
-    final points = [for (final p in branch.members) p.at * scale];
-    final paint = Paint()..color = color.withValues(alpha: 0.11);
-    const width = 46.0;
-    if (points.length == 1) {
-      canvas.drawCircle(points.first, width / 2 * scale, paint);
-      return;
-    }
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (final point in points.skip(1)) {
-      path.lineTo(point.dx, point.dy);
-    }
-    if (points.length > 2) {
-      path.close();
-      canvas.drawPath(path, paint..style = PaintingStyle.fill);
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color.withValues(alpha: 0.11)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = width * scale
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-  }
+  void _link(Canvas canvas, Path path, Color color, TeamMemberStatus? status, {required bool trunk}) =>
+      _drawLink(canvas, path, color, status, trunk: trunk, running: running, scale: scale, flow: flow);
 
   @override
   void paint(Canvas canvas, Size size) {
     for (final branch in branches) {
       final color = colors[branch.key];
-      if (color != null) _zone(canvas, branch, color);
+      if (color != null) {
+        _drawZone(canvas, [for (final p in branch.members) p.at], color, scale);
+      }
     }
     for (final branch in branches) {
       final color = colors[branch.key] ?? labelColor.withValues(alpha: 0.5);
@@ -892,7 +1100,7 @@ class _BranchPainter extends CustomPainter {
       if (hasHub && junction != null) {
         _link(
           canvas,
-          _curve(center * scale, junction * scale, 0.14),
+          _curvePath(center * scale, junction * scale, 0.14),
           color,
           lit,
           trunk: true,
@@ -902,7 +1110,7 @@ class _BranchPainter extends CustomPainter {
         for (final p in branch.members) {
           _link(
             canvas,
-            _curve(p.from * scale, p.at * scale, p.bend),
+            _curvePath(p.from * scale, p.at * scale, p.bend),
             color,
             statuses[p.member.memberEntityId],
             trunk: false,
@@ -921,71 +1129,20 @@ class _BranchPainter extends CustomPainter {
     }
   }
 
-  // The group's badge — a pill with its color, its name in capitals and its size — set beside its junction, clear of the links.
+  // The group's badge, set beside its junction, clear of the links.
   void _label(Canvas canvas, _Branch branch, Color color) {
-    TextPainter text(String value, Color textColor, FontWeight weight) =>
-        TextPainter(
-          text: TextSpan(
-            text: value,
-            style: TextStyle(
-              fontSize: 8.5 * scale,
-              fontWeight: weight,
-              letterSpacing: 8.5 * scale * 0.14,
-              color: textColor,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-
-    final name = text(branch.name!.toUpperCase(), color, FontWeight.w700);
-    final count = text(
-      '${branch.members.length}',
-      labelColor.withValues(alpha: 0.5),
-      FontWeight.w500,
-    );
-    final height = 15.0 * scale;
-    final width =
-        9 * scale +
-        7 * scale +
-        name.width +
-        8 * scale +
-        count.width +
-        8 * scale;
     final px = -math.sin(branch.angle);
     final py = math.cos(branch.angle);
     final j = branch.junction! * scale;
-    final centerPoint = Offset(
-      j.dx + px * (width / 2 + 6 * scale),
-      j.dy + py * 13 * scale,
-    );
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: centerPoint, width: width, height: height),
-      Radius.circular(height / 2),
-    );
-    canvas.drawRRect(rect, Paint()..color = haloColor);
-    canvas.drawRRect(
-      rect,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = scale
-        ..color = color.withValues(alpha: 0.55),
-    );
-    final left = rect.left;
-    canvas.drawCircle(
-      Offset(left + 9 * scale, centerPoint.dy),
-      2.4 * scale,
-      Paint()..color = color,
-    );
-    name.paint(
+    _drawPill(
       canvas,
-      Offset(left + 16 * scale, centerPoint.dy - name.height / 2),
-    );
-    count.paint(
-      canvas,
-      Offset(
-        rect.right - 8 * scale - count.width,
-        centerPoint.dy - count.height / 2,
-      ),
+      name: branch.name!,
+      count: branch.members.length,
+      color: color,
+      scale: scale,
+      labelColor: labelColor,
+      haloColor: haloColor,
+      centerFor: (width) => Offset(j.dx + px * (width / 2 + 6 * scale), j.dy + py * 13 * scale),
     );
   }
 
@@ -999,6 +1156,174 @@ class _BranchPainter extends CustomPainter {
       old.colors != colors;
 }
 
+/// Draws every topology but the manager-led one: the soft zone and the name badge of each group, the band that holds many
+/// parallel members, the links between members (directed ones end in a head) and the start / join / shared-conversation dots.
+/// Links are lit by the status of the member they lead to, in that member's group color.
+class _ScenePainter extends CustomPainter {
+  _ScenePainter({
+    required this.scene,
+    required this.groups,
+    required this.members,
+    required this.statuses,
+    required this.colors,
+    required this.palette,
+    required this.running,
+    required this.flow,
+    required this.scale,
+    required this.labelColor,
+    required this.haloColor,
+  });
+
+  final TeamScene scene;
+  final List<SceneGroup> groups;
+  final Map<String, AgUiTeamMember> members;
+  final Map<String, TeamMemberStatus> statuses;
+  final Map<String, Color> colors;
+  final AgUiTeamPalette palette;
+  final bool running;
+  final double flow;
+  final double scale;
+  final Color labelColor;
+  final Color haloColor;
+
+  static const _muted = Color(0xFF94A3B8);
+
+  // A group split by another in a chain is drawn once per run (key `group#run`); the color is the group's.
+  Color? _groupColor(String key) => colors[key.replaceAll(RegExp(r'#\d+$'), '')];
+
+  TeamMemberStatus? _anyStatus() {
+    final all = [for (final id in members.keys) statuses[id]];
+    if (all.contains(TeamMemberStatus.working)) return TeamMemberStatus.working;
+    if (all.contains(TeamMemberStatus.waiting)) return TeamMemberStatus.waiting;
+    if (all.contains(TeamMemberStatus.done)) return TeamMemberStatus.done;
+    return null;
+  }
+
+  bool get _everyoneDone => members.isNotEmpty && members.keys.every((id) => statuses[id] == TeamMemberStatus.done);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final group in groups) {
+      final color = _groupColor(group.key);
+      if (color != null) _drawZone(canvas, group.points, color, scale);
+    }
+
+    final band = scene.band;
+    if (band != null) {
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(band.left * scale, band.top * scale, band.width * scale, band.height * scale),
+        Radius.circular(18 * scale),
+      );
+      canvas.drawRRect(rect, Paint()..color = _muted.withValues(alpha: 0.08));
+      _dashedPath(
+        canvas,
+        Path()..addRRect(rect),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = scale
+          ..color = _muted.withValues(alpha: 0.45),
+        3 * scale,
+        4 * scale,
+        0,
+      );
+    }
+
+    for (final edge in scene.edges) {
+      _paintEdge(canvas, edge);
+    }
+
+    for (final group in groups) {
+      _drawPill(
+        canvas,
+        name: group.name,
+        count: group.ids.length,
+        color: _groupColor(group.key) ?? labelColor.withValues(alpha: 0.5),
+        scale: scale,
+        labelColor: labelColor,
+        haloColor: haloColor,
+        width: scenePillWidth(group.name) * scale,
+        centerFor: (_) => group.label * scale,
+      );
+    }
+
+    for (final dot in scene.dots) {
+      _paintDot(canvas, dot);
+    }
+  }
+
+  void _paintEdge(Canvas canvas, SceneEdge edge) {
+    final a = shortenLink(edge.from, edge.to, edge.fromInset) * scale;
+    final b = shortenLink(edge.to, edge.from, edge.toInset) * scale;
+    final status = switch (edge.lit) {
+      sceneLitAny => statuses.isEmpty ? null : (_anyStatus() == null ? null : TeamMemberStatus.done),
+      sceneLitAll => _everyoneDone ? TeamMemberStatus.done : null,
+      final id => statuses[id],
+    };
+    final color =
+        members.containsKey(edge.lit)
+            ? (_groupColor(agUiTeamGroupKey(members[edge.lit]!.group) ?? '') ?? labelColor.withValues(alpha: 0.5))
+            : (edge.lit == sceneLitAny || edge.lit == sceneLitAll ? palette.done : labelColor.withValues(alpha: 0.5));
+    _drawLink(canvas, _curvePath(a, b, edge.bend), color, status, trunk: false, running: running, scale: scale, flow: flow);
+    if (edge.arrow) {
+      final alpha = !running
+          ? 0.6
+          : switch (status) {
+            TeamMemberStatus.done || TeamMemberStatus.working || TeamMemberStatus.failed => 1.0,
+            TeamMemberStatus.waiting => 0.75,
+            null => 0.4,
+          };
+      canvas.drawPath(
+        _arrowHead(b, _controlPoint(a, b, edge.bend), 6.5 * scale),
+        Paint()..color = color.withValues(alpha: alpha),
+      );
+    }
+  }
+
+  void _paintDot(Canvas canvas, SceneDot dot) {
+    final at = dot.at * scale;
+    switch (dot.kind) {
+      case SceneDotKind.center:
+        final status = _anyStatus();
+        final stroke = switch (status) {
+          TeamMemberStatus.working => palette.working,
+          TeamMemberStatus.waiting => palette.waiting,
+          TeamMemberStatus.done => palette.done,
+          _ => const Color(0xFFC8CCD4),
+        };
+        canvas.drawCircle(at, 11 * scale, Paint()..color = haloColor);
+        canvas.drawCircle(
+          at,
+          11 * scale,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2 * scale
+            ..color = stroke,
+        );
+        for (final dx in const [-4.5, 0.0, 4.5]) {
+          canvas.drawCircle(at + Offset(dx * scale, 0), 1.5 * scale, Paint()..color = _muted);
+        }
+      case SceneDotKind.start:
+      case SceneDotKind.join:
+        final done = dot.kind == SceneDotKind.start ? statuses.isNotEmpty : _everyoneDone;
+        canvas.drawCircle(
+          at,
+          (dot.kind == SceneDotKind.start ? 4.5 : 5.5) * scale,
+          Paint()..color = done ? palette.done : _muted.withValues(alpha: 0.55),
+        );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScenePainter old) =>
+      old.flow != flow ||
+      old.running != running ||
+      old.statuses != statuses ||
+      old.scene != scene ||
+      old.groups != groups ||
+      old.scale != scale ||
+      old.colors != colors;
+}
+
 /// One member of [AgUiTeamGraph]: a hexagon (the shape Team Studio draws) whose border and icon wear the member's color —
 /// its group's, or the app's own — on a neutral fill. A status ring surrounds it while the member is in the run.
 class _TeamHexNode extends StatelessWidget {
@@ -1008,7 +1333,15 @@ class _TeamHexNode extends StatelessWidget {
     this.ringColor,
     this.off = false,
     this.pulse = 0,
+    this.order,
+    this.scale = 1,
   });
+
+  /// The member's step number in a chain, drawn as a small badge on its hexagon.
+  final int? order;
+
+  /// Pixels per design unit, for the badge.
+  final double scale;
 
   final AgUiMemberAvatar avatar;
   final double size;
@@ -1052,7 +1385,7 @@ class _TeamHexNode extends StatelessWidget {
               ),
             );
 
-    return SizedBox(
+    final hex = SizedBox(
       width: size + 10,
       height: size + 10,
       child: CustomPaint(
@@ -1063,6 +1396,39 @@ class _TeamHexNode extends StatelessWidget {
         ),
         child: Center(child: content),
       ),
+    );
+    if (order == null) return hex;
+    final r = 6.2 * scale;
+    final middle = (size + 10) / 2;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        hex,
+        Positioned(
+          left: middle - size / 2 * 0.9 - r,
+          top: middle - size / 2 * 0.95 - r,
+          width: r * 2,
+          height: r * 2,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.surface,
+              border: Border.all(color: accent, width: 1.4 * scale),
+            ),
+            child: Center(
+              child: Text(
+                '$order',
+                style: TextStyle(
+                  fontSize: 7.5 * scale,
+                  height: 1,
+                  color: accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

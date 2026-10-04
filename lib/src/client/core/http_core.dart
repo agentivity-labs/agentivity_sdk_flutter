@@ -1,13 +1,57 @@
 import 'package:dio/dio.dart';
 
 import 'api_contract.dart';
+import 'connection_monitor.dart';
 
 /// Internal HTTP transport shared by all [*Api] components.
 ///
 /// Exposed publicly so sub-classes and sibling [*Api] objects can reach it,
 /// but callers outside this package should never depend on it directly.
 class AgentivityHttpCore {
-  AgentivityHttpCore({Dio? dio, required String baseUrl}) : _dio = dio ?? Dio(_buildOptions(baseUrl));
+  AgentivityHttpCore({Dio? dio, required String baseUrl, this.monitor}) : _dio = dio ?? Dio(_buildOptions(baseUrl));
+
+  /// Told whenever a request gets no answer (the server cannot be reached) and whenever one does.
+  final ConnectionMonitor? monitor;
+
+  /// Asks the server for anything (the icon catalog): true when ANY answer came back, even an error status; false when it cannot be reached.
+  Future<bool> probe() async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/icons', options: Options(validateStatus: (_) => true));
+      return !_isGatewayError(response.statusCode);
+    } on DioException catch (error) {
+      return error.response != null && !_isGatewayError(error.response?.statusCode);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // A gateway answering for a server that is down (502/503/504) is the same as no answer.
+  static bool _isGatewayError(int? status) => status == 502 || status == 503 || status == 504;
+
+  void _reportAnswer(int? status, String? statusMessage) {
+    if (_isGatewayError(status)) {
+      monitor?.httpFailed('The server answered $status ${statusMessage ?? 'unavailable'}');
+    } else {
+      monitor?.httpReachable();
+    }
+  }
+
+  void _reportError(DioException error) {
+    final response = error.response;
+    if (response != null) {
+      _reportAnswer(response.statusCode, response.statusMessage);
+      return;
+    }
+    switch (error.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        monitor?.httpFailed(error.message ?? error.error?.toString() ?? 'The server cannot be reached');
+      default:
+        break; // cancelled on purpose, bad certificate… — not a connection problem
+    }
+  }
 
   static const String _apiV1 = '/api/v1';
 
@@ -38,12 +82,17 @@ class AgentivityHttpCore {
   // HTTP verbs
   // ---------------------------------------------------------------------------
 
-  Future<Response<T>> guardRequest<T>(Future<Response<T>> Function() request) async {
+  /// [dataBody]: the response body is data, not an error envelope — a 2xx body whose `status` is "failed" is NOT turned into an
+  /// exception. For endpoints that report a run's own status (an execution's inspector says `"status": "Failed"` for a run that failed:
+  /// that is the answer, not a failed request).
+  Future<Response<T>> guardRequest<T>(Future<Response<T>> Function() request, {bool dataBody = false}) async {
     try {
       final response = await request();
-      throwIfApiFailurePayload(response.data, httpStatus: response.statusCode);
+      _reportAnswer(response.statusCode, response.statusMessage);
+      if (!dataBody) throwIfApiFailurePayload(response.data, httpStatus: response.statusCode);
       return response;
     } on DioException catch (error, stackTrace) {
+      _reportError(error);
       final apiError = ApiException.fromDio(error);
       debugLogApiIssue(
         apiError,
@@ -59,9 +108,11 @@ class AgentivityHttpCore {
     Map<String, dynamic>? queryParameters,
     Options? options,
     CancelToken? cancelToken,
+    bool dataBody = false,
   }) =>
       guardRequest(
         () => _dio.get<T>(path, queryParameters: queryParameters, options: options, cancelToken: cancelToken),
+        dataBody: dataBody,
       );
 
   Future<Response<T>> post<T>(

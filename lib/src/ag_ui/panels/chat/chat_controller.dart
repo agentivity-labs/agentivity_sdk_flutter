@@ -69,6 +69,14 @@ enum TeamMemberStatus { working, waiting, done, failed }
 /// no entry.
 enum WorkflowStepStatus { working, waiting, done, failed }
 
+/// Why a run ended with an error. [message] is for the person using the app; [code] (when the platform has one for the failure —
+/// `llm_billing` for an account out of credit, `llm_auth`, `llm_rate_limited`, `llm_unavailable`, …) lets the app word it.
+class AgUiRunError {
+  const AgUiRunError({required this.message, this.code});
+  final String message;
+  final String? code;
+}
+
 /// The Team member currently taking its turn — set from [StepStartedEvent], cleared on [StepFinishedEvent].
 class ActiveChatMember {
   const ActiveChatMember({this.memberEntityId, this.displayName});
@@ -119,6 +127,7 @@ class ChatController extends ChangeNotifier {
   ChatHilGate? _pendingHilGate;
   bool _isAwaitingResponse = false;
   ActiveChatMember? _activeMember;
+  AgUiRunError? _runError;
   Map<String, TeamMemberStatus> _memberStatuses = const {};
   Map<String, WorkflowStepStatus> _stepStatuses = const {};
 
@@ -144,6 +153,17 @@ class ChatController extends ChangeNotifier {
   /// The Team member currently taking its turn, or `null` when nobody is (a
   /// standalone Agent run, or between turns). Powers `AgUiChatActiveMemberIndicator`.
   ActiveChatMember? get activeMember => _activeMember;
+
+  /// Why the last run ended with an error, or `null` (no error, or it was dismissed / a new run started). Powers the notice
+  /// [AgUiChatDiscussion] shows — a run that stops on an account out of credit must never just look stuck.
+  AgUiRunError? get runError => _runError;
+
+  /// Hides the error notice of the last run.
+  void dismissRunError() {
+    if (_runError == null) return;
+    _runError = null;
+    notifyListeners();
+  }
 
   /// Status of every Team member seen so far, keyed by `memberEntityId` — empty for a standalone Agent.
   /// Powers `AgUiTeamRoster` and `AgUiTeamGraph`. A new unmodifiable map on every change.
@@ -270,6 +290,7 @@ class ChatController extends ChangeNotifier {
     _pendingHilGate = null;
     _isAwaitingResponse = false;
     _activeMember = null;
+    _runError = null;
     _memberStatuses = const {};
     _stepStatuses = const {};
     _errorMessage = null;
@@ -282,6 +303,7 @@ class ChatController extends ChangeNotifier {
       // ── Run lifecycle → drive isAwaitingResponse ────────────────────────
       case RunStartedEvent _:
         _isAwaitingResponse = true;
+        _runError = null;
         notifyListeners();
 
       case RunFinishedEvent e:
@@ -307,9 +329,10 @@ class ChatController extends ChangeNotifier {
         }
         notifyListeners();
 
-      case RunErrorEvent _:
+      case RunErrorEvent e:
         _isAwaitingResponse = false;
         _activeMember = null;
+        _runError = AgUiRunError(message: e.message, code: e.code);
         _settleWorkingMembers(interrupted: false);
         _settleWorkingSteps(interrupted: false);
         notifyListeners();
@@ -337,13 +360,15 @@ class ChatController extends ChangeNotifier {
         if (e.stepName.isNotEmpty || changedMember) notifyListeners();
 
       case StepFinishedEvent e:
+        // A step that ended because it failed says so (`error`): its member is shown as failed, not as done.
+        final failed = e.error != null && e.error!.isNotEmpty;
         if (e.stepName.isNotEmpty)
-          _setStepStatus(e.stepName, WorkflowStepStatus.done);
+          _setStepStatus(e.stepName, failed ? WorkflowStepStatus.failed : WorkflowStepStatus.done);
         final hadActiveMember = _activeMember != null || e.memberEntityId != null;
         if (hadActiveMember) {
           _activeMember = null;
           if (e.memberEntityId != null)
-            _setMemberStatus(e.memberEntityId!, TeamMemberStatus.done);
+            _setMemberStatus(e.memberEntityId!, failed ? TeamMemberStatus.failed : TeamMemberStatus.done);
         }
         if (e.stepName.isNotEmpty || hadActiveMember) notifyListeners();
 

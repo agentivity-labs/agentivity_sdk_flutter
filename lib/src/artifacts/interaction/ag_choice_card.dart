@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../shell/ag_artifact_card.dart';
+import '../shell/ag_artifact_image.dart';
 import '../theme/ag_artifacts_theme.dart';
 
 /// Single or multi-select choice widget.
@@ -12,7 +13,7 @@ import '../theme/ag_artifacts_theme.dart';
 ///   "question": "S'agit-il d'un achat professionnel ou personnel ?",
 ///   "multiple": false,
 ///   "options": [
-///     {"id": "pro", "label": "Professionnel", "description": "Achat pour l'entreprise"},
+///     {"id": "pro", "label": "Professionnel", "description": "Achat pour l'entreprise", "imageUrl": "https://…"},
 ///     {"id": "perso", "label": "Personnel", "description": "Usage privé"},
 ///     {"id": "gaming", "label": "Gaming", "description": "Jeux vidéo"}
 ///   ],
@@ -131,6 +132,7 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
             final id = opt['id'] as String? ?? '';
             final label = opt['label'] as String? ?? id;
             final description = opt['description'] as String?;
+            final imageUrl = agSafeImageUrl(opt['imageUrl']);
             final isSelected = _selected.contains(id);
 
             return GestureDetector(
@@ -170,6 +172,10 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
                               : cs.onSurface.withValues(alpha: 0.4),
                     ),
                     const SizedBox(width: 10),
+                    if (imageUrl != null) ...[
+                      AgArtifactImage(src: imageUrl, alt: label, aspectRatio: 1, width: 56, radius: 6),
+                      const SizedBox(width: 10),
+                    ],
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
