@@ -2,6 +2,16 @@
 
 ## 0.1.0 - Unreleased
 
+- **`AgUiTemplateGraph` and `resolveRenderable`.** Draw a team, a workflow or an agent from JSON alone (a Template file, the
+  marketplace's `/root` payload, a catalog wrapper or a bare entity) — no run, no chat. Optional `autoplay`, `interactive`
+  (off by default, so the picture scrolls with the page). `AgUiTeamGraph` and `AgUiWorkflowGraph` no longer require a
+  `controller` and gain `statuses` and `interactive`; `AgUiWorkflowGraph` gains `camera: AgUiWorkflowCamera.fit`. A workflow
+  with a single node is drawn at its normal size.
+- **`camera` on `AgUiTemplateGraph`.** `AgUiWorkflowCamera.follow` opens a workflow (or the graph inside an agent) on its start node at
+  a readable scale and, with `autoplay`, glides from one active node to the next (back to the start when the loop begins again); the
+  widget fills the size its parent gives it, or is 16:9 (240 high at least) when the height is unbounded, and the drawing is clipped by
+  that frame only. `fit` (the default) keeps the whole diagram in view, as before. Still picture when the platform asks for reduced
+  motion. A team is not affected.
 - **Merged into a single package.** `agentivity_ag_ui`, `agentivity_artifacts`, and
   `agentivity_client` are now one published package, `agentivity_sdk` — one dependency, one
   version, one barrel import (`package:agentivity_sdk/agentivity_sdk.dart`). The three areas

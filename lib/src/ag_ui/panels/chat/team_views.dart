@@ -306,7 +306,7 @@ class _RosterMember extends StatelessWidget {
 class AgUiTeamGraph extends StatefulWidget {
   const AgUiTeamGraph({
     super.key,
-    required this.controller,
+    this.controller,
     required this.members,
     this.hubMemberId,
     this.resolveMemberAvatar,
@@ -314,9 +314,20 @@ class AgUiTeamGraph extends StatefulWidget {
     this.restingColors = false,
     this.statusSource,
     this.topology,
+    this.statuses,
+    this.interactive = true,
   });
 
-  final ChatController controller;
+  /// The chat the graph follows. Optional: without it (and without a [statusSource]) the graph shows [statuses], or a still picture.
+  final ChatController? controller;
+
+  /// Member statuses to show, by `memberEntityId` — for a picture driven by the app (a catalog's autoplay) rather than by a run.
+  /// Wins over [statusSource] and [controller].
+  final Map<String, TeamMemberStatus>? statuses;
+
+  /// Whether the visitor can drag and zoom. Turn it off for a picture on a page that scrolls.
+  final bool interactive;
+
   /// Where member statuses come from — an [ExecutionStatusesController] reading the execution's own inspector (right on a
   /// fresh run, after a reconnect and when reopening an old execution). When omitted it falls back to what [controller]
   /// has seen on the stream ([ChatController.memberStatuses]), which is empty for anything that happened before this
@@ -374,7 +385,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
   @override
   void initState() {
     super.initState();
-    widget.controller.addListener(_syncAnimation);
+    widget.controller?.addListener(_syncAnimation);
     widget.statusSource?.addListener(_syncAnimation);
     _syncAnimation();
   }
@@ -383,19 +394,20 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
   void didUpdateWidget(AgUiTeamGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_syncAnimation);
-      widget.controller.addListener(_syncAnimation);
+      oldWidget.controller?.removeListener(_syncAnimation);
+      widget.controller?.addListener(_syncAnimation);
     }
     if (oldWidget.statusSource != widget.statusSource) {
       oldWidget.statusSource?.removeListener(_syncAnimation);
       widget.statusSource?.addListener(_syncAnimation);
     }
+    if (oldWidget.statuses != widget.statuses) _syncAnimation();
     _syncAnimation();
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_syncAnimation);
+    widget.controller?.removeListener(_syncAnimation);
     widget.statusSource?.removeListener(_syncAnimation);
     _view.dispose();
     _blink.dispose();
@@ -403,7 +415,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
     super.dispose();
   }
 
-  Map<String, TeamMemberStatus> get _memberStatuses => widget.statusSource?.memberStatuses ?? widget.controller.memberStatuses;
+  Map<String, TeamMemberStatus> get _memberStatuses => widget.statuses ?? widget.statusSource?.memberStatuses ?? widget.controller?.memberStatuses ?? const {};
 
   // The link animation only runs while someone is actually working.
   void _syncAnimation() {
@@ -667,6 +679,8 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
               Positioned.fill(
                 child: InteractiveViewer(
                   transformationController: _view,
+                  panEnabled: widget.interactive,
+                  scaleEnabled: widget.interactive,
                   minScale: 0.5,
                   maxScale: 6,
                   boundaryMargin: const EdgeInsets.all(double.infinity),
@@ -675,7 +689,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                     height: height,
                     child: ListenableBuilder(
                       listenable: Listenable.merge([
-                        widget.controller,
+                        if (widget.controller != null) widget.controller!,
                         if (widget.statusSource != null) widget.statusSource!,
                         _flow,
                         _blink,
@@ -771,13 +785,14 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                 ),
               ),
               // The way back to the fitted view.
-              Positioned(
-                top: 6,
-                right: 6,
-                child: _FitButton(
-                  onPressed: () => _view.value = Matrix4.identity(),
+              if (widget.interactive)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: _FitButton(
+                    onPressed: () => _view.value = Matrix4.identity(),
+                  ),
                 ),
-              ),
             ],
           ),
         );

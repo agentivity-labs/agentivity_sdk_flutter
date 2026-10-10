@@ -9,6 +9,8 @@ import '../../../client/app_client/domain/workflow_graph_models.dart';
 const colGap = 132.0;
 const rowGap = 92.0;
 const margin = 56.0;
+const _minWidth = 880.0;
+const _minHeight = 330.0;
 
 String edgeKey(String from, String to) => '$from->$to';
 
@@ -119,6 +121,14 @@ WorkflowLayout layoutWorkflowGraph(WorkflowGraphStructure structure) {
   for (final id in ids) place(id); // anything still unplaced (disconnected from every root)
 
   final maxRows = layers.values.map((l) => l.length).fold(1, (a, b) => a > b ? a : b);
+  final maxLayer = layers.keys.fold(0, (a, b) => a > b ? a : b);
+  final naturalWidth = margin * 2 + maxLayer * colGap;
+  final naturalHeight = margin * 2 + (maxRows - 1) * rowGap;
+  // A graph smaller than this is centered in it, so a lone node is drawn at its normal size.
+  final width = naturalWidth < _minWidth ? _minWidth : naturalWidth;
+  final height = naturalHeight < _minHeight ? _minHeight : naturalHeight;
+  final offsetX = (width - naturalWidth) / 2;
+  final offsetY = (height - naturalHeight) / 2;
   final positions = <String, Offset>{};
   for (final entry in layers.entries) {
     final l = entry.key;
@@ -126,19 +136,13 @@ WorkflowLayout layoutWorkflowGraph(WorkflowGraphStructure structure) {
     final total = idsInLayer.length;
     for (var i = 0; i < total; i++) {
       positions[idsInLayer[i]] = Offset(
-        margin + l * colGap,
-        margin + ((maxRows - total) / 2 + i) * rowGap,
+        offsetX + margin + l * colGap,
+        offsetY + margin + ((maxRows - total) / 2 + i) * rowGap,
       );
     }
   }
 
-  final maxLayer = layers.keys.fold(0, (a, b) => a > b ? a : b);
-  return WorkflowLayout(
-    positions: positions,
-    width: margin * 2 + maxLayer * colGap,
-    height: margin * 2 + (maxRows - 1) * rowGap,
-    backEdges: backEdges,
-  );
+  return WorkflowLayout(positions: positions, width: width, height: height, backEdges: backEdges);
 }
 
 /// A left-to-right S-curve between two node centers — the standard flowchart connector shape.

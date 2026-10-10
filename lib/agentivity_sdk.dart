@@ -66,6 +66,8 @@ export 'src/icons/icon_ref.dart';
 export 'src/ag_ui/panels/chat/team_views.dart';
 export 'src/ag_ui/panels/chat/workflow_graph_layout.dart' show WorkflowLayout, layoutWorkflowGraph;
 export 'src/ag_ui/panels/chat/workflow_views.dart';
+export 'src/graph/renderable.dart';
+export 'src/graph/template_graph.dart';
 export 'src/ag_ui/panels/chat/execution_statuses_controller.dart';
 
 // ── AG-UI: panels — assistant ────────────────────────────────────────────────
