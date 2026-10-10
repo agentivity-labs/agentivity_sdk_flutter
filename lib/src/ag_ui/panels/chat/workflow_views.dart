@@ -82,6 +82,14 @@ const _focusSpan = 360.0;
 const _minScale = 0.4;
 const _maxScale = 6.0;
 
+/// How the camera of an [AgUiWorkflowGraph] behaves.
+///
+/// [follow] opens on the start node at a readable scale and glides to whichever node is running (right for a live run, or for a
+/// Template played in a catalog). The frame is then a viewer of its own: it fills the size its parent gives it, or is 16:9 (never
+/// under 240 logical pixels high) when the height is unbounded, and the drawing is clipped by that frame only. [fit] keeps the whole
+/// diagram in view and never moves by itself.
+enum AgUiWorkflowCamera { follow, fit }
+
 /// A Workflow's node graph as a flow diagram — same live-status idea as [AgUiTeamGraph] (driven
 /// by [ChatController], lights up as the run reaches each node) but for a Workflow's actual node
 /// graph instead of a Team's member constellation: circles left-to-right, one per node, linked by
@@ -92,13 +100,27 @@ const _maxScale = 6.0;
 class AgUiWorkflowGraph extends StatefulWidget {
   const AgUiWorkflowGraph({
     super.key,
-    required this.controller,
+    this.controller,
     required this.structure,
     this.statusSource,
+    this.statuses,
+    this.interactive = true,
+    this.camera = AgUiWorkflowCamera.follow,
     this.palette = const AgUiWorkflowPalette(),
   });
 
-  final ChatController controller;
+  /// The chat the diagram follows. Optional: without it (and without a [statusSource]) the diagram shows [statuses], or a still picture.
+  final ChatController? controller;
+
+  /// Node statuses to show, by node id — for a picture driven by the app (a catalog's autoplay) rather than by a run.
+  /// Wins over [statusSource] and [controller].
+  final Map<String, WorkflowStepStatus>? statuses;
+
+  /// Whether the visitor can drag and zoom. Turn it off for a picture on a page that scrolls.
+  final bool interactive;
+
+  /// [AgUiWorkflowCamera.follow] glides to the running node; [AgUiWorkflowCamera.fit] keeps the whole diagram in view.
+  final AgUiWorkflowCamera camera;
 
   /// Where node statuses come from — an [ExecutionStatusesController] reading the execution's own
   /// status API (right on a fresh run, after a reconnect and when reopening an old execution). When
@@ -138,7 +160,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
   void initState() {
     super.initState();
     _layout = layoutWorkflowGraph(widget.structure);
-    widget.controller.addListener(_onControllerChanged);
+    widget.controller?.addListener(_onControllerChanged);
     widget.statusSource?.addListener(_onControllerChanged);
   }
 
@@ -146,13 +168,15 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
   void didUpdateWidget(AgUiWorkflowGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_onControllerChanged);
-      widget.controller.addListener(_onControllerChanged);
+      oldWidget.controller?.removeListener(_onControllerChanged);
+      widget.controller?.addListener(_onControllerChanged);
     }
     if (oldWidget.statusSource != widget.statusSource) {
       oldWidget.statusSource?.removeListener(_onControllerChanged);
       widget.statusSource?.addListener(_onControllerChanged);
     }
+    if (oldWidget.statuses != widget.statuses) _onControllerChanged();
+    if (oldWidget.camera != widget.camera) _didInitialFocus = false;
     if (oldWidget.structure != widget.structure) {
       _layout = layoutWorkflowGraph(widget.structure);
       _didInitialFocus = false;
@@ -161,7 +185,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
 
   @override
   void dispose() {
-    widget.controller.removeListener(_onControllerChanged);
+    widget.controller?.removeListener(_onControllerChanged);
     widget.statusSource?.removeListener(_onControllerChanged);
     _view.dispose();
     _flow.dispose();
@@ -170,7 +194,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
     super.dispose();
   }
 
-  Map<String, WorkflowStepStatus> get _stepStatuses => widget.statusSource?.nodeStatuses ?? widget.controller.stepStatuses;
+  Map<String, WorkflowStepStatus> get _stepStatuses => widget.statuses ?? widget.statusSource?.nodeStatuses ?? widget.controller?.stepStatuses ?? const {};
 
   String _truncate(String text) =>
       text.length > _labelMax ? '${text.substring(0, _labelMax - 1)}…' : text;
@@ -217,7 +241,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
         ..value = 0;
     }
     final active = _activeNodeId();
-    if (_following && active != null && active != _seenActive) {
+    if (widget.camera == AgUiWorkflowCamera.follow && _following && active != null && active != _seenActive) {
       _seenActive = active;
       _focusOn(active, animate: true);
     }
@@ -235,6 +259,15 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
     return Matrix4.identity()
       ..translateByDouble(tx, ty, 0, 1)
       ..scaleByDouble(scale, scale, scale, 1);
+  }
+
+  /// The whole diagram in view, centered, never zoomed past its natural size.
+  void _fitAll() {
+    if (_viewportSize == Size.zero) return;
+    final k = math.min(_viewportSize.width / _layout.width, _viewportSize.height / _layout.height).clamp(_minScale, _maxScale);
+    _view.value = Matrix4.identity()
+      ..translateByDouble((_viewportSize.width - _layout.width * k) / 2, (_viewportSize.height - _layout.height * k) / 2, 0, 1)
+      ..scaleByDouble(k, k, k, 1);
   }
 
   void _focusOn(String nodeId, {required bool animate}) {
@@ -279,9 +312,12 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
         final width = outer.hasBoundedWidth
             ? outer.maxWidth
             : _layout.width + 80;
+        // In follow the frame is a viewer, not the shape of the diagram: the height the parent gives, else 16:9 (240 at least).
         final height = outer.hasBoundedHeight
             ? outer.maxHeight
-            : _layout.height + 80;
+            : widget.camera == AgUiWorkflowCamera.follow
+                ? math.max(240.0, width * 9 / 16)
+                : _layout.height + 80;
         _viewportSize = Size(width, height);
 
         if (!_didInitialFocus) {
@@ -289,7 +325,13 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
           final active = _activeNodeId();
           _seenActive = active;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (active != null && mounted) _focusOn(active, animate: true);
+            if (!mounted) return;
+            if (widget.camera == AgUiWorkflowCamera.fit) {
+              _fitAll();
+            } else if (active != null) {
+              // The opening is not a glide: it is the picture seen first, and the one a still image keeps.
+              _focusOn(active, animate: false);
+            }
           });
         }
 
@@ -305,12 +347,14 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                   maxScale: _maxScale,
                   constrained: false,
                   boundaryMargin: const EdgeInsets.all(double.infinity),
+                  panEnabled: widget.interactive,
+                  scaleEnabled: widget.interactive,
                   onInteractionStart: (_) => _following = false,
                   child: SizedBox(
                     width: math.max(_layout.width, 1),
                     height: math.max(_layout.height, 1),
                     child: ListenableBuilder(
-                      listenable: Listenable.merge([widget.controller, if (widget.statusSource != null) widget.statusSource!, _flow, _blink]),
+                      listenable: Listenable.merge([if (widget.controller != null) widget.controller!, if (widget.statusSource != null) widget.statusSource!, _flow, _blink]),
                       builder: (context, _) {
                         final statuses = _stepStatuses;
                         return Stack(
@@ -339,6 +383,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                   ),
                 ),
               ),
+              if (widget.interactive)
               Positioned(
                 top: 6,
                 right: 6,

@@ -329,10 +329,13 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
   /// True when [message] carries at least one interactive widget block (a multi-block
   /// widget, or a standalone artifact message) — used to find the single most recent
   /// widget message that may still accept a response.
-  static bool _hasInteractiveWidget(ChatMessage message) {
+  /// A display component (a chart, a cover image) is skipped: arriving after the question, it
+  /// must not take the question's place and leave the real one read-only.
+  bool _hasInteractiveWidget(ChatMessage message) {
+    bool asks(Object? type) => type is String && !(widget.widgetRegistry?.isDisplay(type) ?? false);
     final blocks = message.blocks;
-    if (blocks != null && blocks.any((b) => b.type != 'text')) return true;
-    return message.metadata?['widgetType'] != null;
+    if (blocks != null && blocks.any((b) => b.type != 'text' && asks(b.type))) return true;
+    return asks(message.metadata?['widgetType']);
   }
 
   void _scrollToBottom() {
@@ -512,8 +515,9 @@ class _MessageBubble extends StatelessWidget {
   final AgUiMemberAvatar? Function(AgUiChatMember member)? resolveMemberAvatar;
 
   /// Whether this message's widget (if any) is still awaiting a response.
-  /// When `false`, the widget is rendered read-only (dimmed, inputs ignored) —
-  /// it belongs to a resolved or superseded HIL gate.
+  /// When `false`, a widget that asked something is rendered read-only (dimmed,
+  /// inputs ignored) — it belongs to a resolved or superseded HIL gate. A display
+  /// component is never dimmed: it is a result, not a question.
   final bool enabled;
 
   /// Wraps an already-resolved/superseded widget so it reads as inert history:
@@ -527,10 +531,11 @@ class _MessageBubble extends StatelessWidget {
   /// Flutter to dispose the old Element (and its State — the typed answer's
   /// TextEditingControllers) and mount a fresh one, so the answer text
   /// silently disappeared right when the form flipped to read-only.
-  Widget _dimIfDisabled(Widget built) {
+  Widget _dimIfDisabled(Widget built, String component) {
+    final live = enabled || (widgetRegistry?.isDisplay(component) ?? false);
     return IgnorePointer(
-      ignoring: !enabled,
-      child: Opacity(opacity: enabled ? 1.0 : 0.55, child: built),
+      ignoring: !live,
+      child: Opacity(opacity: live ? 1.0 : 0.55, child: built),
     );
   }
 
@@ -611,7 +616,7 @@ class _MessageBubble extends StatelessWidget {
                     };
                     final built = widgetRegistry!.build(context, block.type, props);
                     if (built == null) return const SizedBox.shrink();
-                    return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: _dimIfDisabled(built));
+                    return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: _dimIfDisabled(built, block.type));
                   },
                 ),
           ],
@@ -641,7 +646,7 @@ class _MessageBubble extends StatelessWidget {
         final label = _speakerLabel(context);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: label == null ? _dimIfDisabled(built) : Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [label, _dimIfDisabled(built)]),
+          child: label == null ? _dimIfDisabled(built, widgetType) : Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [label, _dimIfDisabled(built, widgetType)]),
         );
       }
     }

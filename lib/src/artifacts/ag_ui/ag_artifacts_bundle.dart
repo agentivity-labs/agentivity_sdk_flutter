@@ -33,18 +33,34 @@ import '../registry.dart';
 ///
 /// Custom entries in [extra] **override** built-in entries when keys collide,
 /// so you can replace any default widget with your own implementation.
+///
+/// Name in `displayComponents` the custom components that only show something
+/// (a cover image, a report card): the chat keeps them fully visible and usable,
+/// where a component that asked a question is dimmed once it is answered.
+///
+/// ```dart
+/// final registry = AgArtifactsBundle.registry(
+///   extra: {'TripCover': (context, props) => TripCover(props: props)},
+///   displayComponents: {'TripCover'},
+/// );
+/// ```
 class AgArtifactsBundle {
   AgArtifactsBundle._();
 
   /// Builds an [AgUiWidgetRegistry] containing all built-in artifact widgets.
   ///
   /// - [extra]: additional or override component builders merged on top.
+  /// - [displayComponents]: names in [extra] that only show something.
   static AgUiWidgetRegistry registry({
     Map<String, AgUiComponentBuilder> extra = const {},
+    Set<String> displayComponents = const {},
   }) {
-    return AgUiWidgetRegistry({
-      ...buildArtifactsRegistry(),
-      ...extra,
-    });
+    return AgUiWidgetRegistry(
+      {
+        ...buildArtifactsRegistry(),
+        ...extra,
+      },
+      displayComponents: {...artifactDisplayComponents, ...displayComponents},
+    );
   }
 }

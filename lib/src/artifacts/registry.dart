@@ -33,6 +33,20 @@ export '../ag_ui/tools/ag_ui_widget_registry.dart' show AgUiComponentBuilder;
 ///
 /// Use [AgArtifactsBundle.registry] to get a ready-to-use [AgUiWidgetRegistry]
 /// instead of wiring this map manually.
+/// The built-in components that only show something and ask nothing: the chat never
+/// dims them (see `AgUiWidgetRegistry.isDisplay`). Every other built-in collects an answer.
+const Set<String> artifactDisplayComponents = {
+  'BarChart', 'LineChart', 'PieChart', 'AreaChart', 'RadarChart',
+  'MetricCard', 'StatGrid', 'KeyValue',
+  'CodeBlock', 'JsonViewer',
+  'StatusCard', 'Timeline',
+  'Latex',
+  'Svg',
+  'ImageGallery',
+  // Recaps what was collected and asks nothing itself.
+  'SummaryCard',
+};
+
 Map<String, AgUiComponentBuilder> buildArtifactsRegistry() {
   return {
     // Charts
