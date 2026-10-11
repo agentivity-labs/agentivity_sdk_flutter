@@ -24,7 +24,20 @@ class AgUiTemplateGraph extends StatefulWidget {
     this.stepDuration,
     this.interactive = false,
     this.camera = AgUiWorkflowCamera.fit,
+    this.onSelect,
+    this.selectedId,
+    this.zoneLook = AgUiTeamZoneLook.organic,
   });
+
+  /// How the zone behind a group of a team is drawn (see [AgUiTeamGraph.zoneLook]). No effect on a workflow.
+  final AgUiTeamZoneLook zoneLook;
+
+  /// Called when a member of a team or a node of a workflow is clicked or tapped. With it, the graph's elements show a
+  /// pointer and can be selected; without it the graph is a picture.
+  final ValueChanged<AgUiGraphSelection>? onSelect;
+
+  /// The element shown as selected: a member's `memberEntityId` or a node's id. The app owns the selection.
+  final String? selectedId;
 
   final Object? source;
 
@@ -51,6 +64,20 @@ class AgUiTemplateGraph extends StatefulWidget {
   @override
   State<AgUiTemplateGraph> createState() => _AgUiTemplateGraphState();
 }
+
+/// What was selected in an [AgUiTemplateGraph]: a member of a team or a node of a workflow (or of the graph inside an agent).
+class AgUiGraphSelection {
+  const AgUiGraphSelection({required this.kind, required this.id, required this.displayName});
+
+  /// What kind of element it is.
+  final AgUiGraphSelectionKind kind;
+
+  /// A member's `memberEntityId`, or a node's id.
+  final String id;
+  final String displayName;
+}
+
+enum AgUiGraphSelectionKind { member, node }
 
 /// The order in which a run walks a workflow: from its start, following the edges; whatever is left comes last.
 List<String> agUiWorkflowWalk(WorkflowGraphStructure structure) {
@@ -213,6 +240,9 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
         restingColors: !playing,
         statuses: statuses,
         interactive: widget.interactive,
+        zoneLook: widget.zoneLook,
+        selectedMemberId: widget.selectedId,
+        onMemberSelected: widget.onSelect == null ? null : (m) => widget.onSelect!(AgUiGraphSelection(kind: AgUiGraphSelectionKind.member, id: m.memberEntityId, displayName: m.displayName)),
       );
     }
 
@@ -221,6 +251,13 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
     final statuses = playing
         ? agUiPlaybackStatuses<WorkflowStepStatus>(r.ids, _step, working: WorkflowStepStatus.working, done: WorkflowStepStatus.done)
         : null;
-    return AgUiWorkflowGraph(structure: workflow, statuses: statuses, camera: widget.camera, interactive: widget.interactive);
+    return AgUiWorkflowGraph(
+      structure: workflow,
+      statuses: statuses,
+      camera: widget.camera,
+      interactive: widget.interactive,
+      selectedNodeId: widget.selectedId,
+      onNodeSelected: widget.onSelect == null ? null : (n) => widget.onSelect!(AgUiGraphSelection(kind: AgUiGraphSelectionKind.node, id: n.id, displayName: n.displayName)),
+    );
   }
 }

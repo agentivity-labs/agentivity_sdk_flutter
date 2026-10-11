@@ -105,6 +105,8 @@ class ChatController extends ChangeNotifier {
     _eventSub = events.listen(
       _onAgUiEvent,
       onError: (_) {},
+      // A stream that ends without saying the run is over must not leave the conversation looking busy for ever.
+      onDone: streamEnded,
       cancelOnError: false,
     );
   }
@@ -127,6 +129,7 @@ class ChatController extends ChangeNotifier {
   ChatHilGate? _pendingHilGate;
   bool _isAwaitingResponse = false;
   ActiveChatMember? _activeMember;
+  String? _currentStep;
   AgUiRunError? _runError;
   Map<String, TeamMemberStatus> _memberStatuses = const {};
   Map<String, WorkflowStepStatus> _stepStatuses = const {};
@@ -172,6 +175,23 @@ class ChatController extends ChangeNotifier {
   /// Status of every Workflow node reached so far, keyed by `stepName` (its node id) — empty for
   /// a Team/Agent run. Powers `AgUiWorkflowGraph`. A new unmodifiable map on every change.
   Map<String, WorkflowStepStatus> get stepStatuses => _stepStatuses;
+
+  /// The step of the run in progress, as the stream names it (the node id for a workflow), or `null` between steps and when
+  /// no run is in progress. For an app that can say it in words, in the activity indicator for instance.
+  String? get currentStep => _currentStep;
+
+  /// Tells the controller that its source of events is gone for good (a stream closed, a request aborted) without having
+  /// said the run was over: the conversation must not look busy for ever. Called on its own when the stream given to
+  /// [ChatController.fromStream] closes; an app that feeds [feedEvent] from a source of its own calls it itself.
+  void streamEnded() {
+    if (!_isAwaitingResponse && _activeMember == null && _currentStep == null) return;
+    _isAwaitingResponse = false;
+    _activeMember = null;
+    _currentStep = null;
+    _settleWorkingMembers(interrupted: false);
+    _settleWorkingSteps(interrupted: false);
+    notifyListeners();
+  }
 
   void _setMemberStatus(String memberEntityId, TeamMemberStatus status) {
     _memberStatuses = Map.unmodifiable({
@@ -312,6 +332,7 @@ class ChatController extends ChangeNotifier {
     _pendingHilGate = null;
     _isAwaitingResponse = false;
     _activeMember = null;
+    _currentStep = null;
     _runError = null;
     _memberStatuses = const {};
     _stepStatuses = const {};
@@ -331,6 +352,7 @@ class ChatController extends ChangeNotifier {
       case RunFinishedEvent e:
         _isAwaitingResponse = false;
         _activeMember = null;
+        _currentStep = null;
         _settleWorkingMembers(interrupted: e.isInterrupted);
         _settleWorkingSteps(interrupted: e.isInterrupted);
         if (e.isInterrupted) {
@@ -354,6 +376,7 @@ class ChatController extends ChangeNotifier {
       case RunErrorEvent e:
         _isAwaitingResponse = false;
         _activeMember = null;
+        _currentStep = null;
         _runError = AgUiRunError(message: e.message, code: e.code);
         _settleWorkingMembers(interrupted: false);
         _settleWorkingSteps(interrupted: false);
@@ -367,8 +390,10 @@ class ChatController extends ChangeNotifier {
       // identity) and stepStatuses (any run — stepName is always present, so this
       // fires for a Workflow's node-by-node progress too, not just Team turns). ──
       case StepStartedEvent e:
-        if (e.stepName.isNotEmpty)
+        if (e.stepName.isNotEmpty) {
+          _currentStep = e.stepName;
           _setStepStatus(e.stepName, WorkflowStepStatus.working);
+        }
         var changedMember = false;
         if (e.memberEntityId != null || e.displayName != null) {
           _activeMember = ActiveChatMember(
@@ -384,6 +409,7 @@ class ChatController extends ChangeNotifier {
       case StepFinishedEvent e:
         // A step that ended because it failed says so (`error`): its member is shown as failed, not as done.
         final failed = e.error != null && e.error!.isNotEmpty;
+        if (e.stepName == _currentStep) _currentStep = null;
         if (e.stepName.isNotEmpty)
           _setStepStatus(e.stepName, failed ? WorkflowStepStatus.failed : WorkflowStepStatus.done);
         final hadActiveMember = _activeMember != null || e.memberEntityId != null;

@@ -10,6 +10,7 @@ import 'ag_ui_chat_input.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
 import 'member_avatar.dart';
+import 'chat_activity.dart';
 import 'run_error.dart';
 import 'connection_notice.dart';
 import '../../../client/core/connection_monitor.dart';
@@ -66,6 +67,7 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.loadingBuilder,
     this.inputHint = 'Type a message…',
     this.hilInputHint = 'Type your response…',
+    this.initialInputText,
     this.autoLoad = true,
     this.onAttach,
     this.onHilResponse,
@@ -74,6 +76,10 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.running,
     this.connection,
     this.showActiveMemberIndicator = false,
+    this.showActivityIndicator = false,
+    this.activityLabel,
+    this.activityStyle = const AgUiChatActivityStyle(),
+    this.activityBuilder,
     this.showSpeakerLabels = false,
     this.resolveMemberAvatar,
     // AgUiChatInput passthrough
@@ -118,6 +124,10 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// Hint text shown in the input field when a HIL gate is active.
   final String hilInputHint;
 
+  /// Text put in the input when the chat opens, for the person to send as it is or to complete (a request the app
+  /// prepared from what they were looking at). Read once: changing it later does not overwrite what they typed.
+  final String? initialInputText;
+
   /// Call [ChatController.loadThreads] on first build.
   final bool autoLoad;
 
@@ -160,6 +170,23 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// while a Team member is taking its turn (driven by [ChatController.activeMember]).
   /// Off by default; has no effect for a standalone Agent, which never sets [ChatController.activeMember].
   final bool showActiveMemberIndicator;
+
+  /// Shows a discreet "it is working" line (a small moving mark and a short text) above the input for as long as a run is
+  /// in progress, and removes it the moment the run ends, fails, is stopped or asks something. Off by default. It follows the
+  /// same signal as the stop button ([running] or [ChatController.isAwaitingResponse]) and appears only after
+  /// [AgUiChatActivityStyle.delay], so a quick answer shows none. While a Team member is shown by
+  /// [showActiveMemberIndicator], that indicator stands in its place.
+  final bool showActivityIndicator;
+
+  /// What the app says is going on ("Reading your files"), shown instead of the default text. Null leaves the default:
+  /// the member at work when there is one, otherwise [AgUiChatActivityStyle.thinkingLabel].
+  final String? activityLabel;
+
+  /// The look of the activity indicator: animation, mark, colour, text style, delay, wording.
+  final AgUiChatActivityStyle activityStyle;
+
+  /// Draws the activity indicator instead of the default one.
+  final Widget Function(BuildContext context, AgUiChatActivity activity)? activityBuilder;
 
   /// The client's connection monitor (`client.connection`). When given, the conversation says on its own when the server cannot be
   /// reached — with a countdown to the next attempt and a "Retry now" button.
@@ -234,6 +261,9 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialInputText case final text? when text.isNotEmpty) {
+      _inputController.value = TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
+    }
     widget.controller.addListener(_onControllerChange);
     if (widget.autoLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -437,7 +467,21 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
         if (runError != null) AgUiChatRunError(error: runError, onDismiss: widget.controller.dismissRunError),
 
         if (widget.showActiveMemberIndicator && activeMember != null)
-          _ActiveMemberIndicator(member: AgUiChatMember(memberEntityId: activeMember.memberEntityId, displayName: activeMember.displayName), resolver: widget.resolveMemberAvatar),
+          _ActiveMemberIndicator(member: AgUiChatMember(memberEntityId: activeMember.memberEntityId, displayName: activeMember.displayName), resolver: widget.resolveMemberAvatar)
+        else if (widget.showActivityIndicator)
+          // Always in the tree while the option is on, so that it keeps its own delay; it draws nothing when idle.
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: AgUiChatActivityIndicator(
+              // Busy is what the stop button goes by. A question waiting for its answer is not work in progress; one
+              // whose answer is on its way is.
+              activity: (!isHilActive || _submittingHil) && ((widget.running ?? false) || widget.controller.isAwaitingResponse)
+                  ? AgUiChatActivity(label: widget.activityLabel, stepName: widget.controller.currentStep, memberEntityId: activeMember?.memberEntityId, memberName: activeMember?.displayName)
+                  : null,
+              style: widget.activityStyle,
+              builder: widget.activityBuilder,
+            ),
+          ),
 
         // No HIL gate banner: the agent's question (with questions_to_ask) is already
         // published as a chat message, so the thread itself is the source of truth.

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -10,6 +11,8 @@ import 'member_avatar.dart';
 import 'team_appearance.dart';
 import 'team_layouts.dart';
 import 'team_topology.dart';
+
+export 'team_layouts.dart' show AgUiTeamZoneLook;
 
 /// A member of the Team being shown by [AgUiTeamRoster] / [AgUiTeamGraph]. [memberEntityId] must match
 /// the id the backend reports on `STEP_STARTED`/`STEP_FINISHED`.
@@ -316,7 +319,22 @@ class AgUiTeamGraph extends StatefulWidget {
     this.topology,
     this.statuses,
     this.interactive = true,
+    this.onMemberSelected,
+    this.selectedMemberId,
+    this.zoneLook = AgUiTeamZoneLook.organic,
   });
+
+  /// How the zone behind a group is drawn: soft melted shapes ([AgUiTeamZoneLook.organic], the default) or plain discs and
+  /// bands ([AgUiTeamZoneLook.bands], cheaper to draw). Either way a zone never passes over what is not its own.
+  final AgUiTeamZoneLook zoneLook;
+
+  /// Called when a member is clicked or tapped. With it, members show a pointer and can be selected; without it the graph
+  /// is a picture. Dragging the graph is not a selection.
+  final ValueChanged<AgUiTeamMember>? onMemberSelected;
+
+  /// The `memberEntityId` of the member shown as selected (a ring and its name in the accent color). The app owns the
+  /// selection: it sets this from [onMemberSelected], or from its own list.
+  final String? selectedMemberId;
 
   /// The chat the graph follows. Optional: without it (and without a [statusSource]) the graph shows [statuses], or a still picture.
   final ChatController? controller;
@@ -607,6 +625,8 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
           final label = _truncate(
             member.label ?? agUiTeamMemberShortName(member.displayName),
           );
+          final selected = widget.selectedMemberId != null && widget.selectedMemberId == member.memberEntityId;
+          final accentColor = Theme.of(context).colorScheme.primary;
           final hex = _TeamHexNode(
             avatar: resolveMemberAvatar(
               member.asChatMember,
@@ -619,7 +639,8 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
             size: hexSize,
             off: status == null && !resting,
             pulse: status == TeamMemberStatus.working ? _blink.value : 0,
-            ringColor: status == null ? null : widget.palette.of(status),
+            // A status ring says more than a selection ring: the selected member at work keeps its status color.
+            ringColor: status == null ? (selected ? accentColor : null) : widget.palette.of(status),
             order: order,
             scale: scale,
           );
@@ -634,12 +655,15 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
               label,
               maxLines: 1,
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(fontSize: 8.5 * scale),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 8.5 * scale,
+                color: selected ? accentColor : null,
+                fontWeight: selected ? FontWeight.w700 : null,
+              ),
             ),
           );
-          final body = Semantics(
+          final onSelected = widget.onMemberSelected;
+          final picture = Semantics(
             label: '${member.displayName}, ${teamMemberStatusText(status)}',
             excludeSemantics: true,
             child: Tooltip(
@@ -654,6 +678,17 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
               ),
             ),
           );
+          final body =
+              onSelected == null
+                  ? picture
+                  : MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onSelected(member),
+                      child: picture,
+                    ),
+                  );
           // A name above the member is anchored by its bottom edge, so the hexagon stays centered on `at` whatever the name's height.
           return labelAbove
               ? Positioned(
@@ -668,6 +703,18 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                 width: 80,
                 child: body,
               );
+        }
+
+        // The zones follow the team and the frame, never the run: computed here, once per layout.
+        final List<_Zone> zones;
+        if (scene != null) {
+          zones = [
+            for (final group in sceneGroups)
+              // A group split by another in a chain is drawn once per run (key `group#run`); the color is the group's.
+              if (groupColors[group.key.replaceAll(RegExp(r'#\d+$'), '')] case final color?) (shape: group.zone, color: color),
+          ];
+        } else {
+          zones = _branchZones(branches, hasHub: hub != null, hubGroupKey: agUiTeamGroupKey(hub?.group), center: frame.center, colors: groupColors);
         }
 
         return SizedBox(
@@ -702,6 +749,9 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                         return Stack(
                           children: [
                             Positioned.fill(
+                              child: RepaintBoundary(child: CustomPaint(painter: _ZonesPainter(zones: zones, scale: scale, look: widget.zoneLook))),
+                            ),
+                            Positioned.fill(
                               child: CustomPaint(
                                 painter:
                                     scene != null
@@ -727,6 +777,8 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                                         : _BranchPainter(
                                           branches: branches,
                                           hasHub: hub != null,
+                                          hubGroupKey: agUiTeamGroupKey(hub?.group),
+                                          hubGroupName: hub?.group?.trim(),
                                           statuses: statuses,
                                           colors: groupColors,
                                           running: !resting,
@@ -979,32 +1031,120 @@ void _drawLink(
   }
 }
 
-/// The soft zone behind a group: its members' [points] (in design units) thickened into one rounded shape in the group's color.
-void _drawZone(Canvas canvas, List<Offset> points, Color color, double scale) {
-  final px = [for (final p in points) p * scale];
-  final paint = Paint()..color = color.withValues(alpha: 0.11);
-  const width = 46.0;
-  if (px.length == 1) {
-    canvas.drawCircle(px.first, width / 2 * scale, paint);
-    return;
+/// A zone to draw: its shape (in design units) and the color of its group.
+typedef _Zone = ({ZoneShape shape, Color color});
+
+/// The zones of a constellation: one per group of the branches, the hub being a member of its group like anyone else
+/// (alone in it, it gets a zone of its own).
+List<_Zone> _branchZones(List<_Branch> branches, {required bool hasHub, required String? hubGroupKey, required Offset center, required Map<String, Color> colors}) {
+  final zones = <_Zone>[];
+  final hubAlone = hasHub && hubGroupKey != null && !branches.any((b) => b.key == hubGroupKey);
+  if (hubAlone) {
+    final color = colors[hubGroupKey];
+    if (color != null) zones.add((shape: zoneShape([center], const []).withRadius(21 + 13), color: color));
   }
-  final path = Path()..moveTo(px.first.dx, px.first.dy);
-  for (final point in px.skip(1)) {
-    path.lineTo(point.dx, point.dy);
+  for (final branch in branches) {
+    final color = colors[branch.key];
+    if (color == null) continue;
+    final withHub = hasHub && hubGroupKey != null && branch.key == hubGroupKey;
+    // Everything that is not this group: the members of the other branches, and the hub with its name.
+    final obstacles = [
+      for (final other in branches)
+        if (!identical(other, branch))
+          for (final p in other.members) ...memberObstacles(p.at),
+      if (hasHub && !withHub) ...memberObstacles(center, radius: 21),
+    ];
+    // A hub of this group is one of its points.
+    zones.add((shape: zoneShape([if (withHub) center, for (final p in branch.members) p.at], obstacles), color: color));
   }
-  if (px.length > 2) {
-    path.close();
-    canvas.drawPath(path, paint..style = PaintingStyle.fill);
+  return zones;
+}
+
+/// Draws the soft zones behind the groups, under everything else. It is a painter of its own, behind a repaint boundary:
+/// the zones change with the team and the frame, not with the run, so the links can animate over them without the zones
+/// (and their melt) being drawn again.
+class _ZonesPainter extends CustomPainter {
+  const _ZonesPainter({required this.zones, required this.scale, required this.look});
+
+  final List<_Zone> zones;
+  final double scale;
+  final AgUiTeamZoneLook look;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final zone in zones) {
+      _drawZone(canvas, zone.shape, zone.color, scale, organic: look == AgUiTeamZoneLook.organic);
+    }
   }
-  canvas.drawPath(
-    path,
-    Paint()
-      ..color = color.withValues(alpha: 0.11)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width * scale
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round,
-  );
+
+  @override
+  bool shouldRepaint(_ZonesPainter old) => !identical(old.zones, zones) || old.scale != scale || old.look != look;
+}
+
+/// The soft zone behind a group (in design units), drawn as one flat shape however its parts overlap.
+///
+/// As bands: a disc on each member and a band along each link, or the whole area between the members when it is free.
+/// Organic: the free areas between neighbours, a disc on each member and the shortest bands that tie them, melted into one
+/// soft shape — blurred, then cut back to a clean edge, so corners round off and the hollow between two bands fills in like
+/// a drop.
+void _drawZone(Canvas canvas, ZoneShape zone, Color color, double scale, {required bool organic}) {
+  final px = [for (final p in zone.points) p * scale];
+  if (px.isEmpty) return;
+  final width = zoneHalfWidth * 2 * scale;
+  final solid = Paint()..color = color.withValues(alpha: 1);
+  final band =
+      Paint()
+        ..color = color.withValues(alpha: 1)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+
+  Path closed(List<Offset> points) {
+    final path = Path()..moveTo(points.first.dx * scale, points.first.dy * scale);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx * scale, point.dy * scale);
+    }
+    return path..close();
+  }
+
+  void discs() {
+    for (final point in px) {
+      canvas.drawCircle(point, zone.radius != null ? zone.radius! * scale : width / 2, solid);
+    }
+  }
+
+  // One layer, faded as a whole: parts that cross do not darken each other.
+  canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, color.a * 0.11));
+  if (organic) {
+    // The melt: a blur, then alpha pushed back to all-or-nothing (alpha x 22 - 10, as the React SDK's filter does). Two
+    // layers, one per effect, each with a plain paint: composing a color filter into an image filter is not accepted by
+    // every renderer (the web one refuses it, and the zones were then not painted at all).
+    final sigma = 9 * scale;
+    canvas.saveLayer(null, Paint()..colorFilter = const ColorFilter.matrix(<double>[1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 22, -2550]));
+    canvas.saveLayer(null, Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.decal));
+    for (final area in zone.areas) {
+      final path = closed(area);
+      canvas.drawPath(path, solid);
+      canvas.drawPath(path, band);
+    }
+    discs();
+    for (final (a, b) in zone.ties) {
+      canvas.drawLine(a * scale, b * scale, band);
+    }
+    canvas.restore();
+    canvas.restore();
+  } else if (zone.filled) {
+    final path = closed(zone.points);
+    canvas.drawPath(path, solid);
+    canvas.drawPath(path, band);
+  } else {
+    discs();
+    for (final (a, b) in zone.links) {
+      canvas.drawLine(a * scale, b * scale, band);
+    }
+  }
+  canvas.restore();
 }
 
 /// A group's badge — a pill with its color, its name in capitals and its size. [centerFor] gives the pill's center (in pixels)
@@ -1074,10 +1214,16 @@ class _BranchPainter extends CustomPainter {
     required this.center,
     required this.labelColor,
     required this.haloColor,
+    this.hubGroupKey,
+    this.hubGroupName,
   });
 
   final List<_Branch> branches;
   final bool hasHub;
+
+  /// The group of the hub, when it has one: its key (as in [colors]) and its name as written.
+  final String? hubGroupKey;
+  final String? hubGroupName;
   final Map<String, TeamMemberStatus> statuses;
   final Map<String, Color> colors;
   final bool running;
@@ -1102,12 +1248,8 @@ class _BranchPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final branch in branches) {
-      final color = colors[branch.key];
-      if (color != null) {
-        _drawZone(canvas, [for (final p in branch.members) p.at], color, scale);
-      }
-    }
+    // The zones are drawn underneath by [_ZonesPainter]. The hub alone in its group still gets its badge here.
+    final hubAlone = hasHub && hubGroupKey != null && !branches.any((b) => b.key == hubGroupKey);
     for (final branch in branches) {
       final color = colors[branch.key] ?? labelColor.withValues(alpha: 0.5);
       final lit = _litStatus(branch);
@@ -1142,6 +1284,19 @@ class _BranchPainter extends CustomPainter {
         if (branch.name != null) _label(canvas, branch, color);
       }
     }
+    if (hubAlone && hubGroupName != null) {
+      final color = colors[hubGroupKey] ?? labelColor.withValues(alpha: 0.5);
+      _drawPill(
+        canvas,
+        name: hubGroupName!,
+        count: 1,
+        color: color,
+        scale: scale,
+        labelColor: labelColor,
+        haloColor: haloColor,
+        centerFor: (width) => hubBadgeCenter(center, 21, width / scale, [for (final b in branches) b.angle]) * scale,
+      );
+    }
   }
 
   // The group's badge, set beside its junction, clear of the links.
@@ -1152,7 +1307,8 @@ class _BranchPainter extends CustomPainter {
     _drawPill(
       canvas,
       name: branch.name!,
-      count: branch.members.length,
+      // A hub of this group counts in it.
+      count: branch.members.length + (hasHub && hubGroupKey != null && branch.key == hubGroupKey ? 1 : 0),
       color: color,
       scale: scale,
       labelColor: labelColor,
@@ -1167,6 +1323,7 @@ class _BranchPainter extends CustomPainter {
       old.running != running ||
       old.statuses != statuses ||
       old.branches != branches ||
+      old.hubGroupKey != hubGroupKey ||
       old.scale != scale ||
       old.colors != colors;
 }
@@ -1218,11 +1375,6 @@ class _ScenePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final group in groups) {
-      final color = _groupColor(group.key);
-      if (color != null) _drawZone(canvas, group.points, color, scale);
-    }
-
     final band = scene.band;
     if (band != null) {
       final rect = RRect.fromRectAndRadius(

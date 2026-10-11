@@ -107,7 +107,17 @@ class AgUiWorkflowGraph extends StatefulWidget {
     this.interactive = true,
     this.camera = AgUiWorkflowCamera.follow,
     this.palette = const AgUiWorkflowPalette(),
+    this.onNodeSelected,
+    this.selectedNodeId,
   });
+
+  /// Called when a node is clicked or tapped. With it, nodes show a pointer and can be selected; without it the diagram
+  /// is a picture. Dragging the diagram is not a selection.
+  final ValueChanged<WorkflowGraphNode>? onNodeSelected;
+
+  /// The id of the node shown as selected (a ring and its name in the accent color). The app owns the selection: it sets
+  /// this from [onNodeSelected], or from its own list.
+  final String? selectedNodeId;
 
   /// The chat the diagram follows. Optional: without it (and without a [statusSource]) the diagram shows [statuses], or a still picture.
   final ChatController? controller;
@@ -410,21 +420,30 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
     WorkflowStepStatus? status,
   ) {
     final idle = status == null;
+    final selected = widget.selectedNodeId != null && widget.selectedNodeId == n.id;
     final kindColor = widget.palette.kindColor(n.kind);
-    final ringColor = idle ? null : widget.palette.statusColor(status);
+    // A status ring says more than a selection ring: the selected node at work keeps its status color.
+    final ringColor = idle ? (selected ? scheme.primary : null) : widget.palette.statusColor(status);
+    final onSelected = widget.onNodeSelected;
     const size = _nodeRadius * 2;
+    Widget pickable(Widget child) => onSelected == null
+        ? child
+        : MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => onSelected(n), child: child),
+          );
     return Positioned(
       left: at.dx - size / 2 - 10,
       top: at.dy - size / 2,
       width: size + 20,
-      child: Tooltip(
+      child: pickable(Tooltip(
         message: '${n.displayName} — ${workflowStepStatusText(status)}',
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Opacity(
               opacity: idle
-                  ? 0.62
+                  ? (selected ? 1 : 0.62)
                   : (status == WorkflowStepStatus.working ? 1 - 0.45 * _blink.value : 1),
               child: SizedBox(
                 width: size + 8,
@@ -447,11 +466,11 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9, color: selected ? scheme.primary : null, fontWeight: selected ? FontWeight.w700 : null),
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

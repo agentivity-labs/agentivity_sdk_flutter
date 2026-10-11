@@ -505,15 +505,15 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
             return KeyEventResult.handled;
           }
         }
+        // Ctrl+V (Cmd+V): an image on the clipboard becomes an attachment. The key is never consumed here, so the text field
+        // pastes text as usual (a shortcut bound to it would swallow the key and nothing would be pasted).
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyV && widget.enableAttachments && (HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed)) {
+          unawaited(_tryPasteImage().catchError((Object _) => false));
+        }
         return KeyEventResult.ignored;
       },
-      child: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.keyV, control: true): () async {
-            await _tryPasteImage();
-          },
-        },
-        child: TextField(
+      child: Builder(
+        builder: (context) => TextField(
           controller: _ctrl,
           focusNode: _focusNode,
           enabled: isEnabled,

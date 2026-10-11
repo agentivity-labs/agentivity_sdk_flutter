@@ -57,6 +57,7 @@ export 'src/ag_ui/panels/chat/i_chat_provider.dart';
 export 'src/ag_ui/panels/chat/chat_theme.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_input.dart';
 export 'src/ag_ui/panels/chat/ag_ui_chat_discussion.dart';
+export 'src/ag_ui/panels/chat/chat_activity.dart';
 export 'src/ag_ui/panels/chat/member_avatar.dart';
 export 'src/ag_ui/panels/chat/run_error.dart';
 export 'src/ag_ui/panels/chat/connection_notice.dart';
