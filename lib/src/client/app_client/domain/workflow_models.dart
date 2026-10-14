@@ -165,9 +165,12 @@ double _sanitizeZoom(dynamic value) {
 
 const String coreSetNodeType = 'core.set';
 const String coreDataTableNodeType = 'core.datatable';
-const String interactionRequestInputNodeType = 'interaction.request_input';
-const String composableNodeType = 'ai.composable_node';
-const String teamNodeType = 'ai.team_node';
+// The Form Interaction step (title, description, the fields of the form), under the type the server gives it.
+const String formInteractionNodeType = 'interaction.form';
+// The steps that call something of the library (Agent, Team, Workflow), under the types the server gives them.
+const String agenticNodeType = 'agentic_node';
+const String teamNodeType = 'team_node';
+const String workflowCallNodeType = 'workflow_node';
 const String chatChannelNodeType = 'ai.interactions.chat';
 
 class NodeSetField {
@@ -899,8 +902,9 @@ class WorkflowDataTable {
 
   static const List<WorkflowDataTableColumn> systemColumns = <WorkflowDataTableColumn>[
     WorkflowDataTableColumn.system(name: 'id', type: WorkflowDataTableColumnType.number),
-    WorkflowDataTableColumn.system(name: 'CreatedAt', type: WorkflowDataTableColumnType.text),
-    WorkflowDataTableColumn.system(name: 'UpdatedAt', type: WorkflowDataTableColumnType.text),
+    // Named as the server names them in every row it gives.
+    WorkflowDataTableColumn.system(name: 'createdAt', type: WorkflowDataTableColumnType.text),
+    WorkflowDataTableColumn.system(name: 'updatedAt', type: WorkflowDataTableColumnType.text),
   ];
 
   factory WorkflowDataTable.fromJson(String name, Map<String, dynamic> json) {
