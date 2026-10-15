@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../../core/http_core.dart';
+import '../../core/streaming_request.dart';
 
 /// Chat context run (AG-UI stream over a chat context).
 class ChatContextApi {
@@ -27,20 +28,6 @@ class ChatContextApi {
     };
     if (runId != null) body['runId'] = runId;
 
-    final response = await _c.dio.post<ResponseBody>(
-      '/chat/contexts/${Uri.encodeComponent(contextId)}/run',
-      data: jsonEncode(body),
-      cancelToken: cancelToken,
-      options: Options(
-        responseType: ResponseType.stream,
-        headers: headers,
-        receiveTimeout: Duration.zero,
-      ),
-    );
-    final responseBody = response.data;
-    if (responseBody == null) {
-      throw StateError('Chat run stream returned no body for context $contextId.');
-    }
-    return responseBody;
+    return openStreamingRequest(_c.dio, 'POST', '/chat/contexts/${Uri.encodeComponent(contextId)}/run', data: jsonEncode(body), headers: headers, cancelToken: cancelToken);
   }
 }

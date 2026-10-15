@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../../core/http_core.dart';
 import '../domain/entity_models.dart';
 import '../domain/execution_status_models.dart';
+import '../../core/streaming_request.dart';
 
 /// Run lifecycle endpoints: start, HIL, interactions, and SSE streams.
 ///
@@ -295,19 +296,6 @@ class RunsApi {
       headers['Last-Event-ID'] = normalizedLastEventId;
     }
 
-    final response = await _c.dio.get<ResponseBody>(
-      path,
-      cancelToken: cancelToken,
-      options: Options(
-        responseType: ResponseType.stream,
-        headers: headers,
-        receiveTimeout: Duration.zero,
-      ),
-    );
-    final body = response.data;
-    if (body == null) {
-      throw StateError('SSE stream did not return a response body for $path.');
-    }
-    return body;
+    return openStreamingRequest(_c.dio, 'GET', path, headers: headers, cancelToken: cancelToken);
   }
 }

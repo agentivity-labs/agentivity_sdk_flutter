@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../protocol/ag_ui_protocol.dart';
 import '../protocol/ag_ui_sse_channel.dart';
+import '../../client/core/streaming_request.dart';
 
 // ── Run handle ────────────────────────────────────────────────────────────────
 
@@ -203,12 +204,7 @@ class AgentivityPlatformConnector {
   Stream<AgUiEvent> _getEventStream(String url) async* {
     final channel = AgUiSseChannel<AgUiEvent>(
       opener: (path, {lastEventId, cancelToken}) async {
-        final response = await _dio.get<ResponseBody>(path, cancelToken: cancelToken, options: Options(responseType: ResponseType.stream, headers: {'Accept': 'text/event-stream', 'Authorization': _authToken, 'Cache-Control': 'no-cache', if (lastEventId != null) 'Last-Event-ID': lastEventId}, receiveTimeout: Duration.zero));
-        final body = response.data;
-        if (body == null) {
-          throw StateError('AgentivityPlatformConnector: SSE stream returned no body for $url');
-        }
-        return body;
+        return openStreamingRequest(_dio, 'GET', path, cancelToken: cancelToken, headers: {'Accept': 'text/event-stream', 'Authorization': _authToken, 'Cache-Control': 'no-cache', if (lastEventId != null) 'Last-Event-ID': lastEventId});
       },
       path: url,
       parser: _parseAgUiEvent,

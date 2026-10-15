@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import '../protocol/ag_ui_protocol.dart';
 import '../protocol/ag_ui_sse_channel.dart';
 import '../protocol/run_agent_input.dart';
+import '../../client/core/streaming_request.dart';
 
 /// Connector for [LangGraph Cloud](https://langchain-ai.github.io/langgraph/cloud/)
 /// and self-hosted LangGraph deployments.
@@ -242,20 +243,18 @@ class LangGraphConnector {
   }) async* {
     final channel = AgUiSseChannel<AgUiEvent>(
       opener: (p, {lastEventId, cancelToken}) async {
-        final response = await _dio.post<ResponseBody>(
+        return openStreamingRequest(
+          _dio,
+          'POST',
           deploymentUrl + p,
           data: body,
           cancelToken: cancelToken,
-          options: Options(
-            responseType: ResponseType.stream,
-            headers: {
-              'Accept': 'text/event-stream',
-              if (lastEventId != null) 'Last-Event-ID': lastEventId,
-              ..._authHeaders(),
-            },
-          ),
+          headers: {
+            'Accept': 'text/event-stream',
+            if (lastEventId != null) 'Last-Event-ID': lastEventId,
+            ..._authHeaders(),
+          },
         );
-        return response.data!;
       },
       path: path,
       parser: _parseAgUiEvent,
