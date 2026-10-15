@@ -319,14 +319,22 @@ class HilRespondResult {
     required this.runId,
     required this.requestId,
     required this.state,
+    this.threadId,
+    this.messageId,
   });
 
   final String executionId;
+
+  /// The run that asked the question, and was taken up again.
   final String runId;
   final String requestId;
 
   /// Typically "resumed".
   final String state;
+
+  /// The conversation the answer was kept in, and its message there.
+  final String? threadId;
+  final String? messageId;
 
   factory HilRespondResult.fromJson(Map<String, dynamic> json) {
     return HilRespondResult(
@@ -335,38 +343,8 @@ class HilRespondResult {
       runId: (json['runId'] as String? ?? '').trim(),
       requestId: (json['requestId'] as String? ?? '').trim(),
       state: (json['state'] as String? ?? '').trim().toLowerCase(),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RunInteractionResponse — new interaction contract
-// Source: POST /api/v1/runs/{runId}/interactions → 200 OK
-// ─────────────────────────────────────────────────────────────────────────────
-
-@immutable
-class RunInteractionResponse {
-  const RunInteractionResponse({
-    required this.status,
-    required this.runId,
-    this.threadId,
-    this.messageId,
-    this.interactionRequestId,
-  });
-
-  final String status;
-  final String runId;
-  final String? threadId;
-  final String? messageId;
-  final String? interactionRequestId;
-
-  factory RunInteractionResponse.fromJson(Map<String, dynamic> json) {
-    return RunInteractionResponse(
-      status: (json['status'] as String? ?? '').trim(),
-      runId: (json['runId'] as String? ?? '').trim(),
       threadId: _nullableTrimmed(json['threadId']),
       messageId: _nullableTrimmed(json['messageId']),
-      interactionRequestId: _nullableTrimmed(json['interactionRequestId']),
     );
   }
 }

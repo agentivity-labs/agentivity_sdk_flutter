@@ -243,3 +243,19 @@ class ThreadMessage {
     );
   }
 }
+
+/// A message written in a conversation of an execution.
+/// Source: POST /api/v1/executions/{executionId}/threads/{threadId}/messages
+class PostedThreadMessage {
+  const PostedThreadMessage({required this.executionId, required this.threadId, required this.messageId});
+
+  final String executionId;
+  final String threadId;
+  final String messageId;
+
+  factory PostedThreadMessage.fromJson(Map<String, dynamic> json) => PostedThreadMessage(
+    executionId: (json['executionId'] as String? ?? '').trim(),
+    threadId: (json['threadId'] as String? ?? '').trim(),
+    messageId: (json['messageId'] as String? ?? '').trim(),
+  );
+}

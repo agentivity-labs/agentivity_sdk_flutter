@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 
@@ -7,7 +6,7 @@ import '../domain/entity_models.dart';
 import '../domain/execution_status_models.dart';
 import '../../core/streaming_request.dart';
 
-/// Run lifecycle endpoints: start, HIL, interactions, and SSE streams.
+/// Execution lifecycle endpoints: start, questions to a person, and SSE streams.
 ///
 /// Part of the lightweight [AgentivityClient].
 class RunsApi {
@@ -63,8 +62,8 @@ class RunsApi {
 
 
   // ---------------------------------------------------------------------------
-  // HIL — GET /api/v1/executions/{executionId}/hil/pending
-  //         POST /api/v1/runs/{runId}/resume (see submitHilResponse below)
+  // Questions of an execution — GET /api/v1/executions/{executionId}/hil/pending
+  //                             POST /api/v1/executions/{executionId}/respond
   // ---------------------------------------------------------------------------
 
   Future<HilPendingResponse> fetchPendingHil(String executionId) async {
@@ -75,18 +74,10 @@ class RunsApi {
     return HilPendingResponse.fromJson(response.data ?? const <String, dynamic>{});
   }
 
-  /// Submits a reply to a pending HIL gate. Internally calls `POST /runs/{runId}/resume` — NOT
-  /// `POST /executions/{executionId}/respond` (the latter resumes the run but never persists the
-  /// reply as a chat message, so it silently vanishes from any chat transcript rendered from
-  /// `CHAT_MESSAGE_RECEIVED` events). The route's `{runId}` segment is resolved server-side by the
-  /// request's `interruptId` regardless of what's passed — the backend's own doc comment on that
-  /// endpoint confirms this is intended ("may need lookup when the frontend only knows the
-  /// streamId") — so `executionId` is used there directly; callers of this method never need a
-  /// real run id. Return shape is unchanged from the previous implementation; the only signature
-  /// addition is the optional `source`, needed so the backend can tag a widget-submitted reply as
-  /// such (the chat UI hides widget-sourced messages — the widget itself already displays the
-  /// answer inline, so without this tag a widget submission renders as a second, duplicate
-  /// bubble now that replies are actually persisted to the chat).
+  /// Answers the question [requestId] of the execution [executionId], whatever the channel it was asked through
+  /// (chat, form, widget…). Several questions can wait at once: the one answered is named, and the platform takes up
+  /// again the run that asked it. The answer is kept in the conversation the question was asked in; [source] is
+  /// `'widget'` when a widget gave it (the widget shows the answer itself, so the chat does not show it again).
   Future<HilRespondResult> submitHilResponse({
     required String executionId,
     required String requestId,
@@ -96,58 +87,10 @@ class RunsApi {
     final normalizedExecution = _c.requireNormalizedId(executionId, label: 'Execution id');
     final normalizedRequest = _c.requireNormalizedId(requestId, label: 'Request id');
     final result = await _c.post<Map<String, dynamic>>(
-      AgentivityHttpCore.v1('/runs/$normalizedExecution/resume'),
-      data: <String, dynamic>{
-        'interruptId': normalizedRequest,
-        'response': <String, dynamic>{'text': response, if (source != null) 'source': source},
-      },
+      AgentivityHttpCore.v1('/executions/$normalizedExecution/respond'),
+      data: <String, dynamic>{'requestId': normalizedRequest, 'response': response, if (source != null) 'source': source},
     );
-    // /runs/{runId}/resume responds with {runId, status}, not the {executionId, requestId,
-    // runId, state} shape HilRespondResult callers expect — executionId/requestId are already
-    // known here (they're this method's own inputs), so the result is built locally instead of
-    // parsed wholesale from the response body.
-    final data = result.data ?? const <String, dynamic>{};
-    return HilRespondResult(
-      executionId: executionId,
-      runId: (data['runId'] as String? ?? executionId).trim(),
-      requestId: requestId,
-      state: (data['status'] as String? ?? 'resumed').trim().toLowerCase(),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Send message or HIL response — POST /api/v1/runs/{runId}/interactions
-  // ---------------------------------------------------------------------------
-
-  Future<RunInteractionResponse> sendRunInteraction({
-    required String runId,
-    required String message,
-    String? threadId,
-    String? authorId,
-    String? authorName,
-    String? interactionRequestId,
-    String? outcome,
-    String? executionId,
-  }) async {
-    final normalizedRunId = _c.requireNormalizedId(runId, label: 'Run id');
-    final body = <String, dynamic>{'message': message};
-    if (threadId != null && threadId.trim().isNotEmpty) body['threadId'] = threadId.trim();
-    if (authorId != null && authorId.trim().isNotEmpty) body['authorId'] = authorId.trim();
-    if (authorName != null && authorName.trim().isNotEmpty) {
-      body['authorName'] = authorName.trim();
-    }
-    if (interactionRequestId != null && interactionRequestId.trim().isNotEmpty) {
-      body['interactionRequestId'] = interactionRequestId.trim();
-    }
-    if (outcome != null && outcome.trim().isNotEmpty) body['outcome'] = outcome.trim();
-    if (executionId != null && executionId.trim().isNotEmpty) {
-      body['executionId'] = executionId.trim();
-    }
-    final response = await _c.post<Map<String, dynamic>>(
-      AgentivityHttpCore.v1('/runs/$normalizedRunId/interactions'),
-      data: body,
-    );
-    return RunInteractionResponse.fromJson(response.data ?? const <String, dynamic>{});
+    return HilRespondResult.fromJson(result.data ?? const <String, dynamic>{});
   }
 
   // ---------------------------------------------------------------------------
@@ -233,49 +176,6 @@ class RunsApi {
   Future<void> cancelRun(String runId) async {
     final normalizedRunId = _c.requireNormalizedId(runId, label: 'Run id');
     await _c.post<dynamic>(AgentivityHttpCore.v1('/runs/$normalizedRunId/cancel'));
-  }
-
-  // ---------------------------------------------------------------------------
-  // Stream-scoped HIL response — POST /api/v1/streams/{streamId}/interactions
-  // Chat uses only streamId + requestId. The backend resolves the runId internally.
-  // ---------------------------------------------------------------------------
-
-  Future<void> respondToStreamInteraction({
-    required String streamId,
-    required String requestId,
-    required String text,
-    String source = 'text',
-  }) async {
-    final normalizedStreamId = _c.requireNormalizedId(streamId, label: 'Stream id');
-    await _c.post<dynamic>(
-      AgentivityHttpCore.v1('/streams/$normalizedStreamId/interactions'),
-      data: <String, dynamic>{
-        'requestId': requestId,
-        'text': text,
-        'source': source,
-      },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // AG-UI standard resume — POST /api/v1/runs/{runId}/resume
-  // ---------------------------------------------------------------------------
-
-  Future<void> resumeRun({
-    required String runId,
-    required String interruptId,
-    required String responseText,
-    String? source,
-  }) async {
-    final normalizedRunId = _c.requireNormalizedId(runId, label: 'Run id');
-    developer.log('runId=$normalizedRunId interruptId=$interruptId response=$responseText source=$source', name: '[resumeRun]');
-    await _c.post<dynamic>(
-      AgentivityHttpCore.v1('/runs/$normalizedRunId/resume'),
-      data: <String, dynamic>{
-        'interruptId': interruptId,
-        'response': <String, dynamic>{'text': responseText, if (source != null) 'source': source},
-      },
-    );
   }
 
   // ---------------------------------------------------------------------------

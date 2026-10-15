@@ -159,10 +159,6 @@ class AgentivityRunStream implements PlatformStream {
   /// Stream for a single agent run (`/api/v1/streams/runs/{runId}/events`).
   factory AgentivityRunStream.forRun({required AgUiSseOpener opener, required String runId, AgentivitySignalDecoder? decoder}) => AgentivityRunStream(opener: opener, path: '/api/v1/streams/runs/${runId.trim()}/events', decoder: decoder);
 
-  /// Execution-level stream aggregating all runs in an execution chain
-  /// (`/api/v1/streams/runs/executions/{executionId}/events`).
-  factory AgentivityRunStream.forExecution({required AgUiSseOpener opener, required String executionId, AgentivitySignalDecoder? decoder}) => AgentivityRunStream(opener: opener, path: '/api/v1/streams/runs/executions/${executionId.trim()}/events', decoder: decoder);
-
   /// Workspace-level collection stream covering all runs
   /// (`/api/v1/streams/runs/events`).
   factory AgentivityRunStream.forCollection({required AgUiSseOpener opener, AgentivitySignalDecoder? decoder}) => AgentivityRunStream(opener: opener, path: '/api/v1/streams/runs/events', decoder: decoder);

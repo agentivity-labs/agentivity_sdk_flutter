@@ -64,18 +64,15 @@ class AgUiStartRunOptions {
 
 /// Options for [AgentivityPlatformConnector.sendMessage].
 class AgUiSendMessageOptions {
-  const AgUiSendMessageOptions({this.threadId, this.interactionRequestId});
+  const AgUiSendMessageOptions({this.threadId});
 
-  /// Thread to post the message into. Uses the default thread when omitted.
+  /// Conversation to write the message in. The main conversation of the execution when omitted.
   final String? threadId;
-
-  /// Optional HIL interaction request ID when responding to a specific gate.
-  final String? interactionRequestId;
 }
 
 // ── Thread models ─────────────────────────────────────────────────────────────
 
-/// A chat thread on a run, returned by [AgentivityPlatformConnector.listThreads].
+/// A conversation of an execution, returned by [AgentivityPlatformConnector.listThreads].
 class AgUiRunThread {
   const AgUiRunThread({required this.threadId, required this.title, required this.isDefault, required this.status, required this.createdAt});
 
@@ -90,7 +87,7 @@ class AgUiRunThread {
   }
 }
 
-/// A message in a run thread, returned by
+/// A message in a conversation of an execution, returned by
 /// [AgentivityPlatformConnector.listMessages].
 class AgUiThreadMessage {
   const AgUiThreadMessage({required this.messageId, required this.threadId, required this.authorType, required this.text, required this.createdAt, this.authorName});
@@ -113,8 +110,9 @@ class AgUiThreadMessage {
 
 /// REST + SSE connector for the Agentivity platform backend (EPIC-0449 contract).
 ///
-/// Implements the unified `/api/v1/runs` API: starting runs, listening to live
-/// AG-UI events over SSE, resuming HIL interrupts, and sending chat messages.
+/// Works at the level of an execution (`/api/v1/executions`): starting one, listening to its live AG-UI events over
+/// SSE, answering the questions it asks a person, and writing in its conversation. Runs, the levels inside an
+/// execution, are never needed.
 ///
 /// ## Quick start
 ///
@@ -132,18 +130,18 @@ class AgUiThreadMessage {
 /// );
 ///
 /// // Subscribe to live events
-/// await for (final event in connector.openRunStream(handle.runId)) {
+/// await for (final event in connector.openRunStream(handle.runId, streamUrl: handle.streamUrl)) {
 ///   if (event is TextMessageContentEvent) print(event.delta);
 /// }
 /// ```
 ///
-/// ## HIL resume
+/// ## Answering a question
 ///
 /// ```dart
 /// // Stream emits RUN_FINISHED with outcome.interrupt — collect user reply:
-/// await connector.resumeRun(
-///   handle.runId,
-///   interruptId: interrupt.id,
+/// await connector.respond(
+///   handle.executionId,
+///   requestId: interrupt.id,
 ///   responseText: userReply,
 /// );
 /// // The same SSE channel re-emits RUN_STARTED and continues.
@@ -159,12 +157,12 @@ class AgentivityPlatformConnector {
   final String _authToken;
   final Dio _dio;
 
-  String get _runsBase => '$baseUrl/api/v1/runs';
+  String get _executionsBase => '$baseUrl/api/v1/executions';
 
   // ── Run start ──────────────────────────────────────────────────────────────
 
-  /// Starts a run for [entityId] (agent, team, or workflow) and returns a
-  /// [AgUiRunHandle] containing the [AgUiRunHandle.runId] and
+  /// Starts an execution of [entityId] (agent, team, or workflow) and returns a
+  /// [AgUiRunHandle] containing its [AgUiRunHandle.executionId] and
   /// [AgUiRunHandle.streamUrl].
   ///
   /// Pass [AgUiRunHandle.streamUrl] to [openRunStream] for the best performance
@@ -176,7 +174,7 @@ class AgentivityPlatformConnector {
     final maxIter = options?.maxAgentIterations;
     if (maxIter != null) body['maxAgentIterations'] = maxIter;
 
-    final response = await _dio.post<Map<String, dynamic>>(_runsBase, data: body, options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 60)));
+    final response = await _dio.post<Map<String, dynamic>>(_executionsBase, data: body, options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 60)));
     return AgUiRunHandle.fromJson(response.data ?? const <String, dynamic>{});
   }
 
@@ -197,7 +195,8 @@ class AgentivityPlatformConnector {
   /// Heartbeat SSE comments (`: heartbeat`) are silently ignored.
   /// Reconnection with `Last-Event-ID` is handled automatically.
   Stream<AgUiEvent> openRunStream(String runId, {String? streamUrl}) {
-    final url = (streamUrl != null && streamUrl.isNotEmpty) ? streamUrl : '$baseUrl/api/v1/streams/runs/$runId/events';
+    // The platform gives the stream as a path of its own: it is read from it.
+    final url = (streamUrl != null && streamUrl.isNotEmpty) ? (Uri.parse(streamUrl).hasScheme ? streamUrl : '$baseUrl$streamUrl') : '$baseUrl/api/v1/streams/runs/$runId/events';
     return _getEventStream(url);
   }
 
@@ -234,49 +233,39 @@ class AgentivityPlatformConnector {
     return null;
   }
 
-  // ── HIL resume ────────────────────────────────────────────────────────────
+  // ── Questions ─────────────────────────────────────────────────────────────
 
-  /// Resumes [runId] after a HIL interrupt by submitting [responseText] for
-  /// [interruptId].
+  /// Answers the question [requestId] of the execution [executionId] (for an interrupt, its id) with [responseText].
+  /// Several questions can wait at once: the one answered is named, and the platform takes up again the run that asked
+  /// it. The answer is kept in the conversation of the execution.
   ///
   /// After a successful POST the backend emits `RUN_STARTED` on the open SSE
   /// channel and the run continues.
   ///
   /// Throws a [DioException] on non-2xx responses.
-  Future<void> resumeRun(String runId, {required String interruptId, required String responseText}) async {
-    await _dio.post<void>(
-      '$_runsBase/$runId/resume',
-      data: {
-        'interruptId': interruptId,
-        'response': {'text': responseText},
-      },
-      options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}),
-    );
+  Future<void> respond(String executionId, {required String requestId, required String responseText}) async {
+    await _dio.post<void>('$_executionsBase/$executionId/respond', data: {'requestId': requestId, 'response': responseText}, options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}));
   }
 
-  // ── Free-chat message ─────────────────────────────────────────────────────
+  // ── Conversation ──────────────────────────────────────────────────────────
 
-  /// Sends a free-text [message] into an ongoing run.
-  ///
-  /// Use [options] to target a specific thread or attach an interaction request
-  /// ID when responding to a specific HIL gate.
+  /// Writes [message] in a conversation of the execution [executionId]: the one of [options], or its main one. To
+  /// answer a question, use [respond].
   ///
   /// Throws a [DioException] on non-2xx responses.
-  Future<void> sendMessage(String runId, String message, {AgUiSendMessageOptions? options}) async {
-    final body = <String, dynamic>{'message': message};
-    final tid = options?.threadId?.trim();
-    if (tid != null && tid.isNotEmpty) body['threadId'] = tid;
-    final irid = options?.interactionRequestId?.trim();
-    if (irid != null && irid.isNotEmpty) body['interactionRequestId'] = irid;
-
-    await _dio.post<void>('$_runsBase/$runId/interactions', data: body, options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}));
+  Future<void> sendMessage(String executionId, String message, {AgUiSendMessageOptions? options}) async {
+    var threadId = options?.threadId?.trim();
+    if (threadId == null || threadId.isEmpty) {
+      final threads = await listThreads(executionId);
+      if (threads.isEmpty) throw StateError('Execution $executionId has no conversation to write in yet.');
+      threadId = threads.firstWhere((t) => t.isDefault, orElse: () => threads.first).threadId;
+    }
+    await _dio.post<void>('$_executionsBase/$executionId/threads/$threadId/messages', data: {'text': message}, options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}));
   }
 
-  // ── Thread management ─────────────────────────────────────────────────────
-
-  /// Lists the chat threads for [runId].
-  Future<List<AgUiRunThread>> listThreads(String runId) async {
-    final response = await _dio.get<dynamic>('$_runsBase/$runId/threads', options: Options(headers: {'Authorization': _authToken}));
+  /// Lists the conversations of the execution [executionId].
+  Future<List<AgUiRunThread>> listThreads(String executionId) async {
+    final response = await _dio.get<dynamic>('$_executionsBase/$executionId/threads', options: Options(headers: {'Authorization': _authToken}));
     final data = response.data;
     if (data is List) {
       return data.whereType<Map<String, dynamic>>().map(AgUiRunThread.fromJson).toList();
@@ -284,9 +273,9 @@ class AgentivityPlatformConnector {
     return const [];
   }
 
-  /// Lists messages in [threadId] for [runId].
-  Future<List<AgUiThreadMessage>> listMessages(String runId, String threadId) async {
-    final response = await _dio.get<dynamic>('$_runsBase/$runId/threads/$threadId/messages', options: Options(headers: {'Authorization': _authToken}));
+  /// Lists the messages of the conversation [threadId] of the execution [executionId].
+  Future<List<AgUiThreadMessage>> listMessages(String executionId, String threadId) async {
+    final response = await _dio.get<dynamic>('$_executionsBase/$executionId/threads/$threadId/messages', options: Options(headers: {'Authorization': _authToken}));
     final data = response.data;
     if (data is List) {
       return data.whereType<Map<String, dynamic>>().map(AgUiThreadMessage.fromJson).toList();

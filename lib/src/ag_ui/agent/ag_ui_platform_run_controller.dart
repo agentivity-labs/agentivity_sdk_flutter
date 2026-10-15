@@ -102,6 +102,9 @@ class AgUiPlatformRunController extends ChangeNotifier {
   /// The current run ID, set after [start] completes successfully.
   String? get runId => _runId;
 
+  /// The execution [start] started, set once it is known: what questions are answered in and messages written to.
+  String? get executionId => _executionId;
+
   // ── Private state ──────────────────────────────────────────────────────────
 
   AgUiPlatformRunStatus _status = AgUiPlatformRunStatus.idle;
@@ -109,6 +112,7 @@ class AgUiPlatformRunController extends ChangeNotifier {
   AgUiInterrupt? _interrupt;
   String? _error;
   String? _runId;
+  String? _executionId;
 
   StreamSubscription<AgUiEvent>? _sub;
 
@@ -135,6 +139,7 @@ class AgUiPlatformRunController extends ChangeNotifier {
     try {
       final handle = await _connector.startRun(entityId, input, options: options);
       _runId = handle.runId;
+      _executionId = handle.executionId;
       notifyListeners();
 
       final stream = _connector.openRunStream(handle.runId, streamUrl: handle.streamUrl);
@@ -152,18 +157,18 @@ class AgUiPlatformRunController extends ChangeNotifier {
   /// is cleared and [status] is set back to [AgUiPlatformRunStatus.running] in
   /// anticipation of the `RUN_STARTED` event on the SSE channel.
   ///
-  /// Does nothing if there is no active [interrupt] or no [runId].
+  /// Does nothing if there is no active [interrupt] or no [executionId].
   Future<void> resume(String responseText) async {
-    final rid = _runId;
+    final eid = _executionId;
     final activeInterrupt = _interrupt;
-    if (rid == null || activeInterrupt == null) return;
+    if (eid == null || activeInterrupt == null) return;
 
     _interrupt = null;
     _status = AgUiPlatformRunStatus.running;
     notifyListeners();
 
     try {
-      await _connector.resumeRun(rid, interruptId: activeInterrupt.id, responseText: responseText);
+      await _connector.respond(eid, requestId: activeInterrupt.id, responseText: responseText);
     } catch (e) {
       _status = AgUiPlatformRunStatus.failed;
       _error = e.toString();
@@ -171,13 +176,13 @@ class AgUiPlatformRunController extends ChangeNotifier {
     }
   }
 
-  /// Sends a free-text [message] into the current run.
+  /// Writes a free-text [message] in the conversation of the current execution.
   ///
-  /// Does nothing if there is no active [runId].
+  /// Does nothing if there is no [executionId].
   Future<void> send(String message, {AgUiSendMessageOptions? options}) async {
-    final rid = _runId;
-    if (rid == null) return;
-    await _connector.sendMessage(rid, message, options: options);
+    final eid = _executionId;
+    if (eid == null) return;
+    await _connector.sendMessage(eid, message, options: options);
   }
 
   /// Cancels the active run stream and resets all state back to
@@ -190,6 +195,7 @@ class AgUiPlatformRunController extends ChangeNotifier {
     _interrupt = null;
     _error = null;
     _runId = null;
+    _executionId = null;
     _clearInProgress();
     notifyListeners();
   }

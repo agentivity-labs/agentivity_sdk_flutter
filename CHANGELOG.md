@@ -2,6 +2,16 @@
 
 ## 0.1.0 - Unreleased
 
+- **One way to answer a question, at the level of an execution.** `runs.submitHilResponse(executionId, requestId, …)` now
+  calls `POST /executions/{executionId}/respond`: the answer names its question (several can wait at once), the platform
+  takes up again the run that asked it, and the answer is kept in the conversation. Its result gains `threadId` and
+  `messageId`. `conversations.postMessage(executionId, threadId, text)` writes in a conversation of an execution.
+  Removed, as they named runs or the stream: `runs.resumeRun`, `runs.sendRunInteraction`,
+  `runs.respondToStreamInteraction`, `RunInteractionResponse`, and `AgentivityRunStream.forExecution` (its route never
+  existed). `AgentivityPlatformConnector` now starts executions (`POST /executions`, where it used to call a route that does
+  not exist), answers with `respond(executionId, requestId: …, responseText: …)` in place of `resumeRun`, and writes and
+  reads conversations by execution; `AgUiSendMessageOptions` loses `interactionRequestId`, and
+  `AgUiPlatformRunController` gains `executionId`.
 - **`AgUiTemplateGraph` and `resolveRenderable`.** Draw a team, a workflow or an agent from JSON alone (a Template file, the
   marketplace's `/root` payload, a catalog wrapper or a bare entity) — no run, no chat. Optional `autoplay`, `interactive`
   (off by default, so the picture scrolls with the page). `AgUiTeamGraph` and `AgUiWorkflowGraph` no longer require a

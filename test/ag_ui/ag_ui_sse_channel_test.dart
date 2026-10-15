@@ -316,6 +316,19 @@ void main() {
       await ch.dispose();
     });
 
+    test('start() and dispose() work without a Flutter binding', () async {
+      // AgentivityPlatformConnector may drive the channel from pure Dart code where
+      // no WidgetsBinding was ever initialised — this file deliberately never creates one.
+      final ch = AgUiSseChannel<String>(
+        opener: _fixedOpener(_sseBody('data: no-binding\n\n')),
+        path: '/',
+        parser: (_, __, data) => data,
+      );
+      ch.start();
+      expect(await _take(ch.stream, 1), ['no-binding']);
+      await ch.dispose();
+    });
+
     test('dispose() before start() is safe', () async {
       final ch = AgUiSseChannel<String>(
         opener: _fixedOpener(_sseBody('data: x\n\n')),

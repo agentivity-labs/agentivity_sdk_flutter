@@ -110,12 +110,25 @@ class AgUiSseChannel<T> with WidgetsBindingObserver {
   bool _started = false;
   bool _disposed = false;
   bool _terminated = false; // set when a terminal frame is received — suppresses reconnect
+  WidgetsBinding? _observedBinding; // the binding watched for app resume, null when none exists
 
   void start() {
     if (_started || _disposed) return;
     _started = true;
-    WidgetsBinding.instance.addObserver(this);
+    _observedBinding = _bindingIfInitialized()?..addObserver(this);
     unawaited(_connect());
+  }
+
+  /// The Flutter binding, or null when none was initialised — the channel also runs from
+  /// pure Dart code (e.g. AgentivityPlatformConnector), where there is no app lifecycle to
+  /// watch. Flutter has no nullable accessor: `instance` throws (debug) or fails its null
+  /// check (release) before initialisation.
+  static WidgetsBinding? _bindingIfInitialized() {
+    try {
+      return WidgetsBinding.instance;
+    } on Object {
+      return null;
+    }
   }
 
   /// Reacts to the app coming back to the foreground — a backgrounded mobile app can have
@@ -146,7 +159,8 @@ class AgUiSseChannel<T> with WidgetsBindingObserver {
 
   Future<void> dispose() async {
     _disposed = true;
-    WidgetsBinding.instance.removeObserver(this);
+    _observedBinding?.removeObserver(this);
+    _observedBinding = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _watchdogTimer?.cancel();
