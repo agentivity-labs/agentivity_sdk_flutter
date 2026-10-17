@@ -13,7 +13,6 @@ TeamStructure _team(String orchestrator, {required bool grouped}) => TeamStructu
   id: 't',
   name: 'Team',
   orchestratorId: orchestrator,
-  managerTopologyPositionId: orchestrator == 'manager-led' ? 'p0' : null,
   members: [
     TeamMemberPosition(topologyPositionId: 'p0', memberEntityId: 'm0', displayName: 'Lead', group: grouped ? 'Lead' : null),
     for (var i = 1; i < 6; i++) TeamMemberPosition(topologyPositionId: 'p$i', memberEntityId: 'm$i', displayName: 'M$i', group: grouped ? (i < 4 ? 'Booking' : 'Money') : null),

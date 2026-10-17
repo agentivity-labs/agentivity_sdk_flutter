@@ -73,7 +73,6 @@ TeamStructure _structure(String orchestrator, List<_M> members) => TeamStructure
   id: 't',
   name: 'Team',
   orchestratorId: orchestrator,
-  managerTopologyPositionId: orchestrator == 'manager-led' ? 'p0' : null,
   members: [
     for (var i = 0; i < members.length; i++) TeamMemberPosition(topologyPositionId: 'p$i', memberEntityId: 'm$i', displayName: members[i].$1, group: members[i].$2),
   ],

@@ -16,7 +16,7 @@ class TeamMemberPosition {
     this.group,
   });
 
-  /// This member's slot in the team (what connections and `managerAgentId` refer to).
+  /// This member's slot in the team (what connections refer to).
   final String topologyPositionId;
 
   /// The agent, team or workflow behind the slot — the id a run reports on each of its steps.
@@ -82,7 +82,6 @@ class TeamStructure {
     required this.id,
     required this.name,
     required this.orchestratorId,
-    this.managerTopologyPositionId,
     this.goal,
     this.members = const [],
     this.connections = const [],
@@ -95,8 +94,6 @@ class TeamStructure {
   /// `sequential`, `concurrent`, `handoff`, `group-chat`, `manager-led`…
   final String orchestratorId;
 
-  /// The [TeamMemberPosition.topologyPositionId] of the manager (manager-led teams).
-  final String? managerTopologyPositionId;
   final String? goal;
   final List<TeamMemberPosition> members;
   final List<TeamConnectionDefinition> connections;
@@ -105,13 +102,9 @@ class TeamStructure {
   /// default color.
   final Map<String, String> groupColors;
 
-  /// The manager's member, when the team has one.
-  TeamMemberPosition? get manager =>
-      managerTopologyPositionId == null
-          ? null
-          : members
-              .where((m) => m.topologyPositionId == managerTopologyPositionId)
-              .firstOrNull;
+  /// The manager of a manager-led team: the member at the top of its topology — the first one. Nothing names it: its position
+  /// makes it the manager. Null for a team of another kind.
+  TeamMemberPosition? get manager => orchestratorId == 'manager-led' ? members.firstOrNull : null;
 
   factory TeamStructure.fromJson(Map<String, dynamic> json) {
     List<T> list<T>(Object? raw, T Function(Map<String, dynamic>) parse) {
@@ -132,7 +125,6 @@ class TeamStructure {
       id: _text(json['id']) ?? '',
       name: _text(json['name']) ?? '',
       orchestratorId: _text(json['orchestratorId']) ?? '',
-      managerTopologyPositionId: _text(json['managerAgentId']),
       goal: _text(json['goal']),
       members: list(json['members'], TeamMemberPosition.fromJson),
       connections: list(json['connections'], TeamConnectionDefinition.fromJson),

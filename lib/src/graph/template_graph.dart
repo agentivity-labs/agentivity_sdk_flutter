@@ -198,7 +198,6 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
       id: structure.id,
       name: structure.name,
       orchestratorId: structure.orchestratorId,
-      managerTopologyPositionId: structure.managerTopologyPositionId,
       goal: structure.goal,
       connections: structure.connections,
       groupColors: structure.groupColors,
