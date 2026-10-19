@@ -29,6 +29,8 @@ import '../shell/ag_artifact_image.dart';
 ///   "note": "Frais de port offerts dès 500 €"
 /// }
 /// ```
+/// A section with `"list": true` holds lines of text rather than facts (the steps of a plan: a number or a bullet as key,
+/// a sentence as value): they read from the left, starting on the same line as their key.
 /// Pictures turn a section into a "product sheet": a card with three sections is three products, each with its
 /// photo, its facts and an optional badge and link. `imageUrl` on the card is a banner above all sections.
 /// ```json
@@ -83,6 +85,7 @@ class AgSummaryCard extends StatelessWidget {
             final badgeRaw = section['badge'];
             final badge = badgeRaw is String && badgeRaw.trim().isNotEmpty ? badgeRaw : null;
             final link = agSafeHttpUrl(section['url']);
+            final isList = section['list'] == true;
             final rawItems = section['items'] as List? ?? [];
             final items = rawItems
                 .whereType<Map<dynamic, dynamic>>()
@@ -146,6 +149,7 @@ class AgSummaryCard extends StatelessWidget {
                       final key = e.value['key'] as String? ?? '';
                       final value = e.value['value']?.toString() ?? '';
                       final highlight = e.value['highlight'] as bool? ?? false;
+                      final keyText = Text(key, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.6)));
 
                       return Column(
                         mainAxisSize: MainAxisSize.min,
@@ -153,19 +157,16 @@ class AgSummaryCard extends StatelessWidget {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                             child: Row(
+                              crossAxisAlignment: isList ? CrossAxisAlignment.start : CrossAxisAlignment.center,
                               children: [
-                                Text(
-                                  key,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.onSurface.withValues(alpha: 0.6),
-                                  ),
-                                ),
+                                // In a list, a long key (a name) wraps in its third of the row instead of crowding the text.
+                                if (isList) Flexible(child: keyText) else keyText,
                                 const SizedBox(width: 12),
                                 Expanded(
+                                  flex: isList ? 2 : 1,
                                   child: Text(
                                   value,
-                                  textAlign: TextAlign.right,
+                                  textAlign: isList ? TextAlign.left : TextAlign.right,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,

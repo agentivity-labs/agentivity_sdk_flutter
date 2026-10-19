@@ -8,6 +8,7 @@ import 'chat_controller.dart';
   'llm_auth' => (title: 'The AI service rejected its API key', hint: 'Check the API key configured for the model, then send your message again.'),
   'llm_rate_limited' => (title: 'The AI service is busy', hint: 'Wait a moment, then send your message again.'),
   'llm_unavailable' => (title: 'The AI service is unavailable', hint: 'Try again in a few minutes.'),
+  'connection_interrupted' => (title: 'The connection was interrupted', hint: 'Send your message again.'),
   _ => (title: 'Something went wrong', hint: null),
 };
 

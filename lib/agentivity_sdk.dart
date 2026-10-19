@@ -177,6 +177,7 @@ export 'src/client/app_client/domain/workflow_graph_models.dart';
 export 'src/client/app_client/domain/execution_status_models.dart';
 export 'src/client/core/api_contract.dart';
 export 'src/client/core/http_core.dart';
+export 'src/client/core/streaming_request.dart';
 export 'src/client/extras/api/ag_ui_bundles_api.dart';
 export 'src/client/extras/api/chat_context_api.dart';
 export 'src/client/extras/api/svg_icons_api.dart';
