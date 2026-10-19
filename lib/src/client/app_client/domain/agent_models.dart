@@ -16,10 +16,14 @@ class CatalogBrowseItem {
     this.updatedAt,
     this.role,
     this.folderId,
+    this.tags = const [],
   });
 
   final String id;
   final String name;
+
+  /// Its tags, as the library keeps them (in lower case): "solution" marks what a person launches.
+  final List<String> tags;
 
   /// `"agent"` | `"team"` | `"WorkflowEntity"` | `"prompt"` | `"folder"`
   final String type;
@@ -40,6 +44,7 @@ class CatalogBrowseItem {
       updatedAt: _parseDateTime(json['updatedAt']),
       role: _nullableTrimmedString(json['role']),
       folderId: _nullableTrimmedString(json['folderId']),
+      tags: json['tags'] is List ? (json['tags'] as List).map((t) => t.toString().trim()).where((t) => t.isNotEmpty).toList(growable: false) : const [],
     );
   }
 }
