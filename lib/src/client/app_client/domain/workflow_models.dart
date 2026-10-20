@@ -23,7 +23,9 @@ class WorkflowEntity implements AgentivityEntity {
     this.createdAt,
     this.updatedAt,
     List<String>? tags,
+    List<WorkflowOutput>? outputs,
   })  : tags = tags ?? const [],
+        outputs = outputs == null ? <WorkflowOutput>[] : List<WorkflowOutput>.from(outputs),
         metadata = metadata == null ? <String, dynamic>{} : Map<String, dynamic>.from(metadata),
         dataTables = _cloneWorkflowDataTables(dataTables),
         annotations = annotations == null ? <WorkflowAnnotation>[] : List<WorkflowAnnotation>.from(annotations.map((annotation) => annotation.copy()));
@@ -47,6 +49,10 @@ class WorkflowEntity implements AgentivityEntity {
   @override
   List<String> tags;
 
+  /// What this workflow gives to whoever calls it (a step of another workflow, a team), next to its answer: each output,
+  /// its name and where its value is taken from. The output named "output" is its answer.
+  List<WorkflowOutput> outputs;
+
   factory WorkflowEntity.fromJson(Map<String, dynamic> json, {String? fallbackId}) {
     final nodesJson = json['nodes'] as List<dynamic>? ?? const [];
     final connectionsJson = json['connections'] as List<dynamic>? ?? const [];
@@ -65,6 +71,7 @@ class WorkflowEntity implements AgentivityEntity {
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
       tags: (json['tags'] as List<dynamic>?)?.whereType<String>().toList(),
+      outputs: (json['outputs'] as List<dynamic>? ?? const []).whereType<Map>().map((entry) => WorkflowOutput.fromJson(Map<String, dynamic>.from(entry))).toList(),
     );
   }
 
@@ -79,7 +86,41 @@ class WorkflowEntity implements AgentivityEntity {
         if (annotations.isNotEmpty) 'annotations': annotations.map((annotation) => annotation.toJson()).toList(),
         if (metadata.isNotEmpty) 'metadata': metadata,
         if (dataTables.isNotEmpty) 'dataTables': dataTables.map((name, table) => MapEntry(name, table.toJson())),
+        if (outputs.isNotEmpty) 'outputs': outputs.map((output) => output.toJson()).toList(),
       };
+}
+
+/// An output a workflow declares: what it gives under [name] to whoever calls it. [value] says where it is taken from, as
+/// any input of a step says it (`{{step.field}}`, or a text that holds some). The output named "output" is its answer.
+class WorkflowOutput {
+  const WorkflowOutput({required this.name, required this.value, this.description});
+
+  /// The name of the answer of a workflow.
+  static const String answer = 'output';
+
+  final String name;
+  final String value;
+  final String? description;
+
+  factory WorkflowOutput.fromJson(Map<String, dynamic> json) => WorkflowOutput(
+        name: (json['name'] as String? ?? '').trim(),
+        value: json['value'] as String? ?? '',
+        description: (json['description'] as String?)?.trim(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'value': value,
+        if (description != null && description!.isNotEmpty) 'description': description,
+      };
+
+  WorkflowOutput copyWith({String? name, String? value, String? description}) => WorkflowOutput(name: name ?? this.name, value: value ?? this.value, description: description ?? this.description);
+
+  @override
+  bool operator ==(Object other) => other is WorkflowOutput && other.name == name && other.value == value && other.description == description;
+
+  @override
+  int get hashCode => Object.hash(name, value, description);
 }
 
 const String workflowViewportMetadataKey = 'editorViewport';
