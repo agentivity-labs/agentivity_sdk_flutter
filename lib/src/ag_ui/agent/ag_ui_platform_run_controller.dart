@@ -56,7 +56,7 @@ class AgUiRunMessage {
 /// ```dart
 /// final connector = AgentivityPlatformConnector(
 ///   baseUrl: 'https://api.agentivity.com',
-///   authToken: 'Bearer ag_live_...',
+///   authToken: 'agp_...',
 /// );
 ///
 /// final controller = AgUiPlatformRunController(connector: connector);

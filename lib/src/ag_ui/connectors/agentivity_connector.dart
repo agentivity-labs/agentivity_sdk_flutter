@@ -16,7 +16,7 @@ import 'ag_ui_generic_connector.dart';
 ///
 /// ```dart
 /// final connector = AgentivityConnector(
-///   apiKey: 'ag_live_...',
+///   apiKey: 'agp_...',
 ///   organizationId: 'org_...',
 /// );
 ///

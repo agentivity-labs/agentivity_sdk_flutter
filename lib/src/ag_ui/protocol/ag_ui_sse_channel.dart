@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../../client/core/api_contract.dart' show ApiException, ApiErrorPayload;
 import '../../client/core/connection_monitor.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 
@@ -33,7 +34,7 @@ enum AgUiConnectionStatus { connecting, connected, reconnecting, terminated }
 /// try), or done for good because the run genuinely finished
 /// ([AgUiConnectionStatus.terminated]).
 class AgUiConnectionState {
-  const AgUiConnectionState({required this.status, required this.attempt, this.nextRetryAt});
+  const AgUiConnectionState({required this.status, required this.attempt, this.nextRetryAt, this.refusal});
 
   final AgUiConnectionStatus status;
 
@@ -42,6 +43,10 @@ class AgUiConnectionState {
 
   /// Time of the next scheduled retry — only set while status is `reconnecting`.
   final DateTime? nextRetryAt;
+
+  /// Why the stream stopped, when the instance refused it (a key missing or not valid, rights, a site not allowed): set
+  /// with `terminated`. A refusal is not tried again — see [ApiException.isFinal].
+  final ApiException? refusal;
 }
 
 /// Generic, reconnecting SSE channel.
@@ -222,9 +227,43 @@ class AgUiSseChannel<T> with WidgetsBindingObserver {
     } on Object catch (error) {
       final isCancelled = error is DioException && CancelToken.isCancel(error);
       if (_disposed || isCancelled) return;
+      if (error is DioException && error.response != null) {
+        final refusal = await _refusalOf(error);
+        if (_disposed) return;
+        if (refusal.isFinal) {
+          _refuse(refusal);
+          return;
+        }
+      }
       debugPrint('AgUiSseChannel failed to connect $_path: $error');
       _handleDisconnect();
     }
+  }
+
+  // What the instance answered: a stream request gets its body as bytes, read here to say the refusal in its words.
+  static Future<ApiException> _refusalOf(DioException error) async {
+    final response = error.response!;
+    Object? body = response.data;
+    if (body is ResponseBody) {
+      try {
+        final text = await body.stream.cast<List<int>>().transform(utf8.decoder).join();
+        body = text.trim().isEmpty ? null : jsonDecode(text);
+      } on Object {
+        body = null;
+      }
+    }
+    return ApiException(payload: ApiErrorPayload.fromDynamic(body, httpStatus: response.statusCode), cause: error);
+  }
+
+  // The instance refused the stream: it stops, says why, and is not tried again.
+  void _refuse(ApiException refusal) {
+    debugPrint('AgUiSseChannel refused on $_path: ${refusal.userMessage}');
+    _terminated = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _cancelToken = null;
+    connectedNotifier.value = false;
+    connectionStateNotifier.value = AgUiConnectionState(status: AgUiConnectionStatus.terminated, attempt: 0, refusal: refusal);
   }
 
   void _handleFrame(_SseFrame frame) {

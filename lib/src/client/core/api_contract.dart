@@ -42,7 +42,7 @@ class ApiErrorPayload {
     if (explicit != null && explicit.isNotEmpty) {
       return explicit;
     }
-    return apiFallbackMessageForStatus(httpStatus);
+    return apiRefusalMessage(code) ?? apiFallbackMessageForStatus(httpStatus);
   }
 
   factory ApiErrorPayload.fromDynamic(dynamic value, {int? httpStatus}) {
@@ -62,7 +62,8 @@ class ApiErrorPayload {
     final source = nestedError ?? map;
     final status = _readString(source['status']) ?? _readString(map['status']);
     final parsedHttpStatus = _readInt(source['httpStatus']) ?? _readInt(map['httpStatus']) ?? httpStatus;
-    final code = _readString(source['code']) ?? _readString(map['code']);
+    // The refusals of the identity of the instance say their code as `error`, beside their `message`.
+    final code = _readString(source['code']) ?? _readString(map['code']) ?? (nestedError == null ? _readString(map['error']) : null);
     final userMessage = _readString(source['userMessage']) ?? _readString(source['message']) ?? _readString(map['userMessage']) ?? _readString(map['message']);
     final detail = _readString(source['detail']) ?? _readString(map['detail']);
     final context = _extractMap(source['context']) ?? _extractMap(map['context']);
@@ -168,6 +169,30 @@ class ApiException implements Exception {
 
   bool hasCode(String value) => (code ?? '').trim().toLowerCase() == value.trim().toLowerCase();
 
+  /// The permission the instance says was needed, when the refusal is one of rights (`permission_denied`).
+  String? get permission => _readString(payload.raw?['permission']);
+
+  bool get _isNetworkError => code == 'network.connection_error';
+
+  /// What kind of answer the call got — see [ApiFailureKind].
+  ApiFailureKind get kind {
+    if (_isNetworkError) return ApiFailureKind.network;
+    final status = httpStatus ?? 0;
+    if (status == 401) return ApiFailureKind.key;
+    if (status == 403) return ApiFailureKind.forbidden;
+    if (status == 404) return ApiFailureKind.notFound;
+    if (status == 429) return ApiFailureKind.rateLimited;
+    if (status >= 500) return ApiFailureKind.server;
+    return ApiFailureKind.other;
+  }
+
+  /// Whether trying again would get the same answer: the instance refused (a 4xx other than a timeout or too many calls).
+  /// A stream that gets one stops, instead of reconnecting.
+  bool get isFinal {
+    final status = httpStatus ?? 0;
+    return !_isNetworkError && status >= 400 && status < 500 && status != 408 && status != 429;
+  }
+
   factory ApiException.fromDio(DioException error) {
     final payload = _payloadFromDio(error);
     return ApiException(payload: payload, cause: error);
@@ -220,6 +245,29 @@ String? _dioNetworkMessage(DioException error) {
   }
   return null;
 }
+
+/// What kind of answer a failed call got: the key (401: none, or not valid), the rights (403), nothing there (404), too
+/// many calls (429), the server (5xx), the network, or anything else.
+enum ApiFailureKind { key, forbidden, notFound, rateLimited, server, network, other }
+
+/// What the instance refuses, by the code it answers with — the words when it gives none. A refusal of the key or of its
+/// owner's rights is the instance's answer, not a failure of the network: it is not tried again.
+const Map<String, String> _refusalMessages = {
+  'sign_in_required': 'This instance asks for a key: give the SDK an API key (agv_…) made in the Studio, under Your API keys.',
+  'invalid_key': 'The key is not valid: it was revoked, it has ended, or it is mistyped.',
+  'key_scope': 'This key may not call this: make one with the scope it needs (api, read or mcp).',
+  'origin_not_allowed': 'This site is not one the key allows: add it to the sites of the key in the Studio.',
+  'publishable_scope': 'A key for a web page only talks to the agent, team or workflow it was made for.',
+  'permission_denied': "The role of the key's owner does not allow this.",
+  'people_only': 'Only a person signed in to the Studio does this, never a key.',
+  'space_not_visible': "This is in a space the key's owner is not in.",
+  'edition_feature': 'The edition of this instance does not include this.',
+  'edition_limit': 'The edition of this instance allows no more of this.',
+  'too_many_starts': 'Too many conversations started from this site: try again in a minute.',
+};
+
+/// The words for a refusal of the instance, by its code; null for a code it does not know.
+String? apiRefusalMessage(String? code) => code == null ? null : _refusalMessages[code];
 
 String apiFallbackMessageForStatus(int? httpStatus) {
   switch (httpStatus) {

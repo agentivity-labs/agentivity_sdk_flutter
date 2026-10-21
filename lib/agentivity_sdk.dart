@@ -205,7 +205,7 @@ import 'src/client/extras/api/svg_icons_api.dart';
 /// final run = await client.runs.startExecution(entityId: agents.first.id, input: 'Hello');
 /// ```
 class AgentivityPlatformClient extends AgentivityClient {
-  AgentivityPlatformClient({super.dio, required super.baseUrl}) {
+  AgentivityPlatformClient({super.dio, required super.baseUrl, super.apiKey}) {
     chat = ChatContextApi(http);
     agUiBundles = AgUiBundlesApi(http);
     svgIcons = SvgIconsApi(http);

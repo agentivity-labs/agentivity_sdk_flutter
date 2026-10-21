@@ -8,7 +8,9 @@ import 'connection_monitor.dart';
 /// Exposed publicly so sub-classes and sibling [*Api] objects can reach it,
 /// but callers outside this package should never depend on it directly.
 class AgentivityHttpCore {
-  AgentivityHttpCore({Dio? dio, required String baseUrl, this.monitor}) : _dio = dio ?? Dio(_buildOptions(baseUrl));
+  /// [apiKey]: the key a person made for this program, on an instance that asks to sign in (`agv_…`); sent with every request as
+  /// `Authorization: Bearer <key>`. Not needed on an instance without sign-in, nor when [dio] is given (it carries its own headers).
+  AgentivityHttpCore({Dio? dio, required String baseUrl, String? apiKey, this.monitor}) : _dio = dio ?? Dio(_buildOptions(baseUrl, apiKey));
 
   /// Told whenever a request gets no answer (the server cannot be reached) and whenever one does.
   final ConnectionMonitor? monitor;
@@ -55,10 +57,11 @@ class AgentivityHttpCore {
 
   static const String _apiV1 = '/api/v1';
 
-  static BaseOptions _buildOptions(String baseUrl) {
+  static BaseOptions _buildOptions(String baseUrl, String? apiKey) {
     final normalized = _normalizeBaseUrl(baseUrl);
     return BaseOptions(
       baseUrl: normalized,
+      headers: {if (apiKey != null && apiKey.trim().isNotEmpty) 'Authorization': 'Bearer ${apiKey.trim()}'},
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       responseType: ResponseType.json,

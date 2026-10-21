@@ -27,13 +27,17 @@ export 'api/icons_api.dart';
 /// ## Usage
 /// ```dart
 /// final client = AgentivityClient(baseUrl: 'https://my-backend.example.com');
+/// // An instance that asks to sign in: the key a person made for this program, in the Studio (Settings, API keys).
+/// final signedIn = AgentivityClient(baseUrl: 'https://my-instance.example.com', apiKey: const String.fromEnvironment('AGENTIVITY_API_KEY'));
 /// final entities = await client.entities.fetchEntities(kind: 'agent');
 /// final run = await client.runs.startRun(entityId: entities.first.id, input: 'Hello');
 /// ```
 class AgentivityClient {
-  AgentivityClient({Dio? dio, required String baseUrl}) : this._(dio, baseUrl, ConnectionMonitor());
+  /// [apiKey]: on an instance that asks to sign in, the key a person made for this program (`agv_…`). Never put a key in an app
+  /// that runs on people's devices or in a web page: anyone could read it there.
+  AgentivityClient({Dio? dio, required String baseUrl, String? apiKey}) : this._(dio, baseUrl, apiKey, ConnectionMonitor());
 
-  AgentivityClient._(Dio? dio, String baseUrl, this.connection) : _http = AgentivityHttpCore(dio: dio, baseUrl: baseUrl, monitor: connection) {
+  AgentivityClient._(Dio? dio, String baseUrl, String? apiKey, this.connection) : _http = AgentivityHttpCore(dio: dio, baseUrl: baseUrl, apiKey: apiKey, monitor: connection) {
     connection.probe = _http.probe;
     entities = EntitiesApi(_http);
     runs = RunsApi(_http);

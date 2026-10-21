@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../client/core/api_contract.dart' show apiRefusalMessage;
+
 // ── Error types ───────────────────────────────────────────────────────────────
 
 class ApiException implements Exception {
@@ -18,9 +20,12 @@ class ApiException implements Exception {
     String message;
 
     if (data is Map<String, dynamic>) {
-      errorCode = data['errorCode']?.toString() ?? data['code']?.toString();
+      // The refusals of the identity of the instance say their code as `error`, beside their `message`.
+      final error = data['error'];
+      errorCode = data['errorCode']?.toString() ?? data['code']?.toString() ?? (error is String ? error : null);
       message = data['userMessage']?.toString() ??
           data['message']?.toString() ??
+          apiRefusalMessage(errorCode) ??
           data['error']?.toString() ??
           error.message ??
           'Request failed ($statusCode)';
