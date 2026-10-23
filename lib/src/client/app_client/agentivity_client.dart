@@ -35,9 +35,12 @@ export 'api/icons_api.dart';
 class AgentivityClient {
   /// [apiKey]: on an instance that asks to sign in, the key a person made for this program (`agv_…`). Never put a key in an app
   /// that runs on people's devices or in a web page: anyone could read it there.
-  AgentivityClient({Dio? dio, required String baseUrl, String? apiKey}) : this._(dio, baseUrl, apiKey, ConnectionMonitor());
+  /// [workspaceStartWait]: how long a read waits for a hosted workspace that wakes up (a minute unless said).
+  AgentivityClient({Dio? dio, required String baseUrl, String? apiKey, Duration workspaceStartWait = const Duration(minutes: 1)})
+      : this._(dio, baseUrl, apiKey, ConnectionMonitor(), workspaceStartWait);
 
-  AgentivityClient._(Dio? dio, String baseUrl, String? apiKey, this.connection) : _http = AgentivityHttpCore(dio: dio, baseUrl: baseUrl, apiKey: apiKey, monitor: connection) {
+  AgentivityClient._(Dio? dio, String baseUrl, String? apiKey, this.connection, Duration workspaceStartWait)
+      : _http = AgentivityHttpCore(dio: dio, baseUrl: baseUrl, apiKey: apiKey, monitor: connection, workspaceStartWait: workspaceStartWait) {
     connection.probe = _http.probe;
     entities = EntitiesApi(_http);
     runs = RunsApi(_http);

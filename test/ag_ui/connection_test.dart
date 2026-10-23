@@ -20,7 +20,8 @@ class _Adapter implements HttpClientAdapter {
 
 AgentivityClient _client(Future<ResponseBody> Function(RequestOptions) handler) {
   final dio = Dio(BaseOptions(baseUrl: 'https://api.example.com/'))..httpClientAdapter = _Adapter(handler);
-  return AgentivityClient(dio: dio, baseUrl: 'https://api.example.com');
+  // No wait for a workspace that wakes up: a server that stays at 503 is out of reach (see waking_workspace_test).
+  return AgentivityClient(dio: dio, baseUrl: 'https://api.example.com', workspaceStartWait: Duration.zero);
 }
 
 Future<ResponseBody> _answer(int status) async => ResponseBody.fromString('{}', status, headers: {Headers.contentTypeHeader: ['application/json']});
