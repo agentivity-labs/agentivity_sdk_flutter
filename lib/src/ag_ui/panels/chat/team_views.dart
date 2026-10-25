@@ -389,10 +389,10 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
 
   final TransformationController _view = TransformationController();
 
-  // The member at work blinks slowly.
+  // The member at work breathes: a ring around it grows and fades, and comes back (as in Team Studio).
   late final AnimationController _blink = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2600),
+    duration: const Duration(milliseconds: 1200),
   );
 
   late final AnimationController _flow = AnimationController(
@@ -638,19 +638,14 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
             ),
             size: hexSize,
             off: status == null && !resting,
-            pulse: status == TeamMemberStatus.working ? _blink.value : 0,
-            // A status ring says more than a selection ring: the selected member at work keeps its status color.
+            breath: status == TeamMemberStatus.working ? Curves.easeInOut.transform(_blink.value) : null,
+            // A status says more than the selection: the selected member at work keeps its status color.
             ringColor: status == null ? (selected ? accentColor : null) : widget.palette.of(status),
             order: order,
             scale: scale,
           );
           final caption = Opacity(
-            opacity:
-                status == null && !resting
-                    ? 0.5
-                    : (status == TeamMemberStatus.working
-                        ? 1 - 0.45 * _blink.value
-                        : 1.0),
+            opacity: status == null && !resting ? 0.5 : 1.0,
             child: Text(
               label,
               maxLines: 1,
@@ -1492,14 +1487,15 @@ class _ScenePainter extends CustomPainter {
 }
 
 /// One member of [AgUiTeamGraph]: a hexagon (the shape Team Studio draws) whose border and icon wear the member's color —
-/// its group's, or the app's own — on a neutral fill. A status ring surrounds it while the member is in the run.
+/// its group's, or the app's own — on a neutral fill. While the member is in the run its status colors that border; the member
+/// at work also breathes, a ring growing and fading around it.
 class _TeamHexNode extends StatelessWidget {
   const _TeamHexNode({
     required this.avatar,
     required this.size,
     this.ringColor,
     this.off = false,
-    this.pulse = 0,
+    this.breath,
     this.order,
     this.scale = 1,
   });
@@ -1518,8 +1514,8 @@ class _TeamHexNode extends StatelessWidget {
   /// so the links running under it never show through.
   final bool off;
 
-  /// 0 to 1: how far the member at work is into its slow blink — its border and icon fade by up to 45 %.
-  final double pulse;
+  /// 0 to 1: how far the member at work is into its breath — the ring around it grows and fades. Null when not at work.
+  final double? breath;
 
   @override
   Widget build(BuildContext context) {
@@ -1528,7 +1524,7 @@ class _TeamHexNode extends StatelessWidget {
         off
             ? scheme.outline.withValues(alpha: 0.6)
             : (avatar.color ?? scheme.outline);
-    final accent = base.withValues(alpha: base.a * (1 - 0.45 * pulse));
+    final accent = base;
     final glyph = avatar.emoji == null ? agUiIcon(avatar.icon) : null;
     final content =
         avatar.imageUrl != null
@@ -1558,8 +1554,8 @@ class _TeamHexNode extends StatelessWidget {
       child: CustomPaint(
         painter: _HexPainter(
           fill: scheme.surface,
-          border: accent,
-          ring: ringColor,
+          border: ringColor ?? accent,
+          breath: breath,
         ),
         child: Center(child: content),
       ),
@@ -1627,39 +1623,30 @@ class _HexClipper extends CustomClipper<Path> {
 }
 
 class _HexPainter extends CustomPainter {
-  const _HexPainter({required this.fill, required this.border, this.ring});
+  const _HexPainter({required this.fill, required this.border, this.breath});
 
   final Color fill;
   final Color border;
-  final Color? ring;
+  final double? breath;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.shortestSide / 2 - 5;
     final hex = _hexPath(center, radius);
-    canvas.drawPath(hex, Paint()..color = fill);
-    canvas.drawPath(
-      hex,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeJoin = StrokeJoin.round
-        ..color = border,
-    );
-    if (ring != null) {
-      canvas.drawPath(
-        _hexPath(center, radius + 4),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.5
-          ..strokeJoin = StrokeJoin.round
-          ..color = ring!,
-      );
+    Paint line(Color color) => Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeJoin = StrokeJoin.round
+      ..color = color;
+    if (breath != null) {
+      canvas.drawPath(_hexPath(center, radius + 5 + 4 * breath!), line(border.withValues(alpha: 0.9 - 0.6 * breath!)));
     }
+    canvas.drawPath(hex, Paint()..color = fill);
+    canvas.drawPath(hex, line(border));
   }
 
   @override
   bool shouldRepaint(_HexPainter old) =>
-      old.fill != fill || old.border != border || old.ring != ring;
+      old.fill != fill || old.border != border || old.breath != breath;
 }
