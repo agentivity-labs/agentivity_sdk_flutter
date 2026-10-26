@@ -377,7 +377,7 @@ void main() {
       await tester.tap(find.byType(FilledButton));
       await tester.pump();
 
-      expect(submitted, 'Choix : Option A');
+      expect(submitted, 'Choice: Option A');
       expect(find.text('Option A'), findsOneWidget);
       expect(find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1.0), findsNothing);
     });

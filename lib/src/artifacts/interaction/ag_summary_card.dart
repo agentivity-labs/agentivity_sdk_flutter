@@ -8,7 +8,7 @@ import '../shell/ag_artifact_image.dart';
 /// Agent props:
 /// ```json
 /// {
-///   "title": "Récapitulatif de commande",
+///   "title": "Order summary",
 ///   "sections": [
 ///     {
 ///       "label": "Produit",
@@ -54,7 +54,7 @@ class AgSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final title = props['title'] as String? ?? 'Récapitulatif';
+    final title = props['title'] as String? ?? 'Summary';
     final note = props['note'] as String?;
     final bannerUrl = agSafeImageUrl(props['imageUrl']);
     final bannerAlt = props['imageAlt'] as String? ?? title;
@@ -67,7 +67,7 @@ class AgSummaryCard extends StatelessWidget {
     return AgArtifactCard(
       title: title,
       icon: Icons.receipt_long_rounded,
-      type: 'Récap',
+      type: 'Summary',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,

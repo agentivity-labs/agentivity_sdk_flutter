@@ -250,7 +250,7 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
     final cs = Theme.of(context).colorScheme;
     final fontFamily = AgArtifactsThemeData.of(context).fontFamily;
     final title = widget.props['title'] as String? ?? 'Questions';
-    final submitLabel = widget.props['submitLabel'] as String? ?? 'Envoyer';
+    final submitLabel = widget.props['submitLabel'] as String? ?? 'Send';
 
     // Disabled/answered visual state is owned by the chat panel's message
     // bubble (_MessageBubble._dimIfDisabled), not here — this widget only

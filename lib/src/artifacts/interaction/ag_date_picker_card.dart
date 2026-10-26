@@ -11,15 +11,15 @@ import '../theme/ag_artifacts_theme.dart';
 ///   "title": "Planification",
 ///   "question": "Quelle date vous convient pour la livraison ?",
 ///   "mode": "single",
-///   "submitLabel": "Confirmer"
+///   "submitLabel": "Confirm"
 /// }
 /// ```
 /// [mode] can be `"single"` (default) or `"range"`.
 /// The selectable window defaults to today ± a few years — LLMs don't reliably know the
 /// current date, so no min/max bounds are accepted from the agent (optional `minDate`/
 /// `maxDate` ISO strings are still honoured if a trusted caller provides them).
-/// Calls `props['__onSubmit']` with e.g. `"Date : 15 mars 2025"` or
-/// `"Période : 10 mars 2025 → 20 mars 2025"`.
+/// Calls `props['__onSubmit']` with e.g. `"Date: 15 Mar 2025"` or
+/// `"Period: 10 Mar 2025 → 20 Mar 2025"`.
 class AgDatePickerCard extends StatefulWidget {
   const AgDatePickerCard({super.key, required this.props});
   final Map<String, dynamic> props;
@@ -41,20 +41,7 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
     }
   }
 
-  static const _months = [
-    'jan',
-    'fév',
-    'mar',
-    'avr',
-    'mai',
-    'jun',
-    'jul',
-    'aoû',
-    'sep',
-    'oct',
-    'nov',
-    'déc',
-  ];
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   String _fmt(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
 
   /// Clamps [date] inside [min, max] — the agent may send stale or inconsistent
@@ -113,8 +100,8 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
     final mode = widget.props['mode'] as String? ?? 'single';
     final response =
         mode == 'range' && _end != null
-            ? 'Période : ${_fmt(_start!)} → ${_fmt(_end!)}'
-            : 'Date : ${_fmt(_start!)}';
+            ? 'Period: ${_fmt(_start!)} → ${_fmt(_end!)}'
+            : 'Date: ${_fmt(_start!)}';
     setState(() => _submitted = true);
     onSubmit(response);
   }
@@ -128,7 +115,7 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
     final title = widget.props['title'] as String? ?? 'Date';
     final question = widget.props['question'] as String?;
     final mode = widget.props['mode'] as String? ?? 'single';
-    final submitLabel = widget.props['submitLabel'] as String? ?? 'Confirmer';
+    final submitLabel = widget.props['submitLabel'] as String? ?? 'Confirm';
 
     String selectionText =
         mode == 'range' ? 'Sélectionner une période' : 'Sélectionner une date';
@@ -142,7 +129,7 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
     return AgArtifactCard(
       title: title,
       icon: Icons.calendar_today_rounded,
-      type: mode == 'range' ? 'Période' : 'Date',
+      type: mode == 'range' ? 'Period' : 'Date',
       // Disabled/answered visual state is owned by the chat panel's message
       // bubble (_MessageBubble._dimIfDisabled), not here — see ag_choice_card.dart's
       // matching comment for why a second local dimming layer used to make

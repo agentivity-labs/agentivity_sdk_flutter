@@ -17,13 +17,13 @@ import '../theme/ag_artifacts_theme.dart';
 ///     {"id": "perso", "label": "Personnel", "description": "Usage privé"},
 ///     {"id": "gaming", "label": "Gaming", "description": "Jeux vidéo"}
 ///   ],
-///   "submitLabel": "Confirmer"
+///   "submitLabel": "Confirm"
 /// }
 /// ```
 ///
 /// Calls `props['__onSubmit']` with selected label(s):
-/// - Single: `"Choix : Gaming"`
-/// - Multiple: `"Choix : Gaming, Professionnel"`
+/// - Single: `"Choice: Gaming"`
+/// - Multiple: `"Choice: Gaming, Professional"`
 class AgChoiceCard extends StatefulWidget {
   const AgChoiceCard({super.key, required this.props});
 
@@ -89,7 +89,7 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
         .join(', ');
 
     setState(() => _submitted = true);
-    onSubmit('Choix : $labels');
+    onSubmit('Choice: $labels');
   }
 
   @override
@@ -100,9 +100,9 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
     // — confirmed by test, and the reason every FilledButton/OutlinedButton label below sets
     // fontFamily explicitly instead of relying on inheritance like the plain Text widgets here do.
     final fontFamily = AgArtifactsThemeData.of(context).fontFamily;
-    final title = widget.props['title'] as String? ?? 'Choix';
+    final title = widget.props['title'] as String? ?? 'Choice';
     final question = widget.props['question'] as String?;
-    final submitLabel = widget.props['submitLabel'] as String? ?? 'Confirmer';
+    final submitLabel = widget.props['submitLabel'] as String? ?? 'Confirm';
 
     return AgArtifactCard(
       title: title,

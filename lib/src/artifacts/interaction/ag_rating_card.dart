@@ -16,7 +16,7 @@ import '../theme/ag_artifacts_theme.dart';
 /// }
 /// ```
 /// [mode] can be `"stars"` (default) or `"scale"` (numbered buttons).
-/// Calls `props['__onSubmit']` with e.g. `"Note : 4/5 — Bien"`.
+/// Calls `props['__onSubmit']` with e.g. `"Rating: 4/5 — Good"`.
 class AgRatingCard extends StatefulWidget {
   const AgRatingCard({super.key, required this.props});
   final Map<String, dynamic> props;
@@ -44,7 +44,7 @@ class _AgRatingCardState extends State<AgRatingCard> {
             ? ' — ${labels[_selected! - 1]}'
             : '';
     setState(() => _submitted = true);
-    onSubmit('Note : $_selected/$max$label');
+    onSubmit('Rating: $_selected/$max$label');
   }
 
   @override
@@ -53,13 +53,13 @@ class _AgRatingCardState extends State<AgRatingCard> {
     // A button's own Text label doesn't inherit AgArtifactCard's DefaultTextStyle.merge — see
     // ag_choice_card.dart's identical note.
     final fontFamily = AgArtifactsThemeData.of(context).fontFamily;
-    final title = widget.props['title'] as String? ?? 'Évaluation';
+    final title = widget.props['title'] as String? ?? 'Rating';
     final question = widget.props['question'] as String?;
     final mode = widget.props['mode'] as String? ?? 'stars';
     final max = widget.props['max'] as int? ?? 5;
     final labels =
         (widget.props['labels'] as List?)?.map((e) => e.toString()).toList();
-    final submitLabel = widget.props['submitLabel'] as String? ?? 'Envoyer';
+    final submitLabel = widget.props['submitLabel'] as String? ?? 'Send';
 
     return AgArtifactCard(
       title: title,

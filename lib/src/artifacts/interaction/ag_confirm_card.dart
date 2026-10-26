@@ -11,8 +11,8 @@ import '../theme/ag_artifacts_theme.dart';
 ///   "title": "Confirmation requise",
 ///   "message": "Voulez-vous procéder à la commande ?",
 ///   "context": "PC gaming RTX 4070, livraison 3-5 jours ouvrés",
-///   "confirmLabel": "Confirmer",
-///   "cancelLabel": "Annuler"
+///   "confirmLabel": "Confirm",
+///   "cancelLabel": "Cancel"
 /// }
 /// ```
 ///
@@ -45,8 +45,8 @@ class _AgConfirmCardState extends State<AgConfirmCard> {
     final title = widget.props['title'] as String? ?? 'Confirmation';
     final message = widget.props['message'] as String? ?? '';
     final context_ = widget.props['context'] as String?;
-    final confirmLabel = widget.props['confirmLabel'] as String? ?? 'Confirmer';
-    final cancelLabel = widget.props['cancelLabel'] as String? ?? 'Annuler';
+    final confirmLabel = widget.props['confirmLabel'] as String? ?? 'Confirm';
+    final cancelLabel = widget.props['cancelLabel'] as String? ?? 'Cancel';
 
     final isDone = _choice != null;
     final confirmed = _choice == confirmLabel;
