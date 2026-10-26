@@ -29,7 +29,7 @@ class UploadsApi {
     final response = await _c.post<Map<String, dynamic>>(
       AgentivityHttpCore.v1('/uploads'),
       data: formData,
-      options: Options(receiveTimeout: const Duration(seconds: 60), sendTimeout: const Duration(seconds: 60)),
+      options: Options(receiveTimeout: AgentivityHttpCore.wakeWait, sendTimeout: const Duration(seconds: 60)),
     );
     final data = response.data ?? const <String, dynamic>{};
     return UploadedFile(

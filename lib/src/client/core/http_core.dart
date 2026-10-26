@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import 'api_contract.dart';
 import 'connection_monitor.dart';
+import 'slow_calls.dart';
 import 'waking_workspace.dart';
 import 'workspace_sleep.dart';
 
@@ -15,8 +16,8 @@ class AgentivityHttpCore {
   ///
   /// A read asked of a hosted workspace that sleeps is asked again while it wakes up (see [WakingWorkspaceInterceptor]), for
   /// [workspaceStartWait] at most; the interceptor goes on [dio] when it is given. While the app shows the workspace asleep, nothing
-  /// is sent to it ([WorkspaceSleepGate]).
-  AgentivityHttpCore({Dio? dio, required String baseUrl, String? apiKey, this.monitor, Duration workspaceStartWait = const Duration(minutes: 1)})
+  /// is sent to it ([WorkspaceSleepGate]). A call that waits says so ([slow]).
+  AgentivityHttpCore({Dio? dio, required String baseUrl, String? apiKey, this.monitor, Duration workspaceStartWait = const Duration(minutes: 2)})
       : _dio = dio ?? Dio(_buildOptions(baseUrl, apiKey)) {
     if (!_dio.interceptors.any((i) => i is SleepingWorkspaceInterceptor)) {
       _dio.interceptors.insert(0, SleepingWorkspaceInterceptor());
@@ -28,6 +29,13 @@ class AgentivityHttpCore {
 
   /// Told whenever a request gets no answer (the server cannot be reached) and whenever one does.
   final ConnectionMonitor? monitor;
+
+  /// Since when a call waits for its answer (see [SlowCalls]): what an app shows as "Just a moment…".
+  final SlowCalls slow = SlowCalls();
+
+  /// How long a call waits for its answer. A hosted workspace that sleeps is started by the call, which its gateway holds while it
+  /// starts, up to two minutes: a call that waited less would fail while the workspace comes up, an action done all the same.
+  static const Duration wakeWait = Duration(seconds: 130);
 
   /// Asks the server for anything (the icon catalog): true when ANY answer came back, even an error status; false when it cannot be reached.
   Future<bool> probe() async {
@@ -77,7 +85,7 @@ class AgentivityHttpCore {
       baseUrl: normalized,
       headers: {if (apiKey != null && apiKey.trim().isNotEmpty) 'Authorization': 'Bearer ${apiKey.trim()}'},
       connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
+      receiveTimeout: wakeWait,
       responseType: ResponseType.json,
     );
   }
@@ -104,7 +112,7 @@ class AgentivityHttpCore {
   /// that is the answer, not a failed request).
   Future<Response<T>> guardRequest<T>(Future<Response<T>> Function() request, {bool dataBody = false}) async {
     try {
-      final response = await request();
+      final response = await slow.follow(request);
       _reportAnswer(response.statusCode, response.statusMessage);
       if (!dataBody) throwIfApiFailurePayload(response.data, httpStatus: response.statusCode);
       return response;

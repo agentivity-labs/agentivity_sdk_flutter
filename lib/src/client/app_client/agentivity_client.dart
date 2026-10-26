@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/connection_monitor.dart';
 import '../core/http_core.dart';
@@ -37,8 +38,8 @@ export 'api/workspace_sleep_api.dart';
 class AgentivityClient {
   /// [apiKey]: on an instance that asks to sign in, the key a person made for this program (`agv_…`). Never put a key in an app
   /// that runs on people's devices or in a web page: anyone could read it there.
-  /// [workspaceStartWait]: how long a read waits for a hosted workspace that wakes up (a minute unless said).
-  AgentivityClient({Dio? dio, required String baseUrl, String? apiKey, Duration workspaceStartWait = const Duration(minutes: 1)})
+  /// [workspaceStartWait]: how long a read waits for a hosted workspace that wakes up (two minutes unless said).
+  AgentivityClient({Dio? dio, required String baseUrl, String? apiKey, Duration workspaceStartWait = const Duration(minutes: 2)})
       : this._(dio, baseUrl, apiKey, ConnectionMonitor(), workspaceStartWait);
 
   AgentivityClient._(Dio? dio, String baseUrl, String? apiKey, this.connection, Duration workspaceStartWait)
@@ -57,6 +58,10 @@ class AgentivityClient {
 
   /// Whether the server can be reached, and when the next attempt is — what [AgUiConnectionNotice] shows.
   final ConnectionMonitor connection;
+
+  /// Since when a call waits for its answer, or null — what [AgUiWaitNotice] shows: a hosted workspace that wakes up takes most of
+  /// a minute to answer its first calls.
+  ValueListenable<DateTime?> get waiting => _http.slow;
 
   /// Exposes the underlying HTTP core for Studio sub-classes to initialize
   /// their additional [*Api] components using the same transport.

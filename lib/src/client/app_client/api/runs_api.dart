@@ -39,7 +39,7 @@ class RunsApi {
     final response = await _c.post<Map<String, dynamic>>(
       AgentivityHttpCore.v1('/executions'),
       data: body,
-      options: Options(receiveTimeout: const Duration(seconds: 60)),
+      options: Options(receiveTimeout: AgentivityHttpCore.wakeWait),
     );
     return SessionStartedResponse.fromJson(response.data ?? const <String, dynamic>{});
   }

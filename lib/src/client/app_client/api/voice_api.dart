@@ -33,7 +33,7 @@ class VoiceApi {
     final response = await _c.post<Map<String, dynamic>>(
       AgentivityHttpCore.v1('/voice/transcribe'),
       data: formData,
-      options: Options(receiveTimeout: const Duration(seconds: 60)),
+      options: Options(receiveTimeout: AgentivityHttpCore.wakeWait),
     );
     return (response.data ?? const <String, dynamic>{})['text'] as String? ?? '';
   }

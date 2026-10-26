@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../protocol/ag_ui_protocol.dart';
 import '../protocol/ag_ui_sse_channel.dart';
+import '../../client/core/http_core.dart';
 import '../../client/core/streaming_request.dart';
 
 // ── Run handle ────────────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ class AgentivityPlatformConnector {
     final maxIter = options?.maxAgentIterations;
     if (maxIter != null) body['maxAgentIterations'] = maxIter;
 
-    final response = await _dio.post<Map<String, dynamic>>(_executionsBase, data: body, options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 60)));
+    final response = await _dio.post<Map<String, dynamic>>(_executionsBase, data: body, options: Options(headers: {'Authorization': _authToken, 'Content-Type': 'application/json'}, receiveTimeout: AgentivityHttpCore.wakeWait));
     return AgUiRunHandle.fromJson(response.data ?? const <String, dynamic>{});
   }
 
