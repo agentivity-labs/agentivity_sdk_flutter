@@ -8,6 +8,7 @@ import 'api/conversations_api.dart';
 import 'api/agentic_folders_api.dart';
 import 'api/data_tables_api.dart';
 import 'api/icons_api.dart';
+import 'api/workspace_sleep_api.dart';
 
 export '../core/connection_monitor.dart';
 export '../core/http_core.dart';
@@ -17,6 +18,7 @@ export 'api/conversations_api.dart';
 export 'api/agentic_folders_api.dart';
 export 'api/data_tables_api.dart';
 export 'api/icons_api.dart';
+export 'api/workspace_sleep_api.dart';
 
 /// Lightweight Agentivity client intended for publication on pub.dev.
 ///
@@ -48,6 +50,7 @@ class AgentivityClient {
     agenticFolders = AgenticFoldersApi(_http);
     dataTables = DataTablesApi(_http);
     icons = IconsApi(_http);
+    sleep = WorkspaceSleepApi(_http);
   }
 
   final AgentivityHttpCore _http;
@@ -77,4 +80,7 @@ class AgentivityClient {
   /// Shared Data Table rows — read what a Team's workflow wrote, or write back
   /// where the app owns the data. Schema/folders/versions are Studio-only.
   late final DataTablesApi dataTables;
+
+  /// The sleep of a hosted workspace: when it sleeps, keep it awake, wake it (with [WorkspaceSleepGate]).
+  late final WorkspaceSleepApi sleep;
 }

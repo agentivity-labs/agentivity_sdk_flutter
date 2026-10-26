@@ -4,6 +4,8 @@ import 'dart:js_interop';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+
+import 'workspace_sleep.dart';
 import 'package:web/web.dart' as web;
 
 /// See `streaming_request.dart`. The browser's `fetch`, reading the response as it comes. [path] is resolved against
@@ -17,6 +19,9 @@ Future<ResponseBody> openStreamingRequest(
   Map<String, dynamic> headers = const {},
   CancelToken? cancelToken,
 }) async {
+  // The workspace sleeps: a stream opened again would wake it. It fails as an unreachable server does, and is tried again later.
+  final asked = RequestOptions(path: path, method: method, extra: {...dio.options.extra});
+  if (WorkspaceSleepGate.holdsBack(asked)) throw WorkspaceSleepGate.refusal(asked);
   final uri = _resolve(dio.options.baseUrl, path);
   final requestOptions = RequestOptions(path: uri.toString(), method: method, data: data);
 

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import 'workspace_sleep.dart';
+
 /// See `streaming_request.dart`. [path] is resolved against `dio.options.baseUrl` unless it is absolute; [data] is the body
 /// (a `String` sent as it is, anything else as JSON). Fails as Dio does when the server answers with an error.
 Future<ResponseBody> openStreamingRequest(
@@ -10,6 +12,9 @@ Future<ResponseBody> openStreamingRequest(
   Map<String, dynamic> headers = const {},
   CancelToken? cancelToken,
 }) async {
+  // The workspace sleeps: a stream opened again would wake it. It fails as an unreachable server does, and is tried again later.
+  final asked = RequestOptions(path: path, method: method, extra: {...dio.options.extra});
+  if (WorkspaceSleepGate.holdsBack(asked)) throw WorkspaceSleepGate.refusal(asked);
   final response = await dio.request<ResponseBody>(
     path,
     data: data,

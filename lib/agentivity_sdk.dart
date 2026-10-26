@@ -178,6 +178,7 @@ export 'src/client/app_client/domain/execution_status_models.dart';
 export 'src/client/core/api_contract.dart';
 export 'src/client/core/http_core.dart';
 export 'src/client/core/waking_workspace.dart';
+export 'src/client/core/workspace_sleep.dart';
 export 'src/client/core/streaming_request.dart';
 export 'src/client/extras/api/ag_ui_bundles_api.dart';
 export 'src/client/extras/api/chat_context_api.dart';

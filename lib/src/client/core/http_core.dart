@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'api_contract.dart';
 import 'connection_monitor.dart';
 import 'waking_workspace.dart';
+import 'workspace_sleep.dart';
 
 /// Internal HTTP transport shared by all [*Api] components.
 ///
@@ -13,9 +14,13 @@ class AgentivityHttpCore {
   /// `Authorization: Bearer <key>`. Not needed on an instance without sign-in, nor when [dio] is given (it carries its own headers).
   ///
   /// A read asked of a hosted workspace that sleeps is asked again while it wakes up (see [WakingWorkspaceInterceptor]), for
-  /// [workspaceStartWait] at most; the interceptor goes on [dio] when it is given.
+  /// [workspaceStartWait] at most; the interceptor goes on [dio] when it is given. While the app shows the workspace asleep, nothing
+  /// is sent to it ([WorkspaceSleepGate]).
   AgentivityHttpCore({Dio? dio, required String baseUrl, String? apiKey, this.monitor, Duration workspaceStartWait = const Duration(minutes: 1)})
       : _dio = dio ?? Dio(_buildOptions(baseUrl, apiKey)) {
+    if (!_dio.interceptors.any((i) => i is SleepingWorkspaceInterceptor)) {
+      _dio.interceptors.insert(0, SleepingWorkspaceInterceptor());
+    }
     if (!_dio.interceptors.any((i) => i is WakingWorkspaceInterceptor)) {
       _dio.interceptors.add(WakingWorkspaceInterceptor(_dio, mostWait: workspaceStartWait));
     }
