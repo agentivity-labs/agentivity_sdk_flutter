@@ -236,7 +236,12 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
   final _scrollController = ScrollController();
   List<ChatMessage> _messages = const [];
   bool _loadingMessages = false;
-  bool _submittingHil = false;
+  // The question whose answer is on its way: the answer box waits for it only while that question is the one open. The answer
+  // can take the whole next turn to come back (the Studio's Assistant: minutes), and a new question asked meanwhile must be
+  // answerable at once, not shown over a box that types nothing.
+  String? _submittingGate;
+
+  bool get _submittingHil => _submittingGate != null && _submittingGate == widget.controller.pendingHilGate?.requestId;
   bool _stopping = false;
 
   Future<void> _stop() async {
@@ -386,11 +391,10 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
 
   Future<void> _submitHilResponse(String text, {String source = 'text'}) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _submittingHil) return;
     final gate = widget.controller.pendingHilGate;
-    if (gate == null) return;
+    if (trimmed.isEmpty || gate == null || _submittingGate == gate.requestId) return;
     _inputController.clear();
-    setState(() => _submittingHil = true);
+    setState(() => _submittingGate = gate.requestId);
     try {
       // The server adds the user's response to the thread and echoes it back
       // via CHAT_MESSAGE_RECEIVED(role=user) SSE — no local optimistic add needed.
@@ -402,7 +406,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
         widget.controller.clearHilGate();
       }
     } finally {
-      if (mounted) setState(() => _submittingHil = false);
+      if (mounted && _submittingGate == gate.requestId) setState(() => _submittingGate = null);
     }
   }
 
