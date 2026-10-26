@@ -119,4 +119,20 @@ void main() {
       await channel.dispose();
     });
   });
+
+  // Dio's own text ("RequestOptions.connectTimeout…") once showed under the message, as its detail: plain words only.
+  test('a call that did not get through is said in plain words, without the text of Dio', () {
+    final options = RequestOptions(path: '/api/v1/prompts/p1/testcases/execute-all');
+    for (final error in [
+      DioException.connectionTimeout(requestOptions: options, timeout: const Duration(seconds: 10)),
+      DioException.receiveTimeout(requestOptions: options, timeout: const Duration(seconds: 10)),
+      DioException.connectionError(requestOptions: options, reason: 'The XMLHttpRequest onError callback was called.'),
+    ]) {
+      final said = ApiException.fromDio(error);
+      expect(said.payload.detail, isNull);
+      expect(said.userMessage, isNot(contains('RequestOptions')));
+      expect(said.userMessage, isNot(contains('XMLHttpRequest')));
+    }
+  });
 }
+

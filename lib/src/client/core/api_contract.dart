@@ -211,13 +211,11 @@ ApiErrorPayload _payloadFromDio(DioException error) {
     return parsed;
   }
 
+  // Said in plain words only: Dio's own text ("RequestOptions.connectTimeout…") is for whoever debugs, kept in the cause of the
+  // exception and in the debug log, never shown to the person.
   final networkMessage = _dioNetworkMessage(error);
   if (networkMessage != null) {
-    return ApiErrorPayload(
-      code: 'network.connection_error',
-      userMessage: networkMessage,
-      detail: error.message?.trim(),
-    );
+    return ApiErrorPayload(code: 'network.connection_error', userMessage: networkMessage);
   }
 
   return ApiErrorPayload(httpStatus: error.response?.statusCode);
