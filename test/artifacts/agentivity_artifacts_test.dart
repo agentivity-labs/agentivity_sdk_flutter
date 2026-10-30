@@ -315,6 +315,21 @@ void main() {
       expect(submitted, '• Travelers → 2');
     });
 
+    testWidgets('a question that can be left blank says Optional, in English', (tester) async {
+      await tester.pumpWidget(_wrap(
+        AgQuestionForm(
+          props: {
+            'questions': [
+              {'id': 'notes', 'label': 'Anything else?', 'required': false},
+            ],
+            '__onSubmit': (String _) {},
+          },
+        ),
+      ));
+
+      expect(find.text('Optional'), findsOneWidget);
+    });
+
     testWidgets('a boolean question is two Yes/No buttons, no text field at all', (tester) async {
       String? submitted;
       await tester.pumpWidget(_wrap(

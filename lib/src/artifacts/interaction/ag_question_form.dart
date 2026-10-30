@@ -294,7 +294,7 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
                       ),
                       if (!required)
                         Text(
-                          'Optionnel',
+                          'Optional',
                           style: TextStyle(
                             fontSize: 10,
                             color: cs.onSurface.withValues(alpha: 0.45),
