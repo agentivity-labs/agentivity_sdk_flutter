@@ -31,6 +31,22 @@ void main() {
     expect(palette.start, const Color(0xFF123456));
   });
 
+  testWidgets('a workflow wears its colors by type of step', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: AgUiTemplateGraph(source: {
+      ...(_agent(null)['graph'] as Map<String, dynamic>),
+      'metadata': {
+        'stepColors': {'end': '#654321'},
+      },
+    }))));
+    await tester.pump();
+    final palette = tester.widget<AgUiWorkflowGraph>(find.byType(AgUiWorkflowGraph)).palette;
+
+    expect(palette.end, const Color(0xFF654321));
+    expect(palette.ai, const AgUiWorkflowPalette().ai);
+  });
+
   testWidgets('without a group it keeps the default colors', (tester) async {
     expect((await paletteOf(tester, null)).ai, const AgUiWorkflowPalette().ai);
   });

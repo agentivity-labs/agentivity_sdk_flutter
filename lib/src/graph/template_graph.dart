@@ -217,11 +217,27 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
     );
   }
 
-  /// The color of an agent's group: its graph keeps it in its metadata, and its steps wear it.
-  static Color? _agentColorOf(Renderable renderable) {
-    final graph = renderable.entity['graph'];
-    final metadata = graph is Map ? graph['metadata'] : null;
-    return renderable.kind == RenderableKind.agent && metadata is Map ? agUiParseHexColor(metadata['groupColor'] as String?) : null;
+  /// The colors a graph wears by type of step: those of a workflow, or the color of an agent's group. Both are kept in the metadata.
+  static AgUiWorkflowPalette _paletteOf(Renderable renderable) {
+    const base = AgUiWorkflowPalette();
+    Color? hex(Object? value) => value is String ? agUiParseHexColor(value) : null;
+    if (renderable.kind == RenderableKind.agent) {
+      final graph = renderable.entity['graph'];
+      final metadata = graph is Map ? graph['metadata'] : null;
+      final color = metadata is Map ? hex(metadata['groupColor']) : null;
+      return color == null ? base : AgUiWorkflowPalette(start: color, ai: color);
+    }
+    final metadata = renderable.entity['metadata'];
+    final steps = metadata is Map ? metadata['stepColors'] : null;
+    if (steps is! Map) return base;
+    return AgUiWorkflowPalette(
+      start: hex(steps['start']) ?? base.start,
+      decision: hex(steps['decision']) ?? base.decision,
+      human: hex(steps['human']) ?? base.human,
+      ai: hex(steps['ai']) ?? base.ai,
+      action: hex(steps['action']) ?? base.action,
+      end: hex(steps['end']) ?? base.end,
+    );
   }
 
   Widget _message(String text) => Semantics(
@@ -258,9 +274,8 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
     final statuses = playing
         ? agUiPlaybackStatuses<WorkflowStepStatus>(r.ids, _step, working: WorkflowStepStatus.working, done: WorkflowStepStatus.done)
         : null;
-    final agentColor = _agentColorOf(r.renderable!);
     return AgUiWorkflowGraph(
-      palette: agentColor == null ? const AgUiWorkflowPalette() : AgUiWorkflowPalette(start: agentColor, ai: agentColor),
+      palette: _paletteOf(r.renderable!),
       structure: workflow,
       statuses: statuses,
       camera: widget.camera,
