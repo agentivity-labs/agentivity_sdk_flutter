@@ -5,14 +5,12 @@ import 'package:flutter/material.dart';
 
 /// Colors given to groups, in the order groups first appear in a team.
 const List<Color> agUiTeamGroupPalette = [
-  Color(0xFFFF8A5B),
-  Color(0xFF4FD1C5),
-  Color(0xFFF6C453),
-  Color(0xFFA78BFA),
-  Color(0xFF60A5FA),
-  Color(0xFFF472B6),
-  Color(0xFF84CC16),
-  Color(0xFFFB7185),
+  Color(0xFFE11D3F),
+  Color(0xFF2563EB),
+  Color(0xFF9B6DD6),
+  Color(0xFF0F1220),
+  Color(0xFFFF4158),
+  Color(0xFF5B8DEF),
 ];
 
 /// The identity of a group — trimmed and case-insensitive, so "Booking" and "booking " are the same group.

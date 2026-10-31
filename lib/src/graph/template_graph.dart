@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../ag_ui/panels/chat/chat_controller.dart';
 import '../ag_ui/panels/chat/member_avatar.dart';
+import '../ag_ui/panels/chat/team_appearance.dart';
 import '../ag_ui/panels/chat/team_views.dart';
 import '../ag_ui/panels/chat/workflow_views.dart';
 import '../client/app_client/domain/team_definition_models.dart';
@@ -216,6 +217,13 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
     );
   }
 
+  /// The color of an agent's group: its graph keeps it in its metadata, and its steps wear it.
+  static Color? _agentColorOf(Renderable renderable) {
+    final graph = renderable.entity['graph'];
+    final metadata = graph is Map ? graph['metadata'] : null;
+    return renderable.kind == RenderableKind.agent && metadata is Map ? agUiParseHexColor(metadata['groupColor'] as String?) : null;
+  }
+
   Widget _message(String text) => Semantics(
     label: 'Nothing to draw',
     child: Padding(padding: const EdgeInsets.all(16), child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
@@ -250,7 +258,9 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
     final statuses = playing
         ? agUiPlaybackStatuses<WorkflowStepStatus>(r.ids, _step, working: WorkflowStepStatus.working, done: WorkflowStepStatus.done)
         : null;
+    final agentColor = _agentColorOf(r.renderable!);
     return AgUiWorkflowGraph(
+      palette: agentColor == null ? const AgUiWorkflowPalette() : AgUiWorkflowPalette(start: agentColor, ai: agentColor),
       structure: workflow,
       statuses: statuses,
       camera: widget.camera,

@@ -10,16 +10,16 @@ import 'workflow_graph_layout.dart';
 /// Status/kind colors for [AgUiWorkflowGraph]. Override to retheme — same idea as [AgUiTeamPalette].
 class AgUiWorkflowPalette {
   const AgUiWorkflowPalette({
-    this.working = const Color(0xFFF1633B),
-    this.waiting = const Color(0xFFE3A94F),
+    this.working = const Color(0xFF2563EB),
+    this.waiting = const Color(0xFFF5A524),
     this.done = const Color(0xFF10B981),
     this.failed = const Color(0xFFDC2626),
-    this.start = const Color(0xFF10B981),
-    this.decision = const Color(0xFFF59E0B),
-    this.human = const Color(0xFF2563EB),
-    this.ai = const Color(0xFF8B5CF6),
-    this.end = const Color(0xFF334155),
-    this.action = const Color(0xFF64748B),
+    this.start = const Color(0xFFE11D3F),
+    this.decision = const Color(0xFF2563EB),
+    this.human = const Color(0xFF9B6DD6),
+    this.ai = const Color(0xFF0F1220),
+    this.end = const Color(0xFF0F1220),
+    this.action = const Color(0xFF9B6DD6),
   });
   final Color working;
   final Color waiting;

@@ -126,8 +126,8 @@ AgUiMemberAvatar? Function(AgUiChatMember) _memberAvatar(
 /// Colors for each [TeamMemberStatus] (and for a member that has not been needed yet).
 class AgUiTeamPalette {
   const AgUiTeamPalette({
-    this.working = const Color(0xFFF1633B),
-    this.waiting = const Color(0xFFE3A94F),
+    this.working = const Color(0xFF2563EB),
+    this.waiting = const Color(0xFFF5A524),
     this.done = const Color(0xFF10B981),
     this.failed = const Color(0xFFDC2626),
     this.idle = const Color(0xFFCBD5E1),
