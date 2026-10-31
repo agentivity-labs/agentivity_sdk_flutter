@@ -1506,6 +1506,18 @@ class _ScenePainter extends CustomPainter {
 /// One member of [AgUiTeamGraph]: a hexagon (the shape Team Studio draws) whose border and icon wear the member's color —
 /// its group's, or the app's own — on a neutral fill. While the member is in the run its status colors that border; the member
 /// at work also breathes, a ring growing and fading around it.
+/// A member as the team graph draws it: its hexagon, its icon and its color. For an app that places members itself.
+class AgUiMemberHexagon extends StatelessWidget {
+  const AgUiMemberHexagon({super.key, required this.avatar, required this.size, this.ringColor});
+
+  final AgUiMemberAvatar avatar;
+  final double size;
+  final Color? ringColor;
+
+  @override
+  Widget build(BuildContext context) => _TeamHexNode(avatar: avatar, size: size, ringColor: ringColor);
+}
+
 class _TeamHexNode extends StatelessWidget {
   const _TeamHexNode({
     required this.avatar,

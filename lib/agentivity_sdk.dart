@@ -65,6 +65,7 @@ export 'src/ag_ui/panels/wait_notice.dart';
 export 'src/ag_ui/panels/chat/team_appearance.dart';
 export 'src/ag_ui/panels/chat/team_topology.dart';
 export 'src/icons/icon_ref.dart';
+export 'src/ag_ui/panels/chat/team_layouts.dart' show ZoneObstacle, ZoneShape, zoneShape;
 export 'src/ag_ui/panels/chat/team_views.dart';
 export 'src/ag_ui/panels/chat/workflow_graph_layout.dart' show WorkflowLayout, layoutWorkflowGraph;
 export 'src/ag_ui/panels/chat/workflow_views.dart';
