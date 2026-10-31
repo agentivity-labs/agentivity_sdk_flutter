@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../palettes/ag_graph_palette.dart';
+
 /// How a Team member's group looks: the color it shares with the other members of the group, and the order that keeps a
 /// group together. (The icon a member wears is an `IconRef`, drawn via `agUiIcon` — see `src/icons`.)
 
-/// Colors given to groups, in the order groups first appear in a team.
-const List<Color> agUiTeamGroupPalette = [
-  Color(0xFFFF8A5B),
-  Color(0xFF4FD1C5),
-  Color(0xFFF6C453),
-  Color(0xFFA78BFA),
-  Color(0xFF60A5FA),
-  Color(0xFFF472B6),
-  Color(0xFF84CC16),
-  Color(0xFFFB7185),
-];
+/// Colors given to groups by default, in the order groups first appear in a team: the default palette's.
+final List<Color> agUiTeamGroupPalette = agDefaultGraphPalette.groups;
 
 /// The identity of a group — trimmed and case-insensitive, so "Booking" and "booking " are the same group.
 String? agUiTeamGroupKey(String? group) {
@@ -21,15 +14,16 @@ String? agUiTeamGroupKey(String? group) {
   return key == null || key.isEmpty ? null : key;
 }
 
-/// A color for each group of [groups]: the one the team editor chose ([custom], by group key) or else the default,
-/// assigned in order of first appearance and cycling through [agUiTeamGroupPalette] — deterministic for a given team, and
+/// A color for each group of [groups]: the one the team editor chose ([custom], by group key) or else the palette's
+/// ([palette], by default [agUiTeamGroupPalette]), assigned in order of first appearance and cycling through it — deterministic for a given team, and
 /// the same rule in every SDK.
-Map<String, Color> agUiTeamGroupColors(Iterable<String?> groups, {Map<String, Color> custom = const {}}) {
+Map<String, Color> agUiTeamGroupColors(Iterable<String?> groups, {Map<String, Color> custom = const {}, List<Color>? palette}) {
+  final offered = palette ?? agUiTeamGroupPalette;
   final colors = <String, Color>{};
   for (final group in groups) {
     final key = agUiTeamGroupKey(group);
     if (key != null && !colors.containsKey(key)) {
-      colors[key] = custom[key] ?? agUiTeamGroupPalette[colors.length % agUiTeamGroupPalette.length];
+      colors[key] = custom[key] ?? offered[colors.length % offered.length];
     }
   }
   return colors;

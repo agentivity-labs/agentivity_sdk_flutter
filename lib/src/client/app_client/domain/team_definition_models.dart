@@ -86,6 +86,7 @@ class TeamStructure {
     this.members = const [],
     this.connections = const [],
     this.groupColors = const {},
+    this.palette,
   });
 
   final String id;
@@ -101,6 +102,9 @@ class TeamStructure {
   /// Colors the team editor chose for groups (`#RRGGBB`), by group key (trimmed, lower-case). A group without one gets the
   /// default color.
   final Map<String, String> groupColors;
+
+  /// The name of the palette chosen for this team: its groups' colors unless they have their own, and the colors of its states.
+  final String? palette;
 
   /// The manager of a manager-led team: the member at the top of its topology — the first one. Nothing names it: its position
   /// makes it the manager. Null for a team of another kind.
@@ -129,6 +133,7 @@ class TeamStructure {
       members: list(json['members'], TeamMemberPosition.fromJson),
       connections: list(json['connections'], TeamConnectionDefinition.fromJson),
       groupColors: _groupColors(json['groupColors']),
+      palette: (json['palette'] as String?)?.trim(),
     );
   }
 }
