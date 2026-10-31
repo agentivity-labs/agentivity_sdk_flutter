@@ -1068,7 +1068,7 @@ class _ZonesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (final zone in zones) {
-      _drawZone(canvas, zone.shape, zone.color, scale, organic: look == AgUiTeamZoneLook.organic);
+      agUiDrawGroupZone(canvas, zone.shape, zone.color, scale, organic: look == AgUiTeamZoneLook.organic);
     }
   }
 
@@ -1082,7 +1082,7 @@ class _ZonesPainter extends CustomPainter {
 /// Organic: the free areas between neighbours, a disc on each member and the shortest bands that tie them, melted into one
 /// soft shape — blurred, then cut back to a clean edge, so corners round off and the hollow between two bands fills in like
 /// a drop.
-void _drawZone(Canvas canvas, ZoneShape zone, Color color, double scale, {required bool organic}) {
+void agUiDrawGroupZone(Canvas canvas, ZoneShape zone, Color color, double scale, {required bool organic}) {
   final px = [for (final p in zone.points) p * scale];
   if (px.isEmpty) return;
   final width = zoneHalfWidth * 2 * scale;

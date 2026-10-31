@@ -27,27 +27,30 @@ void main() {
   testWidgets('an agent wears the color of its group', (tester) async {
     final palette = await paletteOf(tester, {'group': 'Sales', 'groupColor': '#123456'});
 
-    expect(palette.ai, const Color(0xFF123456));
-    expect(palette.start, const Color(0xFF123456));
-  });
-
-  testWidgets('a workflow wears its colors by type of step', (tester) async {
-    await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-            body: AgUiTemplateGraph(source: {
-      ...(_agent(null)['graph'] as Map<String, dynamic>),
-      'metadata': {
-        'stepColors': {'end': '#654321'},
-      },
-    }))));
-    await tester.pump();
-    final palette = tester.widget<AgUiWorkflowGraph>(find.byType(AgUiWorkflowGraph)).palette;
-
-    expect(palette.end, const Color(0xFF654321));
-    expect(palette.ai, const AgUiWorkflowPalette().ai);
+    expect(palette.node, const Color(0xFF123456));
   });
 
   testWidgets('without a group it keeps the default colors', (tester) async {
-    expect((await paletteOf(tester, null)).ai, const AgUiWorkflowPalette().ai);
+    expect((await paletteOf(tester, null)).node, const AgUiWorkflowPalette().node);
+  });
+
+  test('a workflow knows the group of its steps and the colors chosen for them', () {
+    final structure = WorkflowGraphStructure.fromJson({
+      'entryNode': 'a',
+      'metadata': {
+        'groupColors': {'crew': '#123456'},
+      },
+      'nodes': [
+        {'id': 'a', 'nodeType': 'ai.node', 'metadata': {'group': ' Crew '}},
+        {'id': 'b', 'nodeType': 'ai.node'},
+      ],
+      'connections': [
+        {'from': 'a', 'to': 'b', 'fromPort': 'out', 'toPort': 'in'},
+      ],
+    });
+
+    expect(structure.nodes.first.group, 'Crew');
+    expect(structure.nodes.last.group, isNull);
+    expect(structure.groupColors, {'crew': '#123456'});
   });
 }

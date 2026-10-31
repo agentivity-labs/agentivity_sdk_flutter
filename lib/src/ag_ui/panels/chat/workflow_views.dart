@@ -5,35 +5,27 @@ import 'package:flutter/material.dart';
 import '../../../client/app_client/domain/workflow_graph_models.dart';
 import 'chat_controller.dart';
 import 'execution_statuses_controller.dart';
+import 'team_appearance.dart';
+import 'team_layouts.dart';
+import 'team_views.dart';
 import 'workflow_graph_layout.dart';
 
-/// Status/kind colors for [AgUiWorkflowGraph]. Override to retheme — same idea as [AgUiTeamPalette].
+/// Status and node colors for [AgUiWorkflowGraph]. Override to retheme — same idea as [AgUiTeamPalette].
 class AgUiWorkflowPalette {
   const AgUiWorkflowPalette({
     this.working = const Color(0xFF2563EB),
     this.waiting = const Color(0xFFF5A524),
     this.done = const Color(0xFF10B981),
     this.failed = const Color(0xFFDC2626),
-    this.start = const Color(0xFFE11D3F),
-    this.decision = const Color(0xFF2563EB),
-    this.human = const Color(0xFF9B6DD6),
-    this.ai = const Color(0xFF0F1220),
-    this.end = const Color(0xFF0F1220),
-    this.action = const Color(0xFF9B6DD6),
+    this.node = const Color(0xFF64748B),
   });
   final Color working;
   final Color waiting;
   final Color done;
   final Color failed;
 
-  /// One color per node kind — the graph's own visual grammar (what a node DOES), independent of
-  /// the working/waiting/done ring (what it's currently DOING).
-  final Color start;
-  final Color decision;
-  final Color human;
-  final Color ai;
-  final Color end;
-  final Color action;
+  /// What a step wears without a group: a type of step has no color, the ring says what it's currently DOING.
+  final Color node;
 
   Color statusColor(WorkflowStepStatus? status) => switch (status) {
     WorkflowStepStatus.working => working,
@@ -41,15 +33,6 @@ class AgUiWorkflowPalette {
     WorkflowStepStatus.done => done,
     WorkflowStepStatus.failed => failed,
     null => const Color(0x00000000),
-  };
-
-  Color kindColor(WorkflowNodeKind kind) => switch (kind) {
-    WorkflowNodeKind.start => start,
-    WorkflowNodeKind.decision => decision,
-    WorkflowNodeKind.human => human,
-    WorkflowNodeKind.ai => ai,
-    WorkflowNodeKind.end => end,
-    WorkflowNodeKind.action => action,
   };
 }
 
@@ -370,6 +353,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                         return Stack(
                           clipBehavior: Clip.none,
                           children: [
+                            Positioned.fill(child: CustomPaint(painter: _GroupsPainter(structure: widget.structure, layout: _layout))),
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: _EdgePainter(
@@ -421,7 +405,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
   ) {
     final idle = status == null;
     final selected = widget.selectedNodeId != null && widget.selectedNodeId == n.id;
-    final kindColor = widget.palette.kindColor(n.kind);
+    final nodeColor = _groupColorsOf(widget.structure)[agUiTeamGroupKey(n.group)] ?? widget.palette.node;
     // A status ring says more than a selection ring: the selected node at work keeps its status color.
     final ringColor = idle ? (selected ? scheme.primary : null) : widget.palette.statusColor(status);
     final onSelected = widget.onNodeSelected;
@@ -451,11 +435,11 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                 child: CustomPaint(
                   painter: _NodeCirclePainter(
                     fill: scheme.surfaceContainerLow,
-                    border: kindColor,
+                    border: nodeColor,
                     ring: ringColor,
                   ),
                   child: Center(
-                    child: Icon(_kindIcon(n.kind), size: size * 0.55, color: kindColor),
+                    child: Icon(_kindIcon(n.kind), size: size * 0.55, color: nodeColor),
                   ),
                 ),
               ),
@@ -502,6 +486,49 @@ class _RecenterButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The color of each group of a workflow, by group key: the one chosen, or the default.
+Map<String, Color> _groupColorsOf(WorkflowGraphStructure structure) => agUiTeamGroupColors(
+      structure.nodes.map((n) => n.group),
+      custom: {
+        for (final e in structure.groupColors.entries)
+          if (agUiParseHexColor(e.value) case final color?) e.key: color,
+      },
+    );
+
+/// The groups of a workflow, drawn as in a team: a soft zone behind the steps of each, in its color, that never passes over the
+/// other steps, and its name.
+class _GroupsPainter extends CustomPainter {
+  const _GroupsPainter({required this.structure, required this.layout});
+
+  final WorkflowGraphStructure structure;
+  final WorkflowLayout layout;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final MapEntry(:key, value: color) in _groupColorsOf(structure).entries) {
+      final own = [for (final n in structure.nodes) if (agUiTeamGroupKey(n.group) == key && layout.positions[n.id] != null) n];
+      if (own.isEmpty) continue;
+      final points = [for (final n in own) layout.positions[n.id]!];
+      final obstacles = [
+        for (final n in structure.nodes)
+          if (agUiTeamGroupKey(n.group) != key && layout.positions[n.id] != null) ZoneObstacle(Rect.fromCircle(center: layout.positions[n.id]!, radius: _nodeRadius)),
+      ];
+      agUiDrawGroupZone(canvas, zoneShape(points, obstacles), color, 1, organic: false);
+      final left = points.map((p) => p.dx).reduce(math.min) - _nodeRadius;
+      final top = points.map((p) => p.dy).reduce(math.min) - _nodeRadius - 16;
+      TextPainter(
+        text: TextSpan(text: own.first.group!.toUpperCase(), style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.7)),
+        textDirection: TextDirection.ltr,
+      )
+        ..layout()
+        ..paint(canvas, Offset(left, math.max(top, 2)));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GroupsPainter old) => !identical(old.structure, structure) || !identical(old.layout, layout);
 }
 
 class _NodeCirclePainter extends CustomPainter {

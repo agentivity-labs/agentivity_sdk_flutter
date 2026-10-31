@@ -217,7 +217,7 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
     );
   }
 
-  /// The colors a graph wears by type of step: those of a workflow, or the color of an agent's group. Both are kept in the metadata.
+  /// An agent wears the color of its group, kept in the metadata of its graph.
   static AgUiWorkflowPalette _paletteOf(Renderable renderable) {
     const base = AgUiWorkflowPalette();
     Color? hex(Object? value) => value is String ? agUiParseHexColor(value) : null;
@@ -225,19 +225,9 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
       final graph = renderable.entity['graph'];
       final metadata = graph is Map ? graph['metadata'] : null;
       final color = metadata is Map ? hex(metadata['groupColor']) : null;
-      return color == null ? base : AgUiWorkflowPalette(start: color, ai: color);
+      return color == null ? base : AgUiWorkflowPalette(node: color);
     }
-    final metadata = renderable.entity['metadata'];
-    final steps = metadata is Map ? metadata['stepColors'] : null;
-    if (steps is! Map) return base;
-    return AgUiWorkflowPalette(
-      start: hex(steps['start']) ?? base.start,
-      decision: hex(steps['decision']) ?? base.decision,
-      human: hex(steps['human']) ?? base.human,
-      ai: hex(steps['ai']) ?? base.ai,
-      action: hex(steps['action']) ?? base.action,
-      end: hex(steps['end']) ?? base.end,
-    );
+    return base;
   }
 
   Widget _message(String text) => Semantics(

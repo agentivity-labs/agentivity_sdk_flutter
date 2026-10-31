@@ -15,6 +15,7 @@ class WorkflowGraphNode {
     required this.displayName,
     required this.nodeType,
     required this.kind,
+    this.group,
   });
   final String id;
   final String displayName;
@@ -22,6 +23,9 @@ class WorkflowGraphNode {
   /// The node's actual catalog type (e.g. `ai.llm.prompt`, `core.if`) — [kind] is derived from this.
   final String nodeType;
   final WorkflowNodeKind kind;
+
+  /// The group it belongs to, as written.
+  final String? group;
 }
 
 class WorkflowGraphEdge {
@@ -38,10 +42,14 @@ class WorkflowGraphStructure {
     required this.nodes,
     required this.edges,
     this.entryNodeId,
+    this.groupColors = const {},
   });
   final List<WorkflowGraphNode> nodes;
   final List<WorkflowGraphEdge> edges;
   final String? entryNodeId;
+
+  /// The colors chosen for its groups (`#RRGGBB`), by group key.
+  final Map<String, String> groupColors;
 
   static WorkflowNodeKind _kindFor(String nodeType) {
     if (nodeType == 'core.if' || nodeType.startsWith('core.switch'))
@@ -124,9 +132,21 @@ class WorkflowGraphStructure {
           : !hasOutgoing.contains(id)
           ? WorkflowNodeKind.end
           : _kindFor(nodeType);
-      return WorkflowGraphNode(id: id, displayName: displayName, nodeType: nodeType, kind: kind);
+      final group = metadataMap?['group'];
+      return WorkflowGraphNode(id: id, displayName: displayName, nodeType: nodeType, kind: kind, group: group is String && group.trim().isNotEmpty ? group.trim() : null);
     }).toList(growable: false);
 
-    return WorkflowGraphStructure(nodes: nodes, edges: edges, entryNodeId: entryNode);
+    final entity = json['metadata'];
+    final chosen = entity is Map ? entity['groupColors'] : null;
+    return WorkflowGraphStructure(
+      nodes: nodes,
+      edges: edges,
+      entryNodeId: entryNode,
+      groupColors: {
+        if (chosen is Map)
+          for (final e in chosen.entries)
+            if (e.value is String) '${e.key}': e.value as String,
+      },
+    );
   }
 }
