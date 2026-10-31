@@ -699,18 +699,20 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                       child: picture,
                     ),
                   );
+          // The name grows with the graph: at a fixed width it would be cut once the graph is large.
+          final double nameWidth = 80.0 * math.max(1.0, scale);
           // A name above the member is anchored by its bottom edge, so the hexagon stays centered on `at` whatever the name's height.
           return labelAbove
               ? Positioned(
-                left: at.dx * scale - 40,
+                left: at.dx * scale - nameWidth / 2,
                 bottom: height - (at.dy * scale + boxSize / 2),
-                width: 80,
+                width: nameWidth,
                 child: body,
               )
               : Positioned(
-                left: at.dx * scale - 40,
+                left: at.dx * scale - nameWidth / 2,
                 top: at.dy * scale - boxSize / 2,
-                width: 80,
+                width: nameWidth,
                 child: body,
               );
         }
