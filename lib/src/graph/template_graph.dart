@@ -28,7 +28,11 @@ class AgUiTemplateGraph extends StatefulWidget {
     this.onSelect,
     this.selectedId,
     this.zoneLook = AgUiTeamZoneLook.organic,
+    this.measures,
   });
+
+  /// What to read on the members or steps, by the same ids as [selectedId]. See [AgUiGraphMeasure].
+  final Map<String, AgUiGraphMeasure>? measures;
 
   /// How the zone behind a group of a team is drawn (see [AgUiTeamGraph.zoneLook]). No effect on a workflow.
   final AgUiTeamZoneLook zoneLook;
@@ -255,6 +259,7 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
         interactive: widget.interactive,
         zoneLook: widget.zoneLook,
         selectedMemberId: widget.selectedId,
+        measures: widget.measures,
         onMemberSelected: widget.onSelect == null ? null : (m) => widget.onSelect!(AgUiGraphSelection(kind: AgUiGraphSelectionKind.member, id: m.memberEntityId, displayName: m.displayName)),
       );
     }
@@ -271,6 +276,7 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
       camera: widget.camera,
       interactive: widget.interactive,
       selectedNodeId: widget.selectedId,
+      measures: widget.measures,
       onNodeSelected: widget.onSelect == null ? null : (n) => widget.onSelect!(AgUiGraphSelection(kind: AgUiGraphSelectionKind.node, id: n.id, displayName: n.displayName)),
     );
   }

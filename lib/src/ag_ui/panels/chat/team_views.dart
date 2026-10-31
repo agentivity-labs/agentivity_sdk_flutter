@@ -302,6 +302,15 @@ class _RosterMember extends StatelessWidget {
   }
 }
 
+/// What a measure says of a member or a step: a short text under its name and its color on one scale. With measures, a graph
+/// is read for them: the groups step back, and what has no measure stays neutral.
+class AgUiGraphMeasure {
+  const AgUiGraphMeasure({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+}
+
 /// The whole Team as a constellation: an optional hub in the middle, one branch per group (named, in its color) and every
 /// member a small hexagon with its icon and its name underneath. Each member is lit by its live status — working now
 /// (animated link), waiting on the user, done (the path already taken is drawn in full), or not needed yet (a faint dotted link).
@@ -322,7 +331,11 @@ class AgUiTeamGraph extends StatefulWidget {
     this.onMemberSelected,
     this.selectedMemberId,
     this.zoneLook = AgUiTeamZoneLook.organic,
+    this.measures,
   });
+
+  /// What to read on the members, by `memberEntityId`. See [AgUiGraphMeasure].
+  final Map<String, AgUiGraphMeasure>? measures;
 
   /// How the zone behind a group is drawn: soft melted shapes ([AgUiTeamZoneLook.organic], the default) or plain discs and
   /// bands ([AgUiTeamZoneLook.bands], cheaper to draw). Either way a zone never passes over what is not its own.
@@ -627,6 +640,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
           );
           final selected = widget.selectedMemberId != null && widget.selectedMemberId == member.memberEntityId;
           final accentColor = Theme.of(context).colorScheme.primary;
+          final measure = widget.measures?[member.memberEntityId];
           final hex = _TeamHexNode(
             avatar: resolveMemberAvatar(
               member.asChatMember,
@@ -637,10 +651,10 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
               ),
             ),
             size: hexSize,
-            off: status == null && !resting,
+            off: widget.measures != null || (status == null && !resting),
             breath: status == TeamMemberStatus.working ? Curves.easeInOut.transform(_blink.value) : null,
             // A status says more than the selection: the selected member at work keeps its status color.
-            ringColor: status == null ? (selected ? accentColor : null) : widget.palette.of(status),
+            ringColor: measure?.color ?? (status == null ? (selected ? accentColor : null) : widget.palette.of(status)),
             order: order,
             scale: scale,
           );
@@ -657,6 +671,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
               ),
             ),
           );
+          final figure = measure == null ? null : Text(measure.label, maxLines: 1, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9 * scale, color: measure.color, fontWeight: FontWeight.w700));
           final onSelected = widget.onMemberSelected;
           final picture = Semantics(
             label: '${member.displayName}, ${teamMemberStatusText(status)}',
@@ -668,8 +683,8 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                 mainAxisSize: MainAxisSize.min,
                 children:
                     labelAbove
-                        ? [caption, const SizedBox(height: 1), hex]
-                        : [hex, const SizedBox(height: 1), caption],
+                        ? [if (figure != null) figure, caption, const SizedBox(height: 1), hex]
+                        : [hex, const SizedBox(height: 1), caption, if (figure != null) figure],
               ),
             ),
           );
@@ -744,7 +759,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                         return Stack(
                           children: [
                             Positioned.fill(
-                              child: RepaintBoundary(child: CustomPaint(painter: _ZonesPainter(zones: zones, scale: scale, look: widget.zoneLook))),
+                              child: RepaintBoundary(child: CustomPaint(painter: _ZonesPainter(zones: widget.measures == null ? zones : const [], scale: scale, look: widget.zoneLook))),
                             ),
                             Positioned.fill(
                               child: CustomPaint(

@@ -92,7 +92,11 @@ class AgUiWorkflowGraph extends StatefulWidget {
     this.palette = const AgUiWorkflowPalette(),
     this.onNodeSelected,
     this.selectedNodeId,
+    this.measures,
   });
+
+  /// What to read on the steps, by node id. See [AgUiGraphMeasure].
+  final Map<String, AgUiGraphMeasure>? measures;
 
   /// Called when a node is clicked or tapped. With it, nodes show a pointer and can be selected; without it the diagram
   /// is a picture. Dragging the diagram is not a selection.
@@ -254,10 +258,13 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
       ..scaleByDouble(scale, scale, scale, 1);
   }
 
-  /// The whole diagram in view, centered, never zoomed past its natural size.
+  // A long workflow goes below the scale of a hand zoom: all of it is in view, whatever its length.
+  double get _fitScale => math.min(_viewportSize.width / _layout.width, _viewportSize.height / _layout.height).clamp(0.05, _maxScale);
+
+  /// The whole diagram in view, centered.
   void _fitAll() {
     if (_viewportSize == Size.zero) return;
-    final k = math.min(_viewportSize.width / _layout.width, _viewportSize.height / _layout.height).clamp(_minScale, _maxScale);
+    final k = _fitScale;
     _view.value = Matrix4.identity()
       ..translateByDouble((_viewportSize.width - _layout.width * k) / 2, (_viewportSize.height - _layout.height * k) / 2, 0, 1)
       ..scaleByDouble(k, k, k, 1);
@@ -336,7 +343,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
               Positioned.fill(
                 child: InteractiveViewer(
                   transformationController: _view,
-                  minScale: _minScale,
+                  minScale: widget.camera == AgUiWorkflowCamera.fit ? math.min(_minScale, _fitScale) : _minScale,
                   maxScale: _maxScale,
                   constrained: false,
                   boundaryMargin: const EdgeInsets.all(double.infinity),
@@ -353,7 +360,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                         return Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            Positioned.fill(child: CustomPaint(painter: _GroupsPainter(structure: widget.structure, layout: _layout))),
+                            if (widget.measures == null) Positioned.fill(child: CustomPaint(painter: _GroupsPainter(structure: widget.structure, layout: _layout))),
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: _EdgePainter(
@@ -383,6 +390,10 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                 right: 6,
                 child: _RecenterButton(
                   onPressed: () {
+                    if (widget.camera == AgUiWorkflowCamera.fit) {
+                      _fitAll();
+                      return;
+                    }
                     _following = true;
                     final active = _activeNodeId();
                     if (active != null) _focusOn(active, animate: true);
@@ -405,7 +416,8 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
   ) {
     final idle = status == null;
     final selected = widget.selectedNodeId != null && widget.selectedNodeId == n.id;
-    final nodeColor = _groupColorsOf(widget.structure)[agUiTeamGroupKey(n.group)] ?? widget.palette.node;
+    final measure = widget.measures?[n.id];
+    final nodeColor = measure?.color ?? (widget.measures != null ? widget.palette.node : _groupColorsOf(widget.structure)[agUiTeamGroupKey(n.group)] ?? widget.palette.node);
     // A status ring says more than a selection ring: the selected node at work keeps its status color.
     final ringColor = idle ? (selected ? scheme.primary : null) : widget.palette.statusColor(status);
     final onSelected = widget.onNodeSelected;
@@ -427,7 +439,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
           children: [
             Opacity(
               opacity: idle
-                  ? (selected ? 1 : 0.62)
+                  ? (selected || measure != null ? 1 : 0.62)
                   : (status == WorkflowStepStatus.working ? 1 - 0.45 * _blink.value : 1),
               child: SizedBox(
                 width: size + 8,
@@ -452,6 +464,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9, color: selected ? scheme.primary : null, fontWeight: selected ? FontWeight.w700 : null),
             ),
+            if (measure != null) Text(measure.label, maxLines: 1, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9, color: measure.color, fontWeight: FontWeight.w700)),
           ],
         ),
       )),
