@@ -11,7 +11,6 @@ import 'member_avatar.dart';
 import 'team_appearance.dart';
 import 'team_layouts.dart';
 import 'team_topology.dart';
-import '../../../palettes/ag_graph_palette.dart';
 
 export 'team_layouts.dart' show AgUiTeamZoneLook;
 
@@ -85,12 +84,10 @@ extension AgUiTeamStructureMembers on TeamStructure {
 AgUiMemberAvatar? Function(AgUiChatMember) agUiTeamAvatarResolver(
   List<AgUiTeamMember> members, {
   AgUiMemberAvatar? Function(AgUiChatMember member)? fallback,
-  AgGraphPalette? palette,
 }) {
   final groupColors = agUiTeamGroupColors(
     members.map((m) => m.group),
     custom: _colorOverrides(members),
-    palette: palette?.groups,
   );
   final byId = {for (final m in members) m.memberEntityId: m};
   return (chatMember) {
@@ -129,17 +126,12 @@ AgUiMemberAvatar? Function(AgUiChatMember) _memberAvatar(
 /// Colors for each [TeamMemberStatus] (and for a member that has not been needed yet).
 class AgUiTeamPalette {
   const AgUiTeamPalette({
-    required this.working,
-    required this.waiting,
-    required this.done,
-    required this.failed,
+    this.working = const Color(0xFFF1633B),
+    this.waiting = const Color(0xFFE3A94F),
+    this.done = const Color(0xFF10B981),
+    this.failed = const Color(0xFFDC2626),
     this.idle = const Color(0xFFCBD5E1),
   });
-
-  /// The colors of what a member does, from the palette of the graph.
-  factory AgUiTeamPalette.of(AgGraphPalette palette) =>
-      AgUiTeamPalette(working: palette.states.working, waiting: palette.states.waiting, done: palette.states.done, failed: palette.states.failed);
-
   final Color working;
   final Color waiting;
   final Color done;
@@ -184,7 +176,7 @@ class AgUiTeamRoster extends StatelessWidget {
     required this.controller,
     required this.members,
     this.resolveMemberAvatar,
-    this.palette,
+    this.palette = const AgUiTeamPalette(),
     this.avatarSize = 28,
     this.statusSource,
   });
@@ -200,14 +192,11 @@ class AgUiTeamRoster extends StatelessWidget {
   /// Every member of the Team, in the order to show them.
   final List<AgUiTeamMember> members;
   final AgUiMemberAvatar? Function(AgUiChatMember member)? resolveMemberAvatar;
-
-  /// The colors of the roster. By default the one the app imposes ([AgGraphPaletteScope]), or the default palette.
-  final AgGraphPalette? palette;
+  final AgUiTeamPalette palette;
   final double avatarSize;
 
   @override
   Widget build(BuildContext context) {
-    final colors = AgGraphPaletteScope.of(context, palette);
     return ListenableBuilder(
       listenable: Listenable.merge([controller, if (statusSource != null) statusSource!]),
       builder: (context, _) {
@@ -215,7 +204,6 @@ class AgUiTeamRoster extends StatelessWidget {
         final groupColors = agUiTeamGroupColors(
           members.map((m) => m.group),
           custom: _colorOverrides(members),
-          palette: colors.groups,
         );
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -230,10 +218,10 @@ class AgUiTeamRoster extends StatelessWidget {
                     status: statuses[member.memberEntityId],
                     resolver: _memberAvatar(
                       member,
-                      groupColors[agUiTeamGroupKey(member.group)] ?? colors.steps.end,
+                      groupColors[agUiTeamGroupKey(member.group)],
                       resolveMemberAvatar,
                     ),
-                    palette: AgUiTeamPalette.of(colors),
+                    palette: palette,
                     size: avatarSize,
                   ),
                 ),
@@ -325,7 +313,7 @@ class AgUiTeamGraph extends StatefulWidget {
     required this.members,
     this.hubMemberId,
     this.resolveMemberAvatar,
-    this.palette,
+    this.palette = const AgUiTeamPalette(),
     this.restingColors = false,
     this.statusSource,
     this.topology,
@@ -377,9 +365,7 @@ class AgUiTeamGraph extends StatefulWidget {
   /// The coordinating member (a manager), drawn in the middle and linked to every group. Omit to draw the groups around a neutral center.
   final String? hubMemberId;
   final AgUiMemberAvatar? Function(AgUiChatMember member)? resolveMemberAvatar;
-
-  /// The colors of the graph. By default the one the app imposes ([AgGraphPaletteScope]), or the default palette. A group's own color wins over the palette's.
-  final AgGraphPalette? palette;
+  final AgUiTeamPalette palette;
 
   @override
   State<AgUiTeamGraph> createState() => _AgUiTeamGraphState();
@@ -552,12 +538,9 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
   @override
   Widget build(BuildContext context) {
     final members = widget.members;
-    final colors = AgGraphPaletteScope.of(context, widget.palette);
-    final states = AgUiTeamPalette.of(colors);
     final groupColors = agUiTeamGroupColors(
       members.map((m) => m.group),
       custom: _colorOverrides(members),
-      palette: colors.groups,
     );
     final hub =
         widget.hubMemberId == null
@@ -649,7 +632,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
               member.asChatMember,
               _memberAvatar(
                 member,
-                groupColors[agUiTeamGroupKey(member.group)] ?? colors.steps.end,
+                groupColors[agUiTeamGroupKey(member.group)],
                 widget.resolveMemberAvatar,
               ),
             ),
@@ -657,7 +640,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
             off: status == null && !resting,
             breath: status == TeamMemberStatus.working ? Curves.easeInOut.transform(_blink.value) : null,
             // A status says more than the selection: the selected member at work keeps its status color.
-            ringColor: status == null ? (selected ? accentColor : null) : states.of(status),
+            ringColor: status == null ? (selected ? accentColor : null) : widget.palette.of(status),
             order: order,
             scale: scale,
           );
@@ -773,7 +756,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                                           members: byId,
                                           statuses: statuses,
                                           colors: groupColors,
-                                          palette: states,
+                                          palette: widget.palette,
                                           running: !resting,
                                           flow: _flow.value,
                                           scale: scale,

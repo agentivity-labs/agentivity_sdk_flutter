@@ -6,36 +6,21 @@ import '../../../client/app_client/domain/workflow_graph_models.dart';
 import 'chat_controller.dart';
 import 'execution_statuses_controller.dart';
 import 'workflow_graph_layout.dart';
-import '../../../palettes/ag_graph_palette.dart';
 
 /// Status/kind colors for [AgUiWorkflowGraph]. Override to retheme — same idea as [AgUiTeamPalette].
 class AgUiWorkflowPalette {
   const AgUiWorkflowPalette({
-    required this.working,
-    required this.waiting,
-    required this.done,
-    required this.failed,
-    required this.start,
-    required this.decision,
-    required this.human,
-    required this.ai,
-    required this.end,
-    required this.action,
+    this.working = const Color(0xFFF1633B),
+    this.waiting = const Color(0xFFE3A94F),
+    this.done = const Color(0xFF10B981),
+    this.failed = const Color(0xFFDC2626),
+    this.start = const Color(0xFF10B981),
+    this.decision = const Color(0xFFF59E0B),
+    this.human = const Color(0xFF2563EB),
+    this.ai = const Color(0xFF8B5CF6),
+    this.end = const Color(0xFF334155),
+    this.action = const Color(0xFF64748B),
   });
-  /// The colors of a workflow, from the palette of the graph.
-  factory AgUiWorkflowPalette.of(AgGraphPalette palette) => AgUiWorkflowPalette(
-    working: palette.states.working,
-    waiting: palette.states.waiting,
-    done: palette.states.done,
-    failed: palette.states.failed,
-    start: palette.steps.start,
-    decision: palette.steps.decision,
-    human: palette.steps.human,
-    ai: palette.steps.ai,
-    end: palette.steps.end,
-    action: palette.steps.action,
-  );
-
   final Color working;
   final Color waiting;
   final Color done;
@@ -121,7 +106,7 @@ class AgUiWorkflowGraph extends StatefulWidget {
     this.statuses,
     this.interactive = true,
     this.camera = AgUiWorkflowCamera.follow,
-    this.palette,
+    this.palette = const AgUiWorkflowPalette(),
     this.onNodeSelected,
     this.selectedNodeId,
   });
@@ -155,8 +140,7 @@ class AgUiWorkflowGraph extends StatefulWidget {
 
   /// The workflow's flow structure — from `client.entities.fetchWorkflowGraph(workflowId)`.
   final WorkflowGraphStructure structure;
-  /// The colors of the graph. By default the one the app imposes ([AgGraphPaletteScope]), or the default palette.
-  final AgGraphPalette? palette;
+  final AgUiWorkflowPalette palette;
 
   @override
   State<AgUiWorkflowGraph> createState() => _AgUiWorkflowGraphState();
@@ -392,7 +376,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                                   structure: widget.structure,
                                   layout: _layout,
                                   statuses: statuses,
-                                  palette: AgUiWorkflowPalette.of(AgGraphPaletteScope.of(context, widget.palette)),
+                                  palette: widget.palette,
                                   flow: _flow.value,
                                   mutedColor: scheme.outline,
                                   bgColor: scheme.surface,
@@ -437,10 +421,9 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
   ) {
     final idle = status == null;
     final selected = widget.selectedNodeId != null && widget.selectedNodeId == n.id;
-    final colors = AgUiWorkflowPalette.of(AgGraphPaletteScope.of(context, widget.palette));
-    final kindColor = colors.kindColor(n.kind);
+    final kindColor = widget.palette.kindColor(n.kind);
     // A status ring says more than a selection ring: the selected node at work keeps its status color.
-    final ringColor = idle ? (selected ? scheme.primary : null) : colors.statusColor(status);
+    final ringColor = idle ? (selected ? scheme.primary : null) : widget.palette.statusColor(status);
     final onSelected = widget.onNodeSelected;
     const size = _nodeRadius * 2;
     Widget pickable(Widget child) => onSelected == null

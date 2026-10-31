@@ -8,7 +8,6 @@ import '../ag_ui/panels/chat/team_views.dart';
 import '../ag_ui/panels/chat/workflow_views.dart';
 import '../client/app_client/domain/team_definition_models.dart';
 import '../client/app_client/domain/workflow_graph_models.dart';
-import '../palettes/ag_graph_palette.dart';
 import 'renderable.dart';
 
 /// The graph of anything the platform can describe: a team as its constellation of members, a workflow (or the graph inside an
@@ -28,11 +27,7 @@ class AgUiTemplateGraph extends StatefulWidget {
     this.onSelect,
     this.selectedId,
     this.zoneLook = AgUiTeamZoneLook.organic,
-    this.palette,
   });
-
-  /// The colors of the graph. By default the palette the team, the agent or the workflow chose, or the default one.
-  final AgGraphPalette? palette;
 
   /// How the zone behind a group of a team is drawn (see [AgUiTeamGraph.zoneLook]). No effect on a workflow.
   final AgUiTeamZoneLook zoneLook;
@@ -206,7 +201,6 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
       goal: structure.goal,
       connections: structure.connections,
       groupColors: structure.groupColors,
-      palette: structure.palette,
       members: [
         for (final m in structure.members)
           TeamMemberPosition(
@@ -220,13 +214,6 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
           ),
       ],
     );
-  }
-
-  /// The palette an agent or a workflow chose: it keeps it in its metadata.
-  static String? _ownPalette(Map<String, dynamic> entity) {
-    final graph = entity['graph'];
-    final metadata = (graph is Map ? graph['metadata'] : null) ?? entity['metadata'];
-    return metadata is Map ? metadata['palette'] as String? : null;
   }
 
   Widget _message(String text) => Semantics(
@@ -246,7 +233,6 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
           ? agUiPlaybackStatuses<TeamMemberStatus>(r.ids, _step, working: TeamMemberStatus.working, done: TeamMemberStatus.done)
           : null;
       return AgUiTeamGraph(
-        palette: widget.palette ?? agGraphPaletteById(team.palette),
         members: team.toTeamMembers(),
         hubMemberId: team.hubMemberEntityId,
         resolveMemberAvatar: widget.resolveMemberAvatar,
@@ -265,7 +251,6 @@ class _AgUiTemplateGraphState extends State<AgUiTemplateGraph> {
         ? agUiPlaybackStatuses<WorkflowStepStatus>(r.ids, _step, working: WorkflowStepStatus.working, done: WorkflowStepStatus.done)
         : null;
     return AgUiWorkflowGraph(
-      palette: widget.palette ?? agGraphPaletteById(_ownPalette(r.renderable!.entity)),
       structure: workflow,
       statuses: statuses,
       camera: widget.camera,

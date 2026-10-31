@@ -63,8 +63,6 @@ export 'src/ag_ui/panels/chat/run_error.dart';
 export 'src/ag_ui/panels/chat/connection_notice.dart';
 export 'src/ag_ui/panels/wait_notice.dart';
 export 'src/ag_ui/panels/chat/team_appearance.dart';
-export 'src/palettes/ag_graph_palette.dart';
-export 'src/palettes/ag_graph_palettes_data.dart';
 export 'src/ag_ui/panels/chat/team_topology.dart';
 export 'src/icons/icon_ref.dart';
 export 'src/ag_ui/panels/chat/team_views.dart';

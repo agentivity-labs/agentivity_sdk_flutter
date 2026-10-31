@@ -31,7 +31,7 @@ Future<int> _faintPixels(WidgetTester tester, TeamStructure team, AgUiTeamZoneLo
         body: Center(
           child: RepaintBoundary(
             key: key,
-            child: SizedBox(width: 400, height: 380, child: AgUiTeamGraph(palette: agGraphPaletteById('neon-night'), members: team.toTeamMembers(), hubMemberId: team.hubMemberEntityId, restingColors: true, interactive: false, zoneLook: look)),
+            child: SizedBox(width: 400, height: 380, child: AgUiTeamGraph(members: team.toTeamMembers(), hubMemberId: team.hubMemberEntityId, restingColors: true, interactive: false, zoneLook: look)),
           ),
         ),
       ),
