@@ -516,8 +516,10 @@ class _GroupsPainter extends CustomPainter {
           if (agUiTeamGroupKey(n.group) != key && layout.positions[n.id] != null) ZoneObstacle(Rect.fromCircle(center: layout.positions[n.id]!, radius: _nodeRadius)),
       ];
       agUiDrawGroupZone(canvas, zoneShape(points, obstacles), color, 1, organic: false);
-      final left = points.map((p) => p.dx).reduce(math.min) - _nodeRadius;
-      final top = points.map((p) => p.dy).reduce(math.min) - _nodeRadius - 16;
+      // The name sits just above the first step of the group, however far the others go.
+      final first = points.reduce((a, b) => b.dx < a.dx ? b : a);
+      final left = first.dx - _nodeRadius;
+      final top = first.dy - _nodeRadius - 16;
       TextPainter(
         text: TextSpan(text: own.first.group!.toUpperCase(), style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.7)),
         textDirection: TextDirection.ltr,
