@@ -35,13 +35,13 @@ class EntitiesApi {
 
   // ---------------------------------------------------------------------------
   // Agentic browse (read-only discovery)
-  // GET /api/v1/agentic/browse
+  // GET /api/v1/library/browse
   // ---------------------------------------------------------------------------
 
   Future<AgenticBrowseLevel> fetchAgenticBrowseLevel({String? folderId}) async {
     final normalizedFolderId = _c.normalizeNullableId(folderId);
     final response = await _c.get<Map<String, dynamic>>(
-      AgentivityHttpCore.v1('/agentic/browse'),
+      AgentivityHttpCore.v1('/library/browse'),
       queryParameters: <String, dynamic>{
         if (normalizedFolderId != null) 'folderId': normalizedFolderId,
       },

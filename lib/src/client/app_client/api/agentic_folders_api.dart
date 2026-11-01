@@ -15,7 +15,7 @@ class AgenticFoldersApi {
     final normalizedName = name.trim();
     if (normalizedName.isEmpty) throw ArgumentError('Folder name is required');
     final response = await _c.post<Map<String, dynamic>>(
-      AgentivityHttpCore.v1('/agentic/folders'),
+      AgentivityHttpCore.v1('/library/folders'),
       data: <String, dynamic>{
         'name': normalizedName,
         'parentFolderId': _c.normalizeNullableId(parentFolderId),
@@ -32,7 +32,7 @@ class AgenticFoldersApi {
     final normalizedName = name.trim();
     if (normalizedName.isEmpty) throw ArgumentError('Folder name is required');
     final response = await _c.post<Map<String, dynamic>>(
-      AgentivityHttpCore.v1('/agentic/folders/$normalizedFolderId/rename'),
+      AgentivityHttpCore.v1('/library/folders/$normalizedFolderId/rename'),
       data: <String, dynamic>{'name': normalizedName},
     );
     _c.expectSuccessOrEmptyResponse(response.data, operation: 'Rename agentic folder');
@@ -40,7 +40,7 @@ class AgenticFoldersApi {
 
   Future<void> deleteAgenticFolder(String folderId) async {
     final normalizedFolderId = _c.requireNormalizedId(folderId, label: 'Folder id');
-    await _c.delete<void>(AgentivityHttpCore.v1('/agentic/folders/$normalizedFolderId'));
+    await _c.delete<void>(AgentivityHttpCore.v1('/library/folders/$normalizedFolderId'));
   }
 
   Future<void> moveAgenticFolder({
@@ -49,7 +49,7 @@ class AgenticFoldersApi {
   }) async {
     final normalizedFolderId = _c.requireNormalizedId(folderId, label: 'Folder id');
     final response = await _c.post<Map<String, dynamic>>(
-      AgentivityHttpCore.v1('/agentic/folders/$normalizedFolderId/move'),
+      AgentivityHttpCore.v1('/library/folders/$normalizedFolderId/move'),
       data: <String, dynamic>{
         'targetParentFolderId': _c.normalizeNullableId(targetParentFolderId),
       },

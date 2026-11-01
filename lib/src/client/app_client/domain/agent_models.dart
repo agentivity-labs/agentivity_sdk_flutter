@@ -5,7 +5,7 @@ import 'package:meta/meta.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// A single item in the unified `CatalogBrowseResult` returned by the
-/// `/agentic/browse`, `/workflows/browse`, and `/prompts/browse` endpoints.
+/// `/library/browse`, `/workflows/browse`, and `/prompts/browse` endpoints.
 /// The `type` field discriminates between entity kinds.
 @immutable
 class CatalogBrowseItem {
@@ -25,7 +25,7 @@ class CatalogBrowseItem {
   /// Its tags, as the library keeps them (in lower case): "solution" marks what a person launches.
   final List<String> tags;
 
-  /// `"agent"` | `"team"` | `"WorkflowEntity"` | `"prompt"` | `"folder"`
+  /// `"agent"` | `"team"` | `"workflow"` | `"prompt"` | `"folder"`
   final String type;
   final DateTime? updatedAt;
   final String? role;
@@ -33,7 +33,7 @@ class CatalogBrowseItem {
 
   bool get isAgent => type == 'agent';
   bool get isTeam => type == 'team';
-  bool get isWorkflow => type == 'WorkflowEntity';
+  bool get isWorkflow => type == 'workflow';
   bool get isPrompt => type == 'prompt';
 
   factory CatalogBrowseItem.fromJson(Map<String, dynamic> json) {
@@ -87,7 +87,7 @@ class AgentSummary {
 // AgenticFolder  (returned by CRUD endpoints — not browse)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Folder returned by the `/agentic/folders` CRUD endpoints.
+/// Folder returned by the `/library/folders` CRUD endpoints.
 /// The browse endpoint returns a different (leaner) shape handled by
 /// `CatalogBrowseItem` with `type == "folder"`.
 @immutable
