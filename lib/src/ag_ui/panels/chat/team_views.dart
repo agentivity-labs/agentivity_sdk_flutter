@@ -734,8 +734,10 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
           height: height,
           child: Stack(
             children: [
-              // Drag (mouse or one finger) to move, wheel or pinch to zoom.
+              // Drag (mouse or one finger) to move, wheel or pinch to zoom. A picture of its own: what moves around it does not
+              // paint all of it again.
               Positioned.fill(
+                child: RepaintBoundary(
                 child: InteractiveViewer(
                   transformationController: _view,
                   panEnabled: widget.interactive,
@@ -846,6 +848,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
                       },
                     ),
                   ),
+                ),
                 ),
               ),
               // The way back to the fitted view.
@@ -1209,6 +1212,8 @@ void _drawPill(
   canvas.drawCircle(Offset(left + 9 * scale, centerPoint.dy), 2.4 * scale, Paint()..color = color);
   label.paint(canvas, Offset(left + 16 * scale, centerPoint.dy - label.height / 2));
   countText.paint(canvas, Offset(rect.right - 8 * scale - countText.width, centerPoint.dy - countText.height / 2));
+  label.dispose();
+  countText.dispose();
 }
 
 /// Draws the constellation's links, junction dots and group names. A link is drawn in its branch's color: faint and dotted

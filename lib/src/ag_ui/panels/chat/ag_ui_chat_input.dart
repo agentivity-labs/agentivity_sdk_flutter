@@ -211,7 +211,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       _ctrl = widget.controller!;
     }
 
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))..repeat(reverse: true);
+    // Runs only while recording: left running, it asked for a frame all the time, and the mic redrew everything around it.
+    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
     _voicePulseAnim = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
 
     _focusNode.addListener(() => setState(() {}));
@@ -261,6 +262,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       _recordingElapsed.value = _recordingStopwatch?.elapsed ?? Duration.zero;
     });
+    _pulseCtrl.repeat(reverse: true);
     setState(() => _isRecording = true);
     _openVoiceOverlay();
     try {
@@ -300,6 +302,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _recordingStopwatch = null;
     final pcm = _pcmChunks?.toBytes();
     _pcmChunks = null;
+    _pulseCtrl.stop();
     if (mounted) setState(() => _isRecording = false);
     _closeVoiceOverlay();
 

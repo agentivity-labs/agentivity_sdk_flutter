@@ -340,7 +340,9 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
           height: height,
           child: Stack(
             children: [
+              // A picture of its own: what moves around it (a chat at work beside it) does not paint all of it again.
               Positioned.fill(
+                child: RepaintBoundary(
                 child: InteractiveViewer(
                   transformationController: _view,
                   minScale: widget.camera == AgUiWorkflowCamera.fit ? math.min(_minScale, _fitScale) : _minScale,
@@ -382,6 +384,7 @@ class _AgUiWorkflowGraphState extends State<AgUiWorkflowGraph>
                       },
                     ),
                   ),
+                ),
                 ),
               ),
               if (widget.interactive)
@@ -533,12 +536,13 @@ class _GroupsPainter extends CustomPainter {
       final first = points.reduce((a, b) => b.dx < a.dx ? b : a);
       final left = first.dx - _nodeRadius;
       final top = first.dy - _nodeRadius - 16;
-      TextPainter(
+      final name = TextPainter(
         text: TextSpan(text: own.first.group!.toUpperCase(), style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.7)),
         textDirection: TextDirection.ltr,
       )
         ..layout()
         ..paint(canvas, Offset(left, math.max(top, 2)));
+      name.dispose();
     }
   }
 
@@ -605,16 +609,33 @@ class _EdgePainter extends CustomPainter {
   final Color mutedColor;
   final Color bgColor;
 
-  static void _dashed(Canvas canvas, Path path, Paint paint, double dash, double gap, double flow) {
+  // What a link is made of, kept with the layout it belongs to. On the web a Path lives in the memory of the renderer until the
+  // garbage collector of the page runs, which nothing there hurries: one Path per dot of every link at every paint filled those
+  // 2 GB in minutes, and the page died with them (`Aborted()`). So each shape is made once.
+  static final _shapes = Expando<Map<String, Path>>();
+
+  static Path _shape(WorkflowLayout layout, String key, Path Function() make) => (_shapes[layout] ??= {}).putIfAbsent(key, make);
+
+  /// How many positions a moving dash goes through: few enough to keep them all, enough to look smooth.
+  static const _phases = 16;
+
+  static Path _dashes(Path path, double dash, double gap, double flow) {
+    final out = Path();
     for (final metric in path.computeMetrics()) {
       var travelled = -flow * (dash + gap) * 2;
       while (travelled < metric.length) {
         final start = math.max(travelled, 0.0);
         final end = math.min(travelled + dash, metric.length);
-        if (end > start) canvas.drawPath(metric.extractPath(start, end), paint);
+        if (end > start) out.addPath(metric.extractPath(start, end), Offset.zero);
         travelled += dash + gap;
       }
     }
+    return out;
+  }
+
+  void _dashed(Canvas canvas, String key, Path path, Paint paint, double dash, double gap, double flow) {
+    final phase = (flow * _phases).floor() % _phases;
+    canvas.drawPath(_shape(layout, '$key|$dash|$phase', () => _dashes(path, dash, gap, phase / _phases)), paint);
   }
 
   void _label(Canvas canvas, Offset a, Offset b, String text, bool loop) {
@@ -640,6 +661,7 @@ class _EdgePainter extends CustomPainter {
         ..color = mutedColor,
     );
     painter.paint(canvas, Offset(mx - painter.width / 2, my - painter.height / 2));
+    painter.dispose();
   }
 
   @override
@@ -651,7 +673,8 @@ class _EdgePainter extends CustomPainter {
       final isBack = layout.backEdges.contains(edgeKey(e.from, e.to));
       final from = Offset(a.dx + _nodeRadius, a.dy);
       final to = Offset(b.dx - _nodeRadius, b.dy);
-      final path = isBack ? loopCurve(a, b) : flowCurve(from, to);
+      final key = edgeKey(e.from, e.to);
+      final path = _shape(layout, key, () => isBack ? loopCurve(a, b) : flowCurve(from, to));
 
       final sFrom = statuses[e.from];
       final sTo = statuses[e.to];
@@ -668,7 +691,7 @@ class _EdgePainter extends CustomPainter {
           paint
             ..color = palette.working
             ..strokeWidth = 2.4;
-          _dashed(canvas, path, paint, 6, 4, flow);
+          _dashed(canvas, key, path, paint, 6, 4, flow);
         case WorkflowStepStatus.failed:
           paint
             ..color = palette.failed
@@ -684,7 +707,7 @@ class _EdgePainter extends CustomPainter {
           paint
             ..color = mutedColor.withValues(alpha: 0.8)
             ..strokeWidth = 1.5;
-          _dashed(canvas, path, paint, 1.5, 4, 0);
+          _dashed(canvas, key, path, paint, 1.5, 4, 0);
       }
 
       if (e.label != null) _label(canvas, from, to, e.label!, isBack);
