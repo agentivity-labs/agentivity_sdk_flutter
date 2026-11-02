@@ -1,3 +1,4 @@
+import '../../../artifacts/interaction/ag_unknown_choices.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -662,7 +663,7 @@ class _MessageBubble extends StatelessWidget {
                       if (onUploadFile != null) '__upload': onUploadFile,
         if (onUploadFile != null) '__upload': onUploadFile,
                     };
-                    final built = widgetRegistry!.build(context, block.type, props);
+                    final built = widgetRegistry!.build(context, block.type, props) ?? AgUnknownChoices.fromProps(props);
                     if (built == null) return const SizedBox.shrink();
                     return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: _dimIfDisabled(built, block.type));
                   },
@@ -689,7 +690,7 @@ class _MessageBubble extends StatelessWidget {
         if (onWidgetSubmit != null) '__onSubmit': onWidgetSubmit,
         if (onUploadFile != null) '__upload': onUploadFile,
       };
-      final built = widgetRegistry!.build(context, widgetType, props);
+      final built = widgetRegistry!.build(context, widgetType, props) ?? AgUnknownChoices.fromProps(props);
       if (built != null) {
         final label = _speakerLabel(context);
         return Padding(

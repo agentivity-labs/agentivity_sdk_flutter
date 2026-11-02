@@ -60,6 +60,7 @@ export 'src/ag_ui/panels/chat/ag_ui_chat_discussion.dart';
 export 'src/ag_ui/panels/chat/chat_activity.dart';
 export 'src/ag_ui/panels/chat/member_avatar.dart';
 export 'src/ag_ui/panels/chat/run_error.dart';
+export 'src/artifacts/interaction/ag_unknown_choices.dart';
 export 'src/ag_ui/panels/chat/connection_notice.dart';
 export 'src/ag_ui/panels/wait_notice.dart';
 export 'src/ag_ui/panels/chat/team_appearance.dart';
