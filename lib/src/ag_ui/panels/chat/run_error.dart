@@ -12,6 +12,19 @@ import 'chat_controller.dart';
   _ => (title: 'Something went wrong', hint: null),
 };
 
+/// Lets an app offer a next step on the error of a run, wherever a chat shows one: a button to buy credit, say.
+class AgUiRunErrorAction extends InheritedWidget {
+  const AgUiRunErrorAction({super.key, required this.builder, required super.child});
+
+  /// The action for an error, or null for none.
+  final Widget? Function(BuildContext context, AgUiRunError error) builder;
+
+  static AgUiRunErrorAction? of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<AgUiRunErrorAction>();
+
+  @override
+  bool updateShouldNotify(AgUiRunErrorAction oldWidget) => builder != oldWidget.builder;
+}
+
 /// The run stopped on an error: what happened, in plain words, and what the provider or platform said. Shown by
 /// [AgUiChatDiscussion] whenever the run ends with an error ([ChatController.runError]) — an account out of credit, a rejected
 /// API key or an unavailable AI service must never leave the conversation looking stuck.
@@ -28,6 +41,7 @@ class AgUiChatRunError extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final described = agUiDescribeRunError(error);
+    final action = AgUiRunErrorAction.of(context)?.builder(context, error);
     return Semantics(
       liveRegion: true,
       container: true,
@@ -53,6 +67,7 @@ class AgUiChatRunError extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(error.message, style: text.bodySmall?.copyWith(fontSize: 11, color: scheme.onSurfaceVariant)),
                     ),
+                  if (action != null) Padding(padding: const EdgeInsets.only(top: 8), child: action),
                 ],
               ),
             ),
