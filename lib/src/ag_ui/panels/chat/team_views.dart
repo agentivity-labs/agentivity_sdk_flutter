@@ -106,7 +106,7 @@ AgUiMemberAvatar? Function(AgUiChatMember) agUiTeamAvatarResolver(
 
 /// The avatar resolver for one team member: the app's own answer first (an image or emoji it chose), then the icon and
 /// group color the team editor gave the member, so a team drawn from its saved definition needs no app-side mapping.
-AgUiMemberAvatar? Function(AgUiChatMember) _memberAvatar(
+AgUiMemberAvatar? Function(AgUiChatMember) agUiMemberAvatarFor(
   AgUiTeamMember member,
   Color? groupColor,
   AgUiMemberAvatar? Function(AgUiChatMember member)? resolver,
@@ -216,7 +216,7 @@ class AgUiTeamRoster extends StatelessWidget {
                   child: _RosterMember(
                     member: member,
                     status: statuses[member.memberEntityId],
-                    resolver: _memberAvatar(
+                    resolver: agUiMemberAvatarFor(
                       member,
                       groupColors[agUiTeamGroupKey(member.group)],
                       resolveMemberAvatar,
@@ -644,7 +644,7 @@ class _AgUiTeamGraphState extends State<AgUiTeamGraph>
           final hex = _TeamHexNode(
             avatar: resolveMemberAvatar(
               member.asChatMember,
-              _memberAvatar(
+              agUiMemberAvatarFor(
                 member,
                 groupColors[agUiTeamGroupKey(member.group)],
                 widget.resolveMemberAvatar,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../client/core/api_contract.dart' as platform;
 import '../../protocol/ag_ui_protocol.dart';
 import '../../protocol/api_contract.dart';
 import 'chat_models.dart';
@@ -131,8 +132,16 @@ class ChatController extends ChangeNotifier {
   ActiveChatMember? _activeMember;
   String? _currentStep;
   AgUiRunError? _runError;
+  String? _runId;
+  bool _jobFinished = false;
+  bool _conversationEnded = false;
   Map<String, TeamMemberStatus> _memberStatuses = const {};
   Map<String, WorkflowStepStatus> _stepStatuses = const {};
+  String? _executionId;
+  Map<String, String?> _seenMembers = const {};
+
+  // Same replacement rule: memberEntityId -> what it is about to do, as said when its turn started.
+  Map<String, String> _memberActivities = const {};
 
   List<ChatThread> get threads => _threads;
   bool get isLoading => _isLoading;
@@ -162,6 +171,34 @@ class ChatController extends ChangeNotifier {
   AgUiRunError? get runError => _runError;
 
   /// Hides the error notice of the last run.
+  /// A job has just finished: the person can go on, close or start another. Cleared by the next run or [dismissConversationEnd].
+  bool get jobFinished => _jobFinished;
+
+  /// The conversation has ended, on purpose: a message in it is refused until a new one starts.
+  bool get conversationEnded => _conversationEnded;
+
+  /// The person goes on: hides the offer of a finished job.
+  void dismissConversationEnd() {
+    if (!_jobFinished) return;
+    _jobFinished = false;
+    notifyListeners();
+  }
+
+  /// A message was refused by the platform: tells this conversation why, for it to show what comes next. For an app that catches the
+  /// failure itself. True when the text should stay in the input: a turn goes on, or the conversation has ended.
+  bool noteSendRefused(Object error) {
+    final code = error is platform.ApiException ? error.code : null;
+    if (code == 'execution_ended') markConversationEnded();
+    return code == 'execution_ended' || code == 'execution_busy';
+  }
+
+  /// The conversation has been closed.
+  void markConversationEnded() {
+    _jobFinished = false;
+    _conversationEnded = true;
+    notifyListeners();
+  }
+
   void dismissRunError() {
     if (_runError == null) return;
     _runError = null;
@@ -191,6 +228,27 @@ class ChatController extends ChangeNotifier {
     _settleWorkingMembers(interrupted: false);
     _settleWorkingSteps(interrupted: false);
     notifyListeners();
+  }
+
+  /// The execution the stream is telling about (the last one, when an app starts one per request), or `null` until it says.
+  String? get executionId => _executionId;
+
+  /// The Team members of this execution that have taken a turn, in that order, with their names — all a chat knows of a Team it cannot read.
+  Map<String, String?> get seenMembers => _seenMembers;
+
+  /// What each Team member at work is about to do, in a few words for a customer, when its manager said it, keyed by `memberEntityId`.
+  Map<String, String> get memberActivities => _memberActivities;
+
+  // Another execution on the same controller: what its members do starts afresh, the conversation stays.
+  void _noteExecution(String? executionId) {
+    if (executionId == null || executionId.isEmpty || executionId == _executionId) return;
+    if (_executionId != null) {
+      _memberStatuses = const {};
+      _stepStatuses = const {};
+      _seenMembers = const {};
+      _memberActivities = const {};
+    }
+    _executionId = executionId;
   }
 
   void _setMemberStatus(String memberEntityId, TeamMemberStatus status) {
@@ -336,21 +394,37 @@ class ChatController extends ChangeNotifier {
     _runError = null;
     _memberStatuses = const {};
     _stepStatuses = const {};
+    _seenMembers = const {};
+    _memberActivities = const {};
+    _runId = null;
+    _jobFinished = false;
+    _conversationEnded = false;
+    _executionId = null;
     _errorMessage = null;
     _inProgressThreadId.clear();
     notifyListeners();
   }
 
   void _onAgUiEvent(AgUiEvent event) {
+    _noteExecution(event.executionId);
     switch (event) {
       // ── Run lifecycle → drive isAwaitingResponse ────────────────────────
-      case RunStartedEvent _:
+      case RunStartedEvent e:
         _isAwaitingResponse = true;
         _runError = null;
+        _jobFinished = false;
+        // A new run of the same conversation: its team starts afresh, the conversation stays. An answer takes up the same run.
+        if (_runId != null && e.runId.isNotEmpty && e.runId != _runId) {
+          _memberStatuses = const {};
+          _stepStatuses = const {};
+          _memberActivities = const {};
+        }
+        if (e.runId.isNotEmpty) _runId = e.runId;
         notifyListeners();
 
       case RunFinishedEvent e:
         _isAwaitingResponse = false;
+        if (e.jobFinished) _jobFinished = true;
         _activeMember = null;
         _currentStep = null;
         _settleWorkingMembers(interrupted: e.isInterrupted);
@@ -400,8 +474,15 @@ class ChatController extends ChangeNotifier {
             memberEntityId: e.memberEntityId,
             displayName: e.displayName,
           );
-          if (e.memberEntityId != null)
+          if (e.memberEntityId != null) {
             _setMemberStatus(e.memberEntityId!, TeamMemberStatus.working);
+            if (!_seenMembers.containsKey(e.memberEntityId)) _seenMembers = Map.unmodifiable({..._seenMembers, e.memberEntityId!: e.displayName});
+            // Of this turn: what it said on an earlier one is over.
+            _memberActivities = Map.unmodifiable({
+              ...Map.of(_memberActivities)..remove(e.memberEntityId),
+              if (e.activity != null && e.activity!.isNotEmpty) e.memberEntityId!: e.activity!,
+            });
+          }
           changedMember = true;
         }
         if (e.stepName.isNotEmpty || changedMember) notifyListeners();

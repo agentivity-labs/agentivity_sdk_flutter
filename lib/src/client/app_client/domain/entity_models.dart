@@ -178,10 +178,14 @@ class SessionStartedResponse {
     required this.runContext,
     required this.state,
     this.createdAt,
+    this.givenStreamUrl = '',
   });
 
   /// Full run context — carries executionId, streamId, runId, entityId, entityKind.
   final RunContext runContext;
+
+  /// The stream as the platform gives it: a conversation that goes on follows it from where the last turn left it.
+  final String givenStreamUrl;
 
   final String state;
   final DateTime? createdAt;
@@ -190,7 +194,7 @@ class SessionStartedResponse {
   String get runId => runContext.runId;
   String get executionId => runContext.executionId;
   String get streamId => runContext.streamId;
-  String get streamUrl => runContext.streamUrl;
+  String get streamUrl => givenStreamUrl.isNotEmpty ? givenStreamUrl : runContext.streamUrl;
   String get entityId => runContext.execution.entityId;
   String get entityKind => runContext.execution.entityKind;
 
@@ -201,6 +205,7 @@ class SessionStartedResponse {
       runContext: RunContext(runId: runId, execution: execution),
       state: (json['state'] as String? ?? '').trim().toLowerCase(),
       createdAt: json['createdAt'] is String ? DateTime.tryParse(json['createdAt'] as String) : null,
+      givenStreamUrl: (json['streamUrl'] as String? ?? '').trim(),
     );
   }
 }
@@ -362,6 +367,7 @@ class ExecutionRecord {
     required this.state,
     this.channels = const {},
     this.currentRunId,
+    this.createdAt,
   });
 
   final String executionId;
@@ -372,6 +378,7 @@ class ExecutionRecord {
   /// channelType → threadId (e.g. { "chat": "919d4238-..." })
   final Map<String, String> channels;
   final String? currentRunId;
+  final DateTime? createdAt;
 
   /// Convenience: returns the default chat thread ID if present.
   String? get chatThreadId => channels['chat'];
@@ -391,6 +398,7 @@ class ExecutionRecord {
       state: (json['state'] as String? ?? '').trim(),
       channels: channels,
       currentRunId: _nullableTrimmed(json['currentRunId']),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
     );
   }
 }

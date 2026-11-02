@@ -40,6 +40,27 @@ class ExecutionStatusesController extends ChangeNotifier {
   bool _disposed = false;
   Map<String, WorkflowStepStatus> _nodeStatuses = const {};
   Map<String, TeamMemberStatus> _memberStatuses = const {};
+  Map<String, ExecutionMemberStep> _memberSteps = const {};
+  String _executionState = '';
+  DateTime? _lastStepAt;
+
+  /// The same members with what each has to show — what [AgUiTeamProgressController] reads.
+  Map<String, ExecutionMemberStep> get memberSteps => _memberSteps;
+
+  bool _jobFinished = false;
+  bool _closed = false;
+
+  /// See [ExecutionStatuses.jobFinished].
+  bool get jobFinished => _jobFinished;
+
+  /// See [ExecutionStatuses.closed].
+  bool get closed => _closed;
+
+  /// The run's own status, lowercase (`running`, `waitingforinput`, `completed`, …) — empty until first read.
+  String get executionState => _executionState;
+
+  /// When the last finished turn of a team ended, if it has one.
+  DateTime? get lastStepAt => _lastStepAt;
 
   /// Workflow nodes that have started, keyed by node id.
   Map<String, WorkflowStepStatus> get nodeStatuses => _nodeStatuses;
@@ -70,13 +91,18 @@ class ExecutionStatusesController extends ChangeNotifier {
       if (result != null) {
         final nodes = {for (final e in result.nodes.entries) e.key: _node(e.value)};
         final members = {for (final e in result.members.entries) e.key: _member(e.value)};
-        if (!mapEquals(nodes, _nodeStatuses) || !mapEquals(members, _memberStatuses)) {
+        if (!mapEquals(nodes, _nodeStatuses) || !mapEquals(members, _memberStatuses) || !mapEquals(result.memberSteps, _memberSteps) || result.jobFinished != _jobFinished || result.closed != _closed || result.executionState != _executionState) {
           _nodeStatuses = Map.unmodifiable(nodes);
           _memberStatuses = Map.unmodifiable(members);
+          _memberSteps = Map.unmodifiable(result.memberSteps);
+          _executionState = result.executionState;
+          _jobFinished = result.jobFinished;
+          _closed = result.closed;
+          _lastStepAt = result.lastStepAt;
           notifyListeners();
         }
       }
-      // An unreachable status (null) is retried like a live one — a blip must not freeze the diagram.
+      // An unreachable status (null) is retried like a live one — a blip must not freeze the diagram. A refusal will not change.
       _schedule(result?.isLive ?? true);
     } finally {
       _inFlight = false;

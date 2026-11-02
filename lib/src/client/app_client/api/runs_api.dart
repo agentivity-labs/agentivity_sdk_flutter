@@ -1,6 +1,7 @@
 
 import 'package:dio/dio.dart';
 
+import '../../core/api_contract.dart';
 import '../../core/http_core.dart';
 import '../domain/entity_models.dart';
 import '../domain/execution_status_models.dart';
@@ -50,6 +51,11 @@ class RunsApi {
 
   Future<void> cancelExecution(String executionId) async {
     await _c.post<void>(AgentivityHttpCore.v1('/executions/$executionId/cancel'));
+  }
+
+  /// Closes a conversation, on purpose: from then on a message in it is refused (`execution_ended`).
+  Future<void> closeExecution(String executionId) async {
+    await _c.post<void>(AgentivityHttpCore.v1('/executions/$executionId/close'));
   }
 
   Future<void> pauseExecution(String executionId) async {
@@ -149,7 +155,7 @@ class RunsApi {
   }
 
   // ---------------------------------------------------------------------------
-  // Live step statuses — GET /api/v1/executions/{executionId}/inspector
+  // Live step statuses — GET /api/v1/executions/{executionId}/progress
   // The authoritative per-step state (workflow nodes, team members) of any execution: valid on a fresh run, after a reconnect
   // and when reopening an old execution — unlike stream events, which are not replayed.
   // ---------------------------------------------------------------------------
@@ -158,12 +164,15 @@ class RunsApi {
     final normalized = _c.requireNormalizedId(executionId, label: 'Execution id');
     try {
       final response = await _c.get<Map<String, dynamic>>(
-        AgentivityHttpCore.v1('/executions/$normalized/inspector'),
+        AgentivityHttpCore.v1('/executions/$normalized/progress'),
         dataBody: true,
       );
       final data = response.data;
       if (data == null) return null;
       return ExecutionStatuses.fromJson(data);
+    } on ApiException catch (error) {
+      final status = error.payload.httpStatus;
+      return status == 401 || status == 403 ? const ExecutionStatuses.refused() : null;
     } catch (_) {
       return null;
     }

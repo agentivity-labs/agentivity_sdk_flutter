@@ -2,6 +2,20 @@
 
 ## 0.1.0 - Unreleased
 
+- **The team at work, in the chat.** `AgUiChatDiscussion` shows `AgUiChatTeamProgress` by default (`showTeamProgress: false` turns it off):
+  one line per agent while an execution goes on, a result to open, one line once it has ended. Pass `client` for every member
+  and the results, a key for a web page included (`fetchExecutionStatuses` reads `GET /executions/{id}/progress`, no longer the
+  inspector); without it the widget goes by the stream, with names, statuses and what each agent does (`activity` on
+  `StepStartedEvent`, `ChatController.memberActivities`). `ExecutionStatuses` gains `memberSteps`,
+  `lastStepAt` and `refused`; `ExecutionRecord` gains `createdAt`; `ChatController` gains `executionId` and `seenMembers`, and a new
+  execution on a controller starts `memberStatuses` and `stepStatuses` afresh.
+
+- **A conversation holds several jobs and ends only on purpose.** After a run a message goes on in the same execution. Once a job is
+  finished (`RunFinishedEvent.jobFinished`) `AgUiChatDiscussion` offers to go on, close or start another (`AgUiChatConversationEnd`):
+  pass `onNewConversation` for the last, `client` for closing (`runs.closeExecution`). A message refused with `409 execution_ended`
+  shows the same widget, one refused with `execution_busy` stays in the input. A `sendMessage` that fails with those is told to
+  `ChatController.noteSendRefused`; `jobFinished`, `conversationEnded`, and a new run of a conversation starting its statuses afresh.
+
 - **One way to answer a question, at the level of an execution.** `runs.submitHilResponse(executionId, requestId, …)` now
   calls `POST /executions/{executionId}/respond`: the answer names its question (several can wait at once), the platform
   takes up again the run that asked it, and the answer is kept in the conversation. Its result gains `threadId` and

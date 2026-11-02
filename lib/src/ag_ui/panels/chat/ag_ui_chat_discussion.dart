@@ -3,16 +3,21 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../../client/app_client/agentivity_client.dart';
 import '../../../client/app_client/api/uploads_api.dart';
 import '../../theme/ag_theme_data.dart';
 import '../../tools/ag_ui_widget_registry.dart';
 import '../../widgets/ag_ui_markdown_body.dart';
 import 'ag_ui_chat_input.dart';
+import 'ag_ui_chat_team_progress.dart';
 import 'chat_controller.dart';
+import 'conversation_end.dart';
 import 'chat_models.dart';
 import 'member_avatar.dart';
 import 'chat_activity.dart';
 import 'run_error.dart';
+import 'team_progress.dart';
+import 'team_views.dart';
 import 'connection_notice.dart';
 import '../../../client/core/connection_monitor.dart';
 
@@ -81,6 +86,14 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.activityLabel,
     this.activityStyle = const AgUiChatActivityStyle(),
     this.activityBuilder,
+    this.showTeamProgress = true,
+    this.client,
+    this.teamProgressSource,
+    this.onNewConversation,
+    this.conversationEndTexts = const AgUiConversationEndTexts(),
+    this.executionId,
+    this.teamMembers,
+    this.teamProgressTexts = const AgUiTeamProgressTexts(),
     this.showSpeakerLabels = false,
     this.resolveMemberAvatar,
     // AgUiChatInput passthrough
@@ -189,6 +202,34 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// Draws the activity indicator instead of the default one.
   final Widget Function(BuildContext context, AgUiChatActivity activity)? activityBuilder;
 
+  /// Shows the team at work in the thread ([AgUiChatTeamProgress]): one line per agent while an execution goes on, collapsed to one
+  /// line when it ends. On by default; it appears once a team really works together, never for a standalone Agent or a manager
+  /// answering alone. While it shows, it stands in for the two indicators above. Mirrors the React SDK's `showTeamProgress`.
+  final bool showTeamProgress;
+
+  /// The platform's client. Given, [showTeamProgress] reads the execution: every member, each one's result. Without it, it goes by
+  /// the stream alone: the names and statuses of the agents that took a turn.
+  final AgentivityClient? client;
+
+  /// Reads the execution from somewhere else than [client].
+  final AgUiTeamProgressSource? teamProgressSource;
+
+  /// The person starts another conversation, from zero: the app forgets its execution, so that the next message starts a new one, and
+  /// clears the controller. Providing it is what offers the choice, once a job is finished or a conversation has ended.
+  final VoidCallback? onNewConversation;
+
+  /// Other words, or another language, for what is offered at the end of a job or of a conversation.
+  final AgUiConversationEndTexts conversationEndTexts;
+
+  /// The execution [showTeamProgress] follows. Left out, the one the stream tells about; give it for an execution reopened from its history.
+  final String? executionId;
+
+  /// The team's members, for a key that cannot read the team (a key for a web page). Left out, they are read from the execution's team.
+  final List<AgUiTeamMember>? teamMembers;
+
+  /// Other words, or another language, for [showTeamProgress].
+  final AgUiTeamProgressTexts teamProgressTexts;
+
   /// The client's connection monitor (`client.connection`). When given, the conversation says on its own when the server cannot be
   /// reached — with a countdown to the next attempt and a "Retry now" button.
   final ConnectionMonitor? connection;
@@ -244,6 +285,23 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
 
   bool get _submittingHil => _submittingGate != null && _submittingGate == widget.controller.pendingHilGate?.requestId;
   bool _stopping = false;
+  AgUiTeamProgressController? _teamProgress;
+  bool _teamWasAtWork = false;
+
+  void _startTeamProgress() {
+    final client = widget.client;
+    _teamProgress = widget.showTeamProgress ? (AgUiTeamProgressController(chat: widget.controller, source: widget.teamProgressSource ?? (client != null ? AgUiTeamProgressSource.of(client) : null), executionId: widget.executionId, members: widget.teamMembers)..addListener(_onTeamProgress)) : null;
+  }
+
+  void _onTeamProgress() {
+    if (!mounted) return;
+    final progress = _teamProgress?.progress;
+    final atWork = progress != null && progress.visible && progress.isLive;
+    // The team's list is new at the bottom of the thread: the person sees it come.
+    if (atWork && !_teamWasAtWork) _scrollToBottom();
+    _teamWasAtWork = atWork;
+    setState(() {});
+  }
 
   Future<void> _stop() async {
     final onStop = widget.onStop;
@@ -271,6 +329,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
       _inputController.value = TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
     }
     widget.controller.addListener(_onControllerChange);
+    _startTeamProgress();
     if (widget.autoLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadMessages();
@@ -286,11 +345,16 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
       widget.controller.addListener(_onControllerChange);
     }
     if (old.threadId != widget.threadId) _loadMessages();
+    if (old.controller != widget.controller || old.showTeamProgress != widget.showTeamProgress || old.client != widget.client || old.teamProgressSource != widget.teamProgressSource || old.executionId != widget.executionId || old.teamMembers != widget.teamMembers) {
+      _teamProgress?.dispose();
+      _startTeamProgress();
+    }
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChange);
+    _teamProgress?.dispose();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -386,8 +450,30 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     _inputController.clear();
-    await widget.controller.sendMessage(threadId: _activeThreadId, text: trimmed);
+    _offerAnswered = true;
+    try {
+      await widget.controller.sendMessage(threadId: _activeThreadId, text: trimmed);
+    } catch (error) {
+      // Refused, not failed: the text is not lost, and a conversation that has ended says what comes next.
+      if (!widget.controller.noteSendRefused(error)) rethrow;
+      _inputController.text = trimmed;
+      return;
+    }
     await _loadMessages();
+  }
+
+  // The offer read from the platform when a chat reopens goes when the person answers it, as the one the stream brought.
+  bool _offerAnswered = false;
+
+  Future<void> _closeConversation() async {
+    final id = widget.executionId ?? widget.controller.executionId;
+    if (id != null) await widget.client?.runs.closeExecution(id);
+    widget.controller.markConversationEnded();
+  }
+
+  void _goOn() {
+    setState(() => _offerAnswered = true);
+    widget.controller.dismissConversationEnd();
   }
 
   Future<void> _submitHilResponse(String text, {String source = 'text'}) async {
@@ -418,6 +504,9 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
 
     final hilGate = widget.controller.pendingHilGate;
     final isHilActive = hilGate != null;
+    final progress = _teamProgress?.progress;
+    final teamShown = progress != null && progress.visible;
+    final teamAtWork = teamShown && progress.isLive;
 
     // ── Messages area ──────────────────────────────────────────────────────
     // Always build the Column so the input is always visible at the bottom.
@@ -425,7 +514,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
     final Widget messagesArea;
     if (_loadingMessages || (widget.controller.isLoading && _activeThreadId == null && _messages.isEmpty)) {
       messagesArea = widget.loadingBuilder?.call(context) ?? const Center(child: CircularProgressIndicator());
-    } else if (_activeThreadId == null && _messages.isEmpty && !isHilActive) {
+    } else if (_activeThreadId == null && _messages.isEmpty && !isHilActive && !teamShown) {
       messagesArea = widget.emptyBuilder?.call(context) ?? const SizedBox.shrink();
     } else {
       // Only the most recent message carrying an interactive widget may still be answered —
@@ -433,11 +522,16 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
       // Keying off "last widget-bearing message" rather than "last message in the list" keeps
       // trailing plain-text messages (which are not answers) from wrongly re-enabling an old widget.
       final lastWidgetIndex = _messages.lastIndexWhere(_hasInteractiveWidget);
+      // At the bottom while the team works; once it has ended, between the request and what came of it, as a line of steps.
+      final request = _messages.lastIndexWhere((m) => m.role == ChatMessageRole.user);
+      final teamAt = !teamShown ? -1 : (teamAtWork || request < 0 ? _messages.length : request + 1);
       messagesArea = ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.all(12),
-        itemCount: _messages.length,
-        itemBuilder: (context, i) {
+        itemCount: _messages.length + (teamShown ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == teamAt) return Align(alignment: AlignmentDirectional.centerStart, child: AgUiChatTeamProgress(key: const ValueKey('team-progress'), progress: progress!, resolveMemberAvatar: widget.resolveMemberAvatar, texts: widget.teamProgressTexts));
+          final i = teamAt >= 0 && index > teamAt ? index - 1 : index;
           final msg = _messages[i];
           if (widget.messageBuilder != null) return widget.messageBuilder!(msg);
           final isActiveWidget = isHilActive && i == lastWidgetIndex;
@@ -463,6 +557,9 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
 
     final activeMember = widget.controller.activeMember;
     final runError = widget.controller.runError;
+    final teamProgress = _teamProgress?.progress;
+    final conversationEnded = widget.controller.conversationEnded || teamProgress?.closed == true;
+    final offered = !conversationEnded && widget.controller.pendingHilGate == null && !widget.controller.isAwaitingResponse && widget.running != true && (widget.controller.jobFinished || (teamProgress?.jobFinished == true && !_offerAnswered));
     return Column(
       children: [
         Expanded(child: messagesArea),
@@ -471,7 +568,18 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
 
         if (runError != null) AgUiChatRunError(error: runError, onDismiss: widget.controller.dismissRunError),
 
-        if (widget.showActiveMemberIndicator && activeMember != null)
+        if (conversationEnded || offered)
+          AgUiChatConversationEnd(
+            ended: conversationEnded,
+            onContinue: _goOn,
+            onClose: widget.client != null && (widget.executionId ?? widget.controller.executionId) != null ? _closeConversation : null,
+            onStartNew: widget.onNewConversation,
+            texts: widget.conversationEndTexts,
+          ),
+
+        if (teamAtWork)
+          const SizedBox.shrink()
+        else if (widget.showActiveMemberIndicator && activeMember != null)
           _ActiveMemberIndicator(member: AgUiChatMember(memberEntityId: activeMember.memberEntityId, displayName: activeMember.displayName), resolver: widget.resolveMemberAvatar)
         else if (widget.showActivityIndicator)
           // Always in the tree while the option is on, so that it keeps its own delay; it draws nothing when idle.

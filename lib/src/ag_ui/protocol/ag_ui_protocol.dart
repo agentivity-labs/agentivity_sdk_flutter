@@ -24,10 +24,10 @@ sealed class AgUiEvent {
     return switch (type) {
       // Run lifecycle
       'RUN_STARTED' => RunStartedEvent._(type: type, timestamp: ts, executionId: executionId, threadId: _opt(json, 'threadId'), runId: _str(json, 'runId'), parentRunId: _opt(json, 'parentRunId'), input: json['input'] is Map ? Map<String, dynamic>.from(json['input'] as Map) : null),
-      'RUN_FINISHED' => RunFinishedEvent._(type: type, timestamp: ts, executionId: executionId, threadId: _opt(json, 'threadId'), runId: _str(json, 'runId'), outcome: _parseOutcome(json['outcome']), result: json['result']),
+      'RUN_FINISHED' => RunFinishedEvent._(type: type, timestamp: ts, executionId: executionId, threadId: _opt(json, 'threadId'), runId: _str(json, 'runId'), outcome: _parseOutcome(json['outcome']), result: json['result'], jobFinished: json['jobFinished'] == true),
       'RUN_ERROR' => RunErrorEvent._(type: type, timestamp: ts, executionId: executionId, message: _str(json, 'message'), code: _opt(json, 'code')),
       // Steps
-      'STEP_STARTED' => StepStartedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName')),
+      'STEP_STARTED' => StepStartedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName'), activity: _opt(json, 'activity')),
       'STEP_FINISHED' => StepFinishedEvent._(type: type, timestamp: ts, executionId: executionId, stepName: _str(json, 'stepName'), memberEntityId: _opt(json, 'memberEntityId'), memberEntityKind: _opt(json, 'memberEntityKind'), displayName: _opt(json, 'displayName'), error: _opt(json, 'error')),
       // Text messages — streaming
       'TEXT_MESSAGE_START' => TextMessageStartEvent._(type: type, timestamp: ts, executionId: executionId, messageId: _str(json, 'messageId'), role: _str(json, 'role').isEmpty ? 'assistant' : _str(json, 'role'), name: _opt(json, 'name')),
@@ -101,7 +101,10 @@ final class RunStartedEvent extends AgUiEvent {
 
 /// A run completed. Check [outcome] for success vs interrupt.
 final class RunFinishedEvent extends AgUiEvent {
-  const RunFinishedEvent._({required super.type, super.timestamp, super.executionId, this.threadId, required this.runId, this.outcome, this.result});
+  const RunFinishedEvent._({required super.type, super.timestamp, super.executionId, this.threadId, required this.runId, this.outcome, this.result, this.jobFinished = false});
+
+  /// The job is finished, not only the turn: a chat offers to go on, close or start another.
+  final bool jobFinished;
   final String? threadId;
   final String runId;
 
@@ -166,7 +169,7 @@ class AgUiInterrupt {
 // ── Step lifecycle ────────────────────────────────────────────────────────────
 
 final class StepStartedEvent extends AgUiEvent {
-  const StepStartedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName, this.memberEntityId, this.memberEntityKind, this.displayName});
+  const StepStartedEvent._({required super.type, super.timestamp, super.executionId, required this.stepName, this.memberEntityId, this.memberEntityKind, this.displayName, this.activity});
   final String stepName;
 
   /// Present when the step belongs to a Team member — the entity id of that member.
@@ -177,6 +180,9 @@ final class StepStartedEvent extends AgUiEvent {
 
   /// Human-friendly name for the active member, falls back to [memberEntityId] when unset.
   final String? displayName;
+
+  /// What the member is about to do, in a few words for a customer, when its manager said it.
+  final String? activity;
 }
 
 final class StepFinishedEvent extends AgUiEvent {
