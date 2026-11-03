@@ -2,6 +2,10 @@
 
 ## 0.1.0 - Unreleased
 
+- **A picture of the instance, and its download.** `AgArtifactLinks.instanceBaseUrl` says where the instance is, so the pictures it keeps
+  (`/api/v1/resources/…`, what a workflow's Image Viewer sends to the chat) show in the artifacts. An `ImageGallery` picture with
+  `download` has a Download button (`AgArtifactLinks.downloadUrl`).
+
 - **The team at work, in the chat.** `AgUiChatDiscussion` shows `AgUiChatTeamProgress` by default (`showTeamProgress: false` turns it off):
   one line per agent while an execution goes on, a result to open, one line once it has ended. Pass `client` for every member
   and the results, a key for a web page included (`fetchExecutionStatuses` reads `GET /executions/{id}/progress`, no longer the

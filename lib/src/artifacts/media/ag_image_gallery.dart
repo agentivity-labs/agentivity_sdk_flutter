@@ -19,6 +19,7 @@ import '../shell/ag_artifact_image.dart';
 /// ```
 /// `columns` is 1–4 (default 3), `aspectRatio` a ratio such as `"4 / 3"`, `fit` `"contain"` (whole picture, default)
 /// or `"cover"` (crops). A picture that cannot be shown keeps its place with a neutral block, so captions stay aligned.
+/// A picture with `download` (the name to save it under: what a workflow's Image Viewer sends) has a Download button.
 class AgImageGallery extends StatelessWidget {
   const AgImageGallery({super.key, required this.props});
 
@@ -79,6 +80,15 @@ class AgImageGallery extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     picture,
+                    if (image['download'] != null && agSafeImageUrl(image['url']) != null)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () => AgArtifactLinks.open(context, AgArtifactLinks.downloadUrl(agSafeImageUrl(image['url'])!)),
+                          icon: const Icon(Icons.download_rounded, size: 16),
+                          label: const Text('Download'),
+                        ),
+                      ),
                     if (caption != null) ...[
                       const SizedBox(height: 6),
                       Text(caption, style: TextStyle(fontSize: 11, height: 1.35, color: cs.onSurface.withValues(alpha: 0.65))),

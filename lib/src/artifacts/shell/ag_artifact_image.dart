@@ -10,6 +10,9 @@ String? agSafeImageUrl(Object? raw) {
   if (raw is! String) return null;
   final url = raw.trim();
   if (RegExp(r'^https?://', caseSensitive: false).hasMatch(url)) return url;
+  // A picture the instance itself keeps (a step's image, `/api/v1/resources/…`): read from the instance, when the app says where it is.
+  final instance = AgArtifactLinks.instanceUrl(url);
+  if (instance != null) return instance;
   if (RegExp(r'^data:image/(png|jpe?g|gif|webp|avif);base64,', caseSensitive: false).hasMatch(url)) return url;
   return null;
 }
@@ -27,6 +30,20 @@ class AgArtifactLinks {
   AgArtifactLinks._();
 
   static void Function(Uri uri)? onOpen;
+
+  /// Where the instance is (its API base, e.g. `https://my.agentivity.app/`), for the pictures it keeps itself: a step's image
+  /// arrives as `/api/v1/resources/…`. Without it, those pictures show their placeholder.
+  static String? instanceBaseUrl;
+
+  /// [path] read from the instance when it is one of its own pictures (`/api/v1/resources/…`) and [instanceBaseUrl] is set.
+  static String? instanceUrl(String path) {
+    final base = instanceBaseUrl?.trim();
+    if (base == null || base.isEmpty || !path.startsWith('/api/v1/resources/')) return null;
+    return (base.endsWith('/') ? base.substring(0, base.length - 1) : base) + path;
+  }
+
+  /// The address that saves [url] rather than shows it: the instance's own pictures are asked as a download, any other is opened.
+  static String downloadUrl(String url) => url.contains('/api/v1/resources/') ? '$url${url.contains('?') ? '&' : '?'}download=true' : url;
 
   static void open(BuildContext context, String url) {
     final uri = Uri.tryParse(url);
