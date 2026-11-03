@@ -45,6 +45,8 @@ Future<ResponseBody> openStreamingRequest(
           web.RequestInit(
             method: method,
             headers: sent,
+            // As Dio is told to: a page on another port than its API (the Studio in development) sends its session cookie only so.
+            credentials: dio.options.extra['withCredentials'] == true ? 'include' : 'same-origin',
             body: data == null ? null : (data is String ? data : jsonEncode(data)).toJS,
             signal: abort.signal,
           ),
