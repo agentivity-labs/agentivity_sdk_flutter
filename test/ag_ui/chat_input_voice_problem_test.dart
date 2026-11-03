@@ -37,6 +37,22 @@ void main() {
     expect(find.byKey(const ValueKey('ag-chat-input-mic-blocked')), findsNothing);
   });
 
+  testWidgets('a device without any mic is told so, not that its mic is blocked', (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'isRecording') return false;
+      if (call.method == 'listInputDevices') return <Object?>[];
+      if (call.method == 'create' || call.method == 'dispose' || call.method == 'stop') return null;
+      throw PlatformException(code: 'denied', message: 'No microphone');
+    });
+    await tester.pumpWidget(_host(AgUiChatInput(onSend: (_, _) {}, onTranscribeAudio: (_, _) async => 'hello')));
+
+    await tester.tap(find.byIcon(Icons.mic_none_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('No mic found'), findsOneWidget);
+    expect(find.text('Plug in a mic or a headset, then try again.'), findsOneWidget);
+    expect(find.text('The mic is blocked'), findsNothing);
+  });
+
   test('the default texts say what to do next, where the app runs', () {
     const texts = AgUiVoiceProblemTexts();
     expect(texts.notHeard, 'Could not hear that. Try again, or type it.');

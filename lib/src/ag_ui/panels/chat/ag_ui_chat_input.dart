@@ -67,7 +67,14 @@ final class AgUiImageBytesAttachment extends AgUiInputAttachment {
 /// ```
 /// What the chat input says when dictation fails, in the app's own words.
 class AgUiVoiceProblemTexts {
-  const AgUiVoiceProblemTexts({this.notHeard = 'Could not hear that. Try again, or type it.', this.noMic = 'The mic is blocked', this.noMicHow, this.tryAgain = 'Try again'});
+  const AgUiVoiceProblemTexts({
+    this.notHeard = 'Could not hear that. Try again, or type it.',
+    this.noMic = 'The mic is blocked',
+    this.noMicHow,
+    this.micMissing = 'No mic found',
+    this.micMissingHow = 'Plug in a mic or a headset, then try again.',
+    this.tryAgain = 'Try again',
+  });
 
   /// Nothing was recorded, nothing came back from the transcription, or it failed.
   final String notHeard;
@@ -78,6 +85,10 @@ class AgUiVoiceProblemTexts {
   /// How to allow it again, under that title; null: the steps of where the app runs (the browser, Windows, macOS). Nothing can
   /// ask again once the mic was refused: only the person can allow it, there.
   final String? noMicHow;
+
+  /// The title of the card shown when the device has no mic at all, and what to do then.
+  final String micMissing;
+  final String micMissingHow;
 
   /// The button of that card that opens the mic again.
   final String tryAgain;
@@ -220,8 +231,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   // A dictation that failed says so in the field, until the next try or a word typed: a mic that just stops looks broken. In the
   // field rather than a snackbar, which an app without a Scaffold would never show.
   String? _voiceProblem;
-  // The mic could not be opened: a card says how to allow it, and opens it again in one tap.
-  bool _micBlocked = false;
+  // The mic could not be opened: a card says why (blocked, or no mic at all) and how to fix it, and opens it again in one tap.
+  _MicProblem? _micProblem;
   bool _voiceOverlayOpen = false;
   BuildContext? _voiceOverlayContext;
   BytesBuilder? _pcmChunks;
@@ -295,12 +306,13 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     }
     setState(() {
       _voiceProblem = null;
-      _micBlocked = false;
+      _micProblem = null;
     });
     // Asked first: on the web a refused mic does not make startStream throw — the recorder only logs it and gives a stream that
     // ends at once, and the person would watch a recording that hears nothing.
     if (!await _micAllowed()) {
-      if (mounted) setState(() => _micBlocked = true);
+      final problem = await _whyNoMic();
+      if (mounted) setState(() => _micProblem = problem);
       return;
     }
     if (!mounted) return;
@@ -321,7 +333,17 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     } catch (error, stackTrace) {
       developer.log('record.startStream() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
       await _finishRecording(keepAudio: false);
-      if (mounted) setState(() => _micBlocked = true);
+      final problem = await _whyNoMic();
+      if (mounted) setState(() => _micProblem = problem);
+    }
+  }
+
+  /// A device without any mic is told so, not that its mic is blocked.
+  Future<_MicProblem> _whyNoMic() async {
+    try {
+      return (await _recorder.listInputDevices()).isEmpty ? _MicProblem.missing : _MicProblem.blocked;
+    } catch (_) {
+      return _MicProblem.blocked;
     }
   }
 
@@ -642,10 +664,10 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
         if (_attachments.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(6, 6, 6, 0), child: _AttachmentChips(attachments: _attachments, onRemove: _removeAttachment)),
         if (_isDragOver) Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text('Drop files here', style: theme.textTheme.labelSmall?.copyWith(color: accentColor), textAlign: TextAlign.center)),
         textField,
-        if (_micBlocked)
+        if (_micProblem case final problem?)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-            child: _MicBlockedCard(texts: widget.voiceProblemTexts, onTryAgain: _toggleRecording, onClose: () => setState(() => _micBlocked = false)),
+            child: _MicBlockedCard(problem: problem, texts: widget.voiceProblemTexts, onTryAgain: _toggleRecording, onClose: () => setState(() => _micProblem = null)),
           ),
         if (_voiceProblem != null)
           Padding(
@@ -687,10 +709,13 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
 // _MicBlockedCard
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// The mic could not be opened: what to do to allow it, where the app runs, and a button that opens it again.
-class _MicBlockedCard extends StatelessWidget {
-  const _MicBlockedCard({required this.texts, required this.onTryAgain, required this.onClose});
+enum _MicProblem { blocked, missing }
 
+/// The mic could not be opened: why (blocked, or none at all), what to do where the app runs, and a button that opens it again.
+class _MicBlockedCard extends StatelessWidget {
+  const _MicBlockedCard({required this.problem, required this.texts, required this.onTryAgain, required this.onClose});
+
+  final _MicProblem problem;
   final AgUiVoiceProblemTexts texts;
   final VoidCallback onTryAgain;
   final VoidCallback onClose;
@@ -710,9 +735,9 @@ class _MicBlockedCard extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(texts.noMic, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(problem == _MicProblem.missing ? texts.micMissing : texts.noMic, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 2),
-              Text(texts.noMicHowHere(), style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.35)),
+              Text(problem == _MicProblem.missing ? texts.micMissingHow : texts.noMicHowHere(), style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.35)),
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
