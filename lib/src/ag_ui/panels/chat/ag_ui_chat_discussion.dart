@@ -99,6 +99,7 @@ class AgUiChatDiscussion extends StatefulWidget {
     // AgUiChatInput passthrough
     this.enableVoice = true,
     this.onTranscribeAudio,
+    this.voiceProblemTexts = const AgUiVoiceProblemTexts(),
     this.enableAttachments = true,
     this.acceptedAttachmentExtensions,
     this.inputActionBar,
@@ -253,6 +254,9 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// [AgUiChatInput.onTranscribeAudio] — `null` shows the mic disabled with a
   /// tooltip (e.g. no speech-to-text credential configured).
   final Future<String?> Function(Uint8List audioBytes, String mimeType)? onTranscribeAudio;
+
+  /// [AgUiChatInput.voiceProblemTexts]: what the field says when dictation fails.
+  final AgUiVoiceProblemTexts voiceProblemTexts;
 
   /// Shows the file attachment button in [AgUiChatInput]. Forwarded to [AgUiChatInput.enableAttachments].
   final bool enableAttachments;
@@ -614,6 +618,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
                   hilHint: widget.hilInputHint,
                   enableVoice: widget.enableVoice,
                   onTranscribeAudio: widget.onTranscribeAudio,
+                  voiceProblemTexts: widget.voiceProblemTexts,
                   enableAttachments: widget.enableAttachments,
                   acceptedExtensions: widget.acceptedAttachmentExtensions,
                   actionBar: widget.inputActionBar,

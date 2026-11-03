@@ -65,6 +65,17 @@ final class AgUiImageBytesAttachment extends AgUiInputAttachment {
 ///   hint: 'Type a message…',
 /// )
 /// ```
+/// What the chat input says when dictation fails, in the app's own words.
+class AgUiVoiceProblemTexts {
+  const AgUiVoiceProblemTexts({this.notHeard = 'Could not hear that. Try again, or type it.', this.noMic = 'The mic could not be used. Allow it, or type your message.'});
+
+  /// Nothing was recorded, nothing came back from the transcription, or it failed.
+  final String notHeard;
+
+  /// The mic could not be opened: refused, or missing.
+  final String noMic;
+}
+
 class AgUiChatInput extends StatefulWidget {
   const AgUiChatInput({
     required this.onSend,
@@ -82,6 +93,7 @@ class AgUiChatInput extends StatefulWidget {
     this.isHil = false,
     this.enableVoice = true,
     this.onTranscribeAudio,
+    this.voiceProblemTexts = const AgUiVoiceProblemTexts(),
     this.enableAttachments = true,
     this.acceptedExtensions,
     this.actionBar,
@@ -139,6 +151,9 @@ class AgUiChatInput extends StatefulWidget {
   /// check (e.g. `client.voice.checkStatus()`) rather than passed unconditionally.
   final Future<String?> Function(Uint8List audioBytes, String mimeType)? onTranscribeAudio;
 
+  /// What the field says under the text when dictation fails: nothing was heard, or the mic could not be used.
+  final AgUiVoiceProblemTexts voiceProblemTexts;
+
   /// Shows the [+] attachment button and accepts drag-and-drop.
   final bool enableAttachments;
 
@@ -184,6 +199,9 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   final AudioRecorder _recorder = AudioRecorder();
   bool _isRecording = false;
   bool _isTranscribing = false;
+  // A dictation that failed says so in the field, until the next try or a word typed: a mic that just stops looks broken. In the
+  // field rather than a snackbar, which an app without a Scaffold would never show.
+  String? _voiceProblem;
   bool _voiceOverlayOpen = false;
   BuildContext? _voiceOverlayContext;
   BytesBuilder? _pcmChunks;
@@ -255,6 +273,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       _showVoiceUnavailableMessage();
       return;
     }
+    setState(() => _voiceProblem = null);
     _pcmChunks = BytesBuilder();
     _waveform.value = List<double>.filled(_waveformBarCount, 0.0);
     _recordingStopwatch = Stopwatch()..start();
@@ -272,7 +291,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     } catch (error, stackTrace) {
       developer.log('record.startStream() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
       await _finishRecording(keepAudio: false);
-      _showVoiceUnavailableMessage();
+      if (mounted) setState(() => _voiceProblem = widget.voiceProblemTexts.noMic);
     }
   }
 
@@ -307,7 +326,11 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     _closeVoiceOverlay();
 
     final onTranscribeAudio = widget.onTranscribeAudio;
-    if (!keepAudio || pcm == null || pcm.isEmpty || onTranscribeAudio == null) return;
+    if (!keepAudio || onTranscribeAudio == null) return;
+    if (pcm == null || pcm.isEmpty) {
+      if (mounted) setState(() => _voiceProblem = widget.voiceProblemTexts.notHeard);
+      return;
+    }
 
     final wavBytes = _pcm16ToWav(pcm, sampleRate: _sampleRate, numChannels: 1);
     if (mounted) setState(() => _isTranscribing = true);
@@ -319,12 +342,13 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
         final current = _ctrl.text;
         final merged = current.isEmpty ? trimmed : '$current $trimmed';
         _ctrl.value = TextEditingValue(text: merged, selection: TextSelection.collapsed(offset: merged.length));
+        setState(() => _voiceProblem = null);
+      } else {
+        setState(() => _voiceProblem = widget.voiceProblemTexts.notHeard);
       }
     } catch (error, stackTrace) {
       developer.log('onTranscribeAudio threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content: Text('Voice transcription failed.')));
-      }
+      if (mounted) setState(() => _voiceProblem = widget.voiceProblemTexts.notHeard);
     } finally {
       if (mounted) setState(() => _isTranscribing = false);
     }
@@ -524,7 +548,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
           maxLines: widget.maxLines,
           textInputAction: TextInputAction.send,
           onSubmitted: isEnabled ? (_) => _send() : null,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _voiceProblem = null),
           keyboardType: TextInputType.multiline,
           decoration: InputDecoration(hintText: widget.isHil ? widget.hilHint : widget.hint, hintStyle: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.55)), border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, disabledBorder: InputBorder.none, isDense: true, contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 4)),
         ),
@@ -579,6 +603,11 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
         if (_attachments.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(6, 6, 6, 0), child: _AttachmentChips(attachments: _attachments, onRemove: _removeAttachment)),
         if (_isDragOver) Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text('Drop files here', style: theme.textTheme.labelSmall?.copyWith(color: accentColor), textAlign: TextAlign.center)),
         textField,
+        if (_voiceProblem != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 2),
+            child: Semantics(liveRegion: true, child: Text(_voiceProblem!, key: const ValueKey('ag-chat-input-voice-problem'), style: theme.textTheme.bodySmall?.copyWith(color: cs.error))),
+          ),
         //Divider(height: 1, thickness: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
         toolbar,
       ],
