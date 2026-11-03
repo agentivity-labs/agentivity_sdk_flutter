@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart' show ValueListenable, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:record/record.dart';
@@ -67,13 +67,31 @@ final class AgUiImageBytesAttachment extends AgUiInputAttachment {
 /// ```
 /// What the chat input says when dictation fails, in the app's own words.
 class AgUiVoiceProblemTexts {
-  const AgUiVoiceProblemTexts({this.notHeard = 'Could not hear that. Try again, or type it.', this.noMic = 'The mic could not be used. Allow it, or type your message.'});
+  const AgUiVoiceProblemTexts({this.notHeard = 'Could not hear that. Try again, or type it.', this.noMic = 'The mic is blocked', this.noMicHow, this.tryAgain = 'Try again'});
 
   /// Nothing was recorded, nothing came back from the transcription, or it failed.
   final String notHeard;
 
-  /// The mic could not be opened: refused, or missing.
+  /// The title of the card shown when the mic could not be opened: refused, or missing.
   final String noMic;
+
+  /// How to allow it again, under that title; null: the steps of where the app runs (the browser, Windows, macOS). Nothing can
+  /// ask again once the mic was refused: only the person can allow it, there.
+  final String? noMicHow;
+
+  /// The button of that card that opens the mic again.
+  final String tryAgain;
+
+  /// [noMicHow], or the steps of where the app runs.
+  String noMicHowHere() =>
+      noMicHow ??
+      (kIsWeb
+          ? 'Your browser blocks the mic for this site. Click the icon left of the address, set Microphone to Allow, then try again.'
+          : switch (defaultTargetPlatform) {
+              TargetPlatform.windows => 'Windows blocks the mic for this app. Open Settings > Privacy & security > Microphone, allow it, then try again.',
+              TargetPlatform.macOS => 'macOS blocks the mic for this app. Open System Settings > Privacy & Security > Microphone, allow it, then try again.',
+              _ => 'The mic could not be opened. Allow it for this app in the settings of the device, then try again.',
+            });
 }
 
 class AgUiChatInput extends StatefulWidget {
@@ -202,6 +220,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   // A dictation that failed says so in the field, until the next try or a word typed: a mic that just stops looks broken. In the
   // field rather than a snackbar, which an app without a Scaffold would never show.
   String? _voiceProblem;
+  // The mic could not be opened: a card says how to allow it, and opens it again in one tap.
+  bool _micBlocked = false;
   bool _voiceOverlayOpen = false;
   BuildContext? _voiceOverlayContext;
   BytesBuilder? _pcmChunks;
@@ -273,11 +293,14 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       _showVoiceUnavailableMessage();
       return;
     }
-    setState(() => _voiceProblem = null);
+    setState(() {
+      _voiceProblem = null;
+      _micBlocked = false;
+    });
     // Asked first: on the web a refused mic does not make startStream throw — the recorder only logs it and gives a stream that
     // ends at once, and the person would watch a recording that hears nothing.
     if (!await _micAllowed()) {
-      if (mounted) setState(() => _voiceProblem = widget.voiceProblemTexts.noMic);
+      if (mounted) setState(() => _micBlocked = true);
       return;
     }
     if (!mounted) return;
@@ -298,7 +321,7 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     } catch (error, stackTrace) {
       developer.log('record.startStream() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
       await _finishRecording(keepAudio: false);
-      if (mounted) setState(() => _voiceProblem = widget.voiceProblemTexts.noMic);
+      if (mounted) setState(() => _micBlocked = true);
     }
   }
 
@@ -619,6 +642,11 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
         if (_attachments.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(6, 6, 6, 0), child: _AttachmentChips(attachments: _attachments, onRemove: _removeAttachment)),
         if (_isDragOver) Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text('Drop files here', style: theme.textTheme.labelSmall?.copyWith(color: accentColor), textAlign: TextAlign.center)),
         textField,
+        if (_micBlocked)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+            child: _MicBlockedCard(texts: widget.voiceProblemTexts, onTryAgain: _toggleRecording, onClose: () => setState(() => _micBlocked = false)),
+          ),
         if (_voiceProblem != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 2),
@@ -652,6 +680,55 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
     }
 
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [if (widget.actionBar != null) widget.actionBar!, container]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _MicBlockedCard
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The mic could not be opened: what to do to allow it, where the app runs, and a button that opens it again.
+class _MicBlockedCard extends StatelessWidget {
+  const _MicBlockedCard({required this.texts, required this.onTryAgain, required this.onClose});
+
+  final AgUiVoiceProblemTexts texts;
+  final VoidCallback onTryAgain;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const ValueKey('ag-chat-input-mic-blocked'),
+        padding: const EdgeInsets.fromLTRB(10, 8, 4, 6),
+        decoration: BoxDecoration(color: cs.errorContainer.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(6), border: Border.all(color: cs.error.withValues(alpha: 0.25))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(padding: const EdgeInsets.only(top: 2), child: Icon(Icons.mic_off_rounded, size: 18, color: cs.error)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(texts.noMic, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(texts.noMicHowHere(), style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.35)),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('ag-chat-input-mic-try-again'),
+                  onPressed: onTryAgain,
+                  icon: const Icon(Icons.mic_none_rounded, size: 16),
+                  label: Text(texts.tryAgain),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), visualDensity: VisualDensity.compact),
+                ),
+              ),
+            ]),
+          ),
+          IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded, size: 16), visualDensity: VisualDensity.compact, tooltip: MaterialLocalizations.of(context).closeButtonTooltip),
+        ]),
+      ),
+    );
   }
 }
 
