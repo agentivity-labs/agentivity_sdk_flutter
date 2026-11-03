@@ -15,14 +15,17 @@ import '../theme/ag_artifacts_theme.dart';
 ///     {"id": "start", "label": "Departure date", "type": "date"},
 ///     {"id": "travelers", "label": "Travelers", "type": "number"},
 ///     {"id": "car", "label": "Need a rental car?", "type": "boolean"},
+///     {"id": "pace", "label": "Pace", "type": "choice", "options": ["Relaxed", "Busy"]},
+///     {"id": "notes", "label": "Anything else?", "type": "multiline", "required": false},
 ///     {"id": "budget", "label": "Budget", "hint": "e.g. 1500", "required": false}
 ///   ],
 ///   "submitLabel": "Send"
 /// }
 /// ```
 ///
-/// `type` is `'text'` (default), `'date'` (a native date picker — always use this for a question about
-/// a date, never a free-text field), `'number'`, or `'boolean'` (Yes/No).
+/// `type` is `'text'` (default), `'multiline'` (a longer free answer), `'date'` (a native date picker —
+/// always use this for a question about a date, never a free-text field), `'number'`, `'boolean'`
+/// (Yes/No), or `'choice'` (one of `options`, as buttons).
 ///
 /// When submitted, calls `props['__onSubmit']` with a structured text response — a boolean answer reads
 /// as "Yes"/"No", a date answer as its ISO date (`2027-07-01`):
@@ -41,12 +44,14 @@ class AgQuestionForm extends StatefulWidget {
   State<AgQuestionForm> createState() => _AgQuestionFormState();
 }
 
-enum _QuestionType { text, date, number, boolean }
+enum _QuestionType { text, multiline, date, number, boolean, choice }
 
 _QuestionType _typeOf(Map<String, dynamic> q) => switch (q['type']) {
+  'multiline' => _QuestionType.multiline,
   'date' => _QuestionType.date,
   'number' => _QuestionType.number,
   'boolean' => _QuestionType.boolean,
+  'choice' => _QuestionType.choice,
   _ =>
     _QuestionType
         .text, // covers 'text' and anything an older/unknown SDK might send.
@@ -170,7 +175,42 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
     String? hint,
     bool isLast,
   ) {
+    // One answer among several, as a row of buttons that wraps: Yes/No, or the options of a choice.
+    Widget options(List<String> labels) {
+      Widget option(String label) {
+        final selected = _answers[i] == label;
+        return OutlinedButton(
+          onPressed: _submitted ? null : () => setState(() => _answers[i] = label),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: selected ? cs.primary : null,
+            foregroundColor: selected ? cs.onPrimary : cs.onSurface,
+            side: BorderSide(color: selected ? cs.primary : cs.outlineVariant),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            minimumSize: const Size(0, 34),
+          ),
+          child: Text(label, style: TextStyle(fontFamily: fontFamily, fontSize: 13)),
+        );
+      }
+
+      return Wrap(spacing: 8, runSpacing: 8, children: labels.map(option).toList());
+    }
+
     switch (_types[i]) {
+      case _QuestionType.choice:
+        final raw = _questions[i]['options'];
+        return options(raw is List ? raw.map((o) => o.toString()).toList() : const <String>[]);
+
+      case _QuestionType.multiline:
+        return TextField(
+          controller: _controllers[i],
+          enabled: !_submitted,
+          minLines: 3,
+          maxLines: 8,
+          decoration: _decoration(cs, hint: hint),
+          style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+          onChanged: (v) => _answers[i] = v,
+        );
+
       case _QuestionType.boolean:
         Widget option(String label) {
           final selected = _answers[i] == label;

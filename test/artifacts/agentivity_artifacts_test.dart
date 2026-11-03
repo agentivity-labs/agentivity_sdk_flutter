@@ -269,6 +269,29 @@ void main() {
       expect(find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1.0), findsNothing);
     });
 
+    testWidgets('a choice question offers its options as buttons, and reports the one picked', (tester) async {
+      String? submitted;
+      await tester.pumpWidget(_wrap(
+        AgQuestionForm(
+          props: {
+            'questions': [
+              {'id': 'platform', 'label': 'Platform', 'type': 'choice', 'options': ['LinkedIn', 'Instagram', 'X']},
+              {'id': 'idea', 'label': 'Post idea', 'type': 'multiline'},
+            ],
+            '__onSubmit': (String value) => submitted = value,
+          },
+        ),
+      ));
+
+      expect(find.widgetWithText(OutlinedButton, 'Instagram'), findsOneWidget);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Instagram'));
+      await tester.enterText(find.byType(TextField), 'Batch roasting\nonce a week');
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      expect(submitted, '• Platform → Instagram\n• Post idea → Batch roasting\nonce a week');
+    });
+
     testWidgets('a date question opens a native date picker instead of a text field, and reports the ISO date', (tester) async {
       String? submitted;
       await tester.pumpWidget(_wrap(

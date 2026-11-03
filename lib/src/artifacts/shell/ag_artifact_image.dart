@@ -114,6 +114,9 @@ class AgArtifactImage extends StatelessWidget {
         safe,
         fit: fit,
         semanticLabel: alt,
+        // On the web, the browser's own image element loads it: it carries the session cookie to the instance (a page on
+        // another port of the same site, as the Studio in development), where a script's request did not and was refused.
+        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
         errorBuilder: (_, _, _) => placeholder(),
         loadingBuilder: (_, child, progress) => progress == null ? child : ColoredBox(color: cs.surfaceContainerHigh),
       );
