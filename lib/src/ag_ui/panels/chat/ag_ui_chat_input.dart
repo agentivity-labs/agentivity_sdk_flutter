@@ -274,6 +274,13 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       return;
     }
     setState(() => _voiceProblem = null);
+    // Asked first: on the web a refused mic does not make startStream throw — the recorder only logs it and gives a stream that
+    // ends at once, and the person would watch a recording that hears nothing.
+    if (!await _micAllowed()) {
+      if (mounted) setState(() => _voiceProblem = widget.voiceProblemTexts.noMic);
+      return;
+    }
+    if (!mounted) return;
     _pcmChunks = BytesBuilder();
     _waveform.value = List<double>.filled(_waveformBarCount, 0.0);
     _recordingStopwatch = Stopwatch()..start();
@@ -292,6 +299,15 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
       developer.log('record.startStream() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
       await _finishRecording(keepAudio: false);
       if (mounted) setState(() => _voiceProblem = widget.voiceProblemTexts.noMic);
+    }
+  }
+
+  Future<bool> _micAllowed() async {
+    try {
+      return await _recorder.hasPermission();
+    } catch (error, stackTrace) {
+      developer.log('record.hasPermission() threw', name: 'AgUiChatInput', error: error, stackTrace: stackTrace);
+      return false;
     }
   }
 
