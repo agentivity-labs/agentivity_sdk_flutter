@@ -75,6 +75,25 @@ class EntitiesApi {
   }
 
   // ---------------------------------------------------------------------------
+  // Library search, in every folder
+  // GET /api/v1/library/search?q=
+  // ---------------------------------------------------------------------------
+
+  /// The agents, teams and workflows whose name, description or id holds [query], wherever they are, each with the
+  /// folders it is in (`Showcase / Media Content Creator`; empty at the top).
+  Future<List<({CatalogBrowseItem item, String path})>> searchLibrary(String query) async {
+    final response = await _c.get<Map<String, dynamic>>(
+      AgentivityHttpCore.v1('/library/search'),
+      queryParameters: <String, dynamic>{'q': query},
+    );
+    final itemsPayload = (response.data ?? const <String, dynamic>{})['items'];
+    return (itemsPayload is List ? itemsPayload : const <dynamic>[]).whereType<Map>().map((e) {
+      final map = Map<String, dynamic>.from(e);
+      return (item: CatalogBrowseItem.fromJson(map), path: map['path']?.toString() ?? '');
+    }).toList(growable: false);
+  }
+
+  // ---------------------------------------------------------------------------
   // Direct listing endpoints
   // ---------------------------------------------------------------------------
 

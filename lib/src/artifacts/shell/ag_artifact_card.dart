@@ -86,13 +86,20 @@ class AgArtifactCard extends StatelessWidget {
                     Icon(icon, size: 13, color: onBg.withValues(alpha: 0.5)),
                     const SizedBox(width: 6),
                   ],
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontFamily: t.fontFamily,
-                      fontSize: t.headerFontSize,
-                      fontWeight: FontWeight.w600,
-                      color: onBg.withValues(alpha: 0.85),
+                  // A long title (an image's caption) wraps on two lines then ends with an ellipsis, instead of overflowing the
+                  // card; it takes all the room the Spacer leaves, which is little more than nothing.
+                  Flexible(
+                    flex: 100,
+                    child: Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: t.fontFamily,
+                        fontSize: t.headerFontSize,
+                        fontWeight: FontWeight.w600,
+                        color: onBg.withValues(alpha: 0.85),
+                      ),
                     ),
                   ),
                   if (type != null) ...[

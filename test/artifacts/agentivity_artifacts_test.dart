@@ -27,6 +27,20 @@ void main() {
       expect(find.text('Test'), findsOneWidget);
       expect(find.text('content'), findsOneWidget);
     });
+
+    // Found in the chat: an image's caption as the card's title ran past its right edge.
+    testWidgets('a long title stays inside a narrow card', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const SizedBox(
+          width: 240,
+          child: AgArtifactCard(
+            title: 'Warm illustration of a cafe owner roasting coffee beans in a small roaster at the back of the shop',
+            child: Text('content'),
+          ),
+        ),
+      ));
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('AgArtifactViewer', () {
