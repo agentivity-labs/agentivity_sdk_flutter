@@ -34,6 +34,8 @@ AgentivityClient _client(_Instance instance, {String? apiKey}) {
 
 /// An app speaks for its user: each has their own conversations, with a token worth a few minutes.
 void main() {
+  demoVisitors();
+
   test('sends their token rather than the key', () async {
     final instance = _Instance((_) => _json([]));
     final client = _client(instance, apiKey: 'agp_page')..setUserToken(UserToken('agu_alice', expiresAt: _inMinutes(15)));
@@ -100,5 +102,35 @@ void main() {
     expect(instance.asked[3].path, contains('/api/v1/apps/hr/sign-out'));
     expect(instance.authorizationOf(3), 'Bearer agu_alice_2');
     expect(instance.authorizationOf(4), isNull);
+  });
+}
+
+class _Kept implements VisitorStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<void> write(String key, String value) async => values[key] = value;
+}
+
+void demoVisitors() {
+  test('a visitor of a demo is asked once, then kept for the next visit', () async {
+    var given = 0;
+    final instance = _Instance((options) => options.path.endsWith('/visitors')
+        ? _json({'token': 'agu_visitor_${++given}', 'expiresAt': _inMinutes(60 * 24 * 7).toUtc().toIso8601String()})
+        : _json([]));
+    final kept = _Kept();
+
+    final first = _client(instance)..apps.visitDemo('demo', store: kept);
+    await first.http.get<dynamic>('/api/v1/executions');
+    final again = _client(instance)..apps.visitDemo('demo', store: kept);
+    await again.http.get<dynamic>('/api/v1/executions');
+
+    expect(given, 1);
+    expect(instance.asked[0].path, contains('/api/v1/apps/demo/visitors'));
+    expect(instance.authorizationOf(1), 'Bearer agu_visitor_1');
+    expect(instance.authorizationOf(2), 'Bearer agu_visitor_1');
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../../core/http_core.dart';
@@ -13,6 +15,22 @@ class AppSignedIn {
   final String email;
 }
 
+/// Where an app keeps its visitor of a demo between visits (shared_preferences, a file…); in memory unless it gives one.
+abstract interface class VisitorStore {
+  Future<String?> read(String key);
+  Future<void> write(String key, String value);
+}
+
+class _MemoryVisitorStore implements VisitorStore {
+  final Map<String, String> _kept = {};
+
+  @override
+  Future<String?> read(String key) async => _kept[key];
+
+  @override
+  Future<void> write(String key, String value) async => _kept[key] = value;
+}
+
 /// The users of an App, each with their own conversations.
 ///
 /// - The App's own users: the App's **server** gets a token for each (`POST /api/v1/apps/{id}/user-tokens` with its secret, never
@@ -20,6 +38,7 @@ class AppSignedIn {
 ///   server for the next one.
 /// - People of the instance (an internal app): they sign in through the App ([signIn]); the client then renews their token itself
 ///   while their session lasts, and [signOut] ends it.
+/// - Visitors of a demo: anonymous, each app gets one of its own ([visitDemo]), kept while the demo keeps what they start.
 class AppsApi {
   AppsApi(this._c);
   final AgentivityHttpCore _c;
@@ -47,6 +66,31 @@ class AppsApi {
   Future<UserToken> renew(String appId) async {
     final response = await _c.post<Map<String, dynamic>>(_path(appId, '/user-tokens/renew'), options: _own(_c.userTokens.current));
     return UserToken.fromJson(response.data ?? const <String, dynamic>{});
+  }
+
+  /// Speaks for a visitor of the demo App [appId]: the one [store] already keeps, or a new one, kept for the days the demo keeps what
+  /// they start, so that they find their conversations again; a new one is asked when it ends or is refused.
+  /// POST /api/v1/apps/{appId}/visitors
+  void visitDemo(String appId, {VisitorStore? store}) {
+    final kept = store ?? _MemoryVisitorStore();
+    final key = 'agentivity.visitor.$appId';
+    _c.userTokens.set(null, () async {
+      // The one kept serves, unless it is the one the client now asks to replace (past its end, or refused).
+      final raw = await kept.read(key);
+      if (raw != null) {
+        try {
+          final known = UserToken.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+          final ends = known.expiresAt;
+          if (known.token != _c.userTokens.current && (ends == null || ends.difference(DateTime.now()) > const Duration(minutes: 1))) return known;
+        } on FormatException {
+          // Not what was kept: a new visitor.
+        }
+      }
+      final response = await _c.post<Map<String, dynamic>>(_path(appId, '/visitors'), options: _own(null));
+      final data = response.data ?? const <String, dynamic>{};
+      await kept.write(key, jsonEncode({'token': data['token'], 'expiresAt': data['expiresAt']}));
+      return UserToken.fromJson(data);
+    });
   }
 
   static Options _own(String? token) => Options(extra: {UserTokens.ownAuthorization: true}, headers: {'Authorization': token == null ? '' : 'Bearer $token'});
