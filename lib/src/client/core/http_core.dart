@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'api_contract.dart';
 import 'connection_monitor.dart';
 import 'slow_calls.dart';
+import 'user_tokens.dart';
 import 'waking_workspace.dart';
 import 'workspace_sleep.dart';
 
@@ -22,10 +23,17 @@ class AgentivityHttpCore {
     if (!_dio.interceptors.any((i) => i is SleepingWorkspaceInterceptor)) {
       _dio.interceptors.insert(0, SleepingWorkspaceInterceptor());
     }
+    userTokens = _dio.interceptors.whereType<UserTokens>().firstOrNull ?? UserTokens(_dio);
+    if (!_dio.interceptors.contains(userTokens)) {
+      _dio.interceptors.add(userTokens);
+    }
     if (!_dio.interceptors.any((i) => i is WakingWorkspaceInterceptor)) {
       _dio.interceptors.add(WakingWorkspaceInterceptor(_dio, mostWait: workspaceStartWait));
     }
   }
+
+  /// The user of an App the client speaks for, with their token (see [UserTokens]).
+  late final UserTokens userTokens;
 
   /// Told whenever a request gets no answer (the server cannot be reached) and whenever one does.
   final ConnectionMonitor? monitor;

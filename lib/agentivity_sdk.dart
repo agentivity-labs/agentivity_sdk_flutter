@@ -161,6 +161,8 @@ export 'src/artifacts/ag_ui/ag_artifacts_bundle.dart';
 // ── Client: platform API client ────────────────────────────────────────────────
 export 'src/client/app_client/agentivity_client.dart';
 export 'src/client/app_client/api/agentic_folders_api.dart';
+export 'src/client/app_client/api/apps_api.dart';
+export 'src/client/core/user_tokens.dart' show UserToken, RenewUserToken;
 export 'src/client/app_client/api/conversations_api.dart';
 export 'src/client/app_client/api/entities_api.dart';
 export 'src/client/app_client/api/runs_api.dart';
