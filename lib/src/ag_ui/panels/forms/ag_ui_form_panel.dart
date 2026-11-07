@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../artifacts/shared/ag_calendar.dart';
+
 import '../../theme/ag_theme_data.dart';
 import 'form_controller.dart';
 import 'form_models.dart';
@@ -225,24 +227,7 @@ class _FieldWidget extends StatelessWidget {
         final date = value is DateTime
             ? value as DateTime
             : DateTime.tryParse(value?.toString() ?? '');
-        return InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: date ?? DateTime.now(),
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2100),
-            );
-            if (picked != null) onChanged(picked.toIso8601String());
-          },
-          child: InputDecorator(
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), isDense: true),
-            child: Text(date != null
-                ? '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}'
-                : 'Select date'),
-          ),
-        );
+        return AgDateField(value: date, firstDate: DateTime(1900), lastDate: DateTime(2200), onChanged: (picked) => onChanged(agIsoDate(picked)));
 
       case FormFieldType.file:
       case FormFieldType.text:

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../shared/ag_calendar.dart';
 import '../shell/ag_artifact_card.dart';
 import '../theme/ag_artifacts_theme.dart';
 
@@ -44,54 +45,13 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
   static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   String _fmt(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
 
-  /// Clamps [date] inside [min, max] — the agent may send stale or inconsistent
-  /// minDate/maxDate bounds, and showDatePicker asserts (silently killing the dialog)
-  /// when initialDate falls outside [firstDate, lastDate].
-  static DateTime _clamp(DateTime date, DateTime min, DateTime max) =>
-      date.isBefore(min) ? min : (date.isAfter(max) ? max : date);
-
-  Future<void> _pickDate() async {
-    final mode = widget.props['mode'] as String? ?? 'single';
+  (DateTime, DateTime) _window() {
     final now = DateTime.now();
-    var minDate =
-        _parseDate(widget.props['minDate'] as String?) ??
-        DateTime(now.year - 2);
-    var maxDate =
-        _parseDate(widget.props['maxDate'] as String?) ??
-        DateTime(now.year + 3);
+    var minDate = _parseDate(widget.props['minDate'] as String?) ?? DateTime(now.year - 2);
+    var maxDate = _parseDate(widget.props['maxDate'] as String?) ?? DateTime(now.year + 3);
+    // The agent may send its bounds the wrong way round.
     if (maxDate.isBefore(minDate)) (minDate, maxDate) = (maxDate, minDate);
-
-    if (mode == 'range') {
-      final picked = await showDateRangePicker(
-        context: context,
-        firstDate: minDate,
-        lastDate: maxDate,
-        initialDateRange:
-            (_start != null && _end != null)
-                ? DateTimeRange(
-                  start: _clamp(_start!, minDate, maxDate),
-                  end: _clamp(_end!, minDate, maxDate),
-                )
-                : null,
-      );
-      if (picked != null)
-        setState(() {
-          _start = picked.start;
-          _end = picked.end;
-        });
-    } else {
-      final picked = await showDatePicker(
-        context: context,
-        initialDate: _clamp(_start ?? DateTime.now(), minDate, maxDate),
-        firstDate: minDate,
-        lastDate: maxDate,
-      );
-      if (picked != null)
-        setState(() {
-          _start = picked;
-          _end = null;
-        });
-    }
+    return (minDate, maxDate);
   }
 
   void _submit() {
@@ -118,12 +78,12 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
     final submitLabel = widget.props['submitLabel'] as String? ?? 'Confirm';
 
     String selectionText =
-        mode == 'range' ? 'Sélectionner une période' : 'Sélectionner une date';
+        mode == 'range' ? 'Choose the first day, then the last' : 'Choose a day';
     if (_start != null) {
       selectionText =
           mode == 'range' && _end != null
               ? '${_fmt(_start!)} → ${_fmt(_end!)}'
-              : _fmt(_start!);
+              : mode == 'range' ? '${_fmt(_start!)} → choose the last day' : _fmt(_start!);
     }
 
     return AgArtifactCard(
@@ -142,54 +102,43 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
             Text(question, style: TextStyle(fontSize: 13, color: cs.onSurface)),
             const SizedBox(height: 12),
           ],
-          GestureDetector(
-            onTap: _submitted ? null : _pickDate,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _start != null ? cs.primary : cs.outlineVariant,
-                  width: _start != null ? 1.5 : 1,
+          // The calendar of Agentivity, in the card: a tap chooses the day (a period: its first day, then its last).
+          Builder(builder: (context) {
+            final (minDate, maxDate) = _window();
+            return AgCalendar(
+              value: _start,
+              rangeMode: mode == 'range',
+              rangeStart: _start,
+              rangeEnd: _end,
+              firstDate: minDate,
+              lastDate: maxDate,
+              enabled: !_submitted,
+              onChanged: (d) => setState(() {
+                _start = d;
+                _end = null;
+              }),
+              onRangeChanged: (start, end) => setState(() {
+                _start = start;
+                _end = end;
+              }),
+            );
+          }),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.event_available_rounded, size: 16, color: _start != null ? cs.primary : cs.onSurface.withValues(alpha: 0.4)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  selectionText,
+                  style: TextStyle(fontSize: 13, fontWeight: _start != null ? FontWeight.w600 : FontWeight.w400, color: _start != null ? cs.onSurface : cs.onSurface.withValues(alpha: 0.5)),
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.calendar_month_rounded,
-                    size: 18,
-                    color:
-                        _start != null
-                            ? cs.primary
-                            : cs.onSurface.withValues(alpha: 0.4),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      selectionText,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color:
-                            _start != null
-                                ? cs.onSurface
-                                : cs.onSurface.withValues(alpha: 0.45),
-                      ),
-                    ),
-                  ),
-                  if (!_submitted)
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 18,
-                      color: cs.onSurface.withValues(alpha: 0.4),
-                    ),
-                ],
-              ),
-            ),
+            ],
           ),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: (_submitted || _start == null) ? null : _submit,
+            onPressed: (_submitted || _start == null || mode == 'range' && _end == null) ? null : _submit,
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 36),
               shape: RoundedRectangleBorder(

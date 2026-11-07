@@ -139,6 +139,7 @@ export 'src/artifacts/code/ag_json_viewer.dart';
 export 'src/artifacts/interaction/ag_choice_card.dart';
 export 'src/artifacts/interaction/ag_confirm_card.dart';
 export 'src/artifacts/interaction/ag_date_picker_card.dart';
+export 'src/artifacts/shared/ag_calendar.dart';
 export 'src/artifacts/interaction/ag_question_form.dart';
 export 'src/artifacts/interaction/ag_rating_card.dart';
 export 'src/artifacts/interaction/ag_summary_card.dart';

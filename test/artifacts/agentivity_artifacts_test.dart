@@ -306,7 +306,7 @@ void main() {
       expect(submitted, '• Platform → Instagram\n• Post idea → Batch roasting\nonce a week');
     });
 
-    testWidgets('a date question opens a native date picker instead of a text field, and reports the ISO date', (tester) async {
+    testWidgets('a date question opens the calendar of Agentivity instead of a text field, and reports the ISO date', (tester) async {
       String? submitted;
       await tester.pumpWidget(_wrap(
         AgQuestionForm(
@@ -319,11 +319,11 @@ void main() {
         ),
       ));
 
-      // No plain text entry — tapping the field opens the date picker.
+      // No plain text entry — tapping the field opens the calendar; a shortcut chooses today.
       await tester.tap(find.byType(TextField));
       await tester.pumpAndSettle();
-      expect(find.byType(DatePickerDialog), findsOneWidget);
-      await tester.tap(find.text('OK'));
+      expect(find.byType(AgCalendar), findsOneWidget);
+      await tester.tap(find.text('Today'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(FilledButton));

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../shared/ag_calendar.dart';
 import 'package:flutter/services.dart';
 
 import '../shell/ag_artifact_card.dart';
@@ -101,12 +103,7 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
   Future<void> _pickDate(int i) async {
     if (_submitted) return;
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 5),
-    );
+    final picked = await showAgDatePicker(context, initialDate: DateTime.tryParse(_answers[i] ?? ''), firstDate: DateTime(now.year - 1), lastDate: DateTime(now.year + 5));
     if (picked == null) return;
     final iso =
         '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
