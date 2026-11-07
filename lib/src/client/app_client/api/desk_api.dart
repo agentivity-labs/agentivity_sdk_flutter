@@ -43,6 +43,13 @@ class DeskApi {
     });
   }
 
+  /// Deletes a conversation the caller started: stopped first if it goes on, its questions go with it, and it leaves every list.
+  // DELETE /api/v1/desk/conversations/{executionId}
+  Future<void> deleteConversation(String executionId) async {
+    final id = _c.requireNormalizedId(executionId, label: 'Execution id');
+    await _c.delete<dynamic>(AgentivityHttpCore.v1('/desk/conversations/$id'));
+  }
+
   /// Adds a group of one's conversations ([groupId] null), or changes one: every conversation with one of [solutionIds] is in it by
   /// itself.
   // POST /api/v1/desk/groups, PUT /api/v1/desk/groups/{groupId}
