@@ -77,7 +77,8 @@ class EntityUnit {
       id: (json['id'] as String? ?? '').trim(),
       displayName: (json['displayName'] as String? ?? '').trim(),
       kind: (json['kind'] as String? ?? '').trim().toLowerCase(),
-      description: _nullableTrimmed(json['description']),
+      // The service calls it the role: what the element does.
+      description: _nullableTrimmed(json['role']) ?? _nullableTrimmed(json['description']),
       inputs: parsePorts(json['inputs']),
       outputs: parsePorts(json['outputs']),
       folderName: _nullableTrimmed(json['folderName']),

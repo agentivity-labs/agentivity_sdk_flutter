@@ -111,4 +111,9 @@ void main() {
     expect(setup.copyWith(shown: ['a2']).shown, ['a2']);
     expect(setup.copyWith(shown: ['a2']).copyWith(showAll: true).shown, isNull);
   });
+
+  test('an element says what it does: the service calls it its role', () {
+    final unit = EntityUnit.fromJson({'id': 'a1', 'displayName': 'Invoice Clerk', 'kind': 'agent', 'role': 'Reads the supplier invoices you upload.'});
+    expect(unit.description, 'Reads the supplier invoices you upload.');
+  });
 }
