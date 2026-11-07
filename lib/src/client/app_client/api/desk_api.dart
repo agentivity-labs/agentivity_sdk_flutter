@@ -1,4 +1,5 @@
 import '../../core/http_core.dart';
+import '../domain/cockpit_models.dart';
 import '../domain/desk_models.dart';
 
 /// A person's own work on an instance, as Agentivity Desk shows it (it works only with Solutions): how the Desk looks and what it publishes, their conversations
@@ -79,6 +80,23 @@ class DeskApi {
   Future<DeskGains> gains({String? cockpitId}) async {
     final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/gains'), queryParameters: {if (cockpitId != null) 'cockpit': cockpitId});
     return DeskGains.fromJson(response.data ?? const {});
+  }
+
+  /// A cockpit as the caller sees it: as published; or its [draft], for who may change it (a preview from the Studio).
+  // GET /api/v1/desk/cockpits/{cockpitId}
+  Future<CockpitView> cockpit(String cockpitId, {bool draft = false}) async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/cockpits/${Uri.encodeComponent(cockpitId)}'), queryParameters: {if (draft) 'draft': true});
+    return CockpitView.fromJson(response.data ?? const {});
+  }
+
+  /// What a block of a cockpit shows of a Data Table: its figure, or its rows.
+  // GET /api/v1/desk/cockpits/{cockpitId}/blocks/{blockId}
+  Future<CockpitBlockData> cockpitBlock(String cockpitId, String blockId, {bool draft = false}) async {
+    final response = await _c.get<Map<String, dynamic>>(
+      AgentivityHttpCore.v1('/desk/cockpits/${Uri.encodeComponent(cockpitId)}/blocks/${Uri.encodeComponent(blockId)}'),
+      queryParameters: {if (draft) 'draft': true},
+    );
+    return CockpitBlockData.fromJson(response.data ?? const {});
   }
 
   /// The questions and approvals waiting for the caller's answer, newest first.

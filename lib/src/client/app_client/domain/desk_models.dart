@@ -103,7 +103,7 @@ class DeskBrand {
 /// A cockpit: a page of the Desk for a department (Finance, HR…), with the elements it starts.
 @immutable
 class DeskCockpit {
-  const DeskCockpit({required this.id, required this.name, this.intro, this.colour, this.entityIds = const [], this.waiting = 0});
+  const DeskCockpit({required this.id, required this.name, this.intro, this.colour, this.entityIds = const [], this.waiting = 0, this.mayEdit = false});
 
   final String id;
   final String name;
@@ -114,6 +114,9 @@ class DeskCockpit {
   /// How many of the caller's conversations in it wait for their answer.
   final int waiting;
 
+  /// Whether the caller may change it (one of its owners, or who manages the cockpits), in the Studio.
+  final bool mayEdit;
+
   factory DeskCockpit.fromJson(Map<String, dynamic> json) => DeskCockpit(
         id: json['id']?.toString() ?? '',
         name: json['name']?.toString() ?? '',
@@ -121,12 +124,8 @@ class DeskCockpit {
         colour: _text(json['colour']),
         entityIds: _strings(json['entityIds']),
         waiting: (json['waiting'] as num?)?.toInt() ?? 0,
+        mayEdit: json['mayEdit'] == true,
       );
-
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'intro': intro, 'colour': colour, 'entityIds': entityIds};
-
-  DeskCockpit copyWith({String? name, String? intro, String? colour, List<String>? entityIds}) =>
-      DeskCockpit(id: id, name: name ?? this.name, intro: intro ?? this.intro, colour: colour ?? this.colour, entityIds: entityIds ?? this.entityIds, waiting: waiting);
 }
 
 /// What the Desk says of an element: its suggestions, and the time it saves each time (set by hand, or measured).
@@ -220,11 +219,10 @@ class DeskOverview {
 /// How the Desk of the workspace looks and what it shows, as the Studio sets it.
 @immutable
 class DeskSetup {
-  const DeskSetup({this.brand = DeskBrand.none, this.welcome, this.cockpits = const [], this.shown, this.entities = const {}});
+  const DeskSetup({this.brand = DeskBrand.none, this.welcome, this.shown, this.entities = const {}});
 
   final DeskBrand brand;
   final String? welcome;
-  final List<DeskCockpit> cockpits;
 
   /// The elements published to the Desk; null, all of them.
   final List<String>? shown;
@@ -235,7 +233,6 @@ class DeskSetup {
     return DeskSetup(
       brand: DeskBrand.fromJson(_map(json['brand'])),
       welcome: _text(json['welcome']),
-      cockpits: _maps(json['cockpits']).map(DeskCockpit.fromJson).toList(growable: false),
       shown: shown is List ? _strings(shown) : null,
       entities: _map(json['entities']).map((id, info) => MapEntry(id, DeskEntityInfo.fromJson(_map(info)))),
     );
@@ -244,15 +241,13 @@ class DeskSetup {
   Map<String, dynamic> toJson() => {
         'brand': brand.toJson(),
         'welcome': welcome,
-        'cockpits': cockpits.map((c) => c.toJson()).toList(),
         'shown': shown,
         'entities': entities.map((id, info) => MapEntry(id, info.toJson())),
       };
 
-  DeskSetup copyWith({DeskBrand? brand, String? welcome, List<DeskCockpit>? cockpits, List<String>? shown, bool showAll = false, Map<String, DeskEntityInfo>? entities}) => DeskSetup(
+  DeskSetup copyWith({DeskBrand? brand, String? welcome, List<String>? shown, bool showAll = false, Map<String, DeskEntityInfo>? entities}) => DeskSetup(
         brand: brand ?? this.brand,
         welcome: welcome ?? this.welcome,
-        cockpits: cockpits ?? this.cockpits,
         shown: showAll ? null : shown ?? this.shown,
         entities: entities ?? this.entities,
       );

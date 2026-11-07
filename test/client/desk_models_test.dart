@@ -95,9 +95,6 @@ void main() {
   test('the setup of the Desk goes back as it came', () {
     final setup = DeskSetup.fromJson({
       'brand': {'name': 'Acme'},
-      'cockpits': [
-        {'id': 'hr', 'name': 'HR', 'entityIds': ['a2']},
-      ],
       'shown': null,
       'entities': {
         'a2': {'starters': [], 'minutesSaved': 10},
@@ -106,7 +103,7 @@ void main() {
 
     final json = setup.toJson();
     expect(json['shown'], isNull);
-    expect((json['cockpits'] as List).single['name'], 'HR');
+    expect(json.containsKey('cockpits'), isFalse);
     expect((json['entities'] as Map)['a2']['minutesSaved'], 10);
     expect(setup.copyWith(shown: ['a2']).shown, ['a2']);
     expect(setup.copyWith(shown: ['a2']).copyWith(showAll: true).shown, isNull);
@@ -115,5 +112,64 @@ void main() {
   test('an element says what it does: the service calls it its role', () {
     final unit = EntityUnit.fromJson({'id': 'a1', 'displayName': 'Invoice Clerk', 'kind': 'agent', 'role': 'Reads the supplier invoices you upload.'});
     expect(unit.description, 'Reads the supplier invoices you upload.');
+  });
+
+  test('a cockpit is made of blocks, each set as it says, and goes back as it came', () {
+    final view = CockpitView.fromJson({
+      'id': 'finance',
+      'name': 'Finance',
+      'colour': '#1F8A5B',
+      'entityIds': ['a1'],
+      'mayEdit': true,
+      'blocks': [
+        {
+          'id': 'hero',
+          'type': 'hero',
+          'span': 12,
+          'settings': {'text': 'Invoices, checked.'},
+        },
+        {
+          'id': 'tools',
+          'type': 'links',
+          'span': 6,
+          'settings': {
+            'links': [
+              {'label': 'Expenses', 'url': 'https://example.test/expenses'},
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(view.mayEdit, isTrue);
+    expect(view.content.intro, 'Invoices, checked.');
+    final links = view.content.blocks[1];
+    expect(links.span, 6);
+    expect(links.links.single.url, 'https://example.test/expenses');
+    final changed = links.withSetting('title', 'Tools').withSetting('title', ' ');
+    expect(changed.settings.containsKey('title'), isFalse);
+    expect(changed, links);
+    expect(CockpitContent.fromJson(view.content.toJson()).blocks.length, 2);
+
+    final managed = ManagedCockpit.fromJson({
+      'id': 'finance',
+      'draft': view.content.toJson(),
+      'published': null,
+      'hasChanges': true,
+      'owners': [
+        {'id': 'p1', 'name': 'Claire Martin', 'email': 'claire@example.test'},
+      ],
+    });
+    expect(managed.isPublished, isFalse);
+    expect(managed.owners.single.label, 'Claire Martin');
+    final data = CockpitBlockData.fromJson({
+      'columns': ['supplier', 'amount'],
+      'rows': [
+        ['Kestrel', '40'],
+      ],
+      'total': 3,
+    });
+    expect(data.rows.single.first, 'Kestrel');
+    expect(data.total, 3);
   });
 }
