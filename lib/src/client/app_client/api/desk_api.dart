@@ -1,4 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+
 import '../../core/http_core.dart';
+import '../../core/streaming_request.dart';
 import '../domain/cockpit_models.dart';
 import '../domain/desk_models.dart';
 
@@ -16,6 +22,26 @@ class DeskApi {
   Future<DeskOverview> overview() async {
     final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk'));
     return DeskOverview.fromJson(response.data ?? const {});
+  }
+
+  // GET /api/v1/desk/changes (text/event-stream)
+  /// Each time something the Desk shows changes (a conversation that waits, ends, is archived, shared, deleted; a group, a
+  /// cockpit), its number: the Desk then reads itself again. The first comes at once. The stream ends when the line is cut or
+  /// [cancelToken] is cancelled; listening again is the caller's.
+  Stream<int> changes({CancelToken? cancelToken}) async* {
+    final body = await openStreamingRequest(
+      _c.dio,
+      'GET',
+      AgentivityHttpCore.v1('/desk/changes'),
+      headers: {Headers.acceptHeader: 'text/event-stream', 'Cache-Control': 'no-cache'},
+      cancelToken: cancelToken,
+    );
+    final lines = body.stream.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter());
+    await for (final line in lines) {
+      if (!line.startsWith('data:')) continue;
+      final data = jsonDecode(line.substring(5).trim());
+      if (data is Map && data['version'] is num) yield (data['version'] as num).toInt();
+    }
   }
 
   // GET /api/v1/desk/conversations
