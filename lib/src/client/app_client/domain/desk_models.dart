@@ -176,6 +176,7 @@ class DeskOverview {
     this.waiting = 0,
     this.conversations = 0,
     this.archived = 0,
+    this.waitingIds = const {},
     this.emailQuestions = true,
   });
 
@@ -192,6 +193,9 @@ class DeskOverview {
   final int waiting;
   final int conversations;
   final int archived;
+
+  /// The conversations of the Desk that wait for the caller, archived ones aside: [waiting] of them.
+  final Set<String> waitingIds;
 
   /// Whether the caller is told by e-mail of a question asked to them.
   final bool emailQuestions;
@@ -211,6 +215,7 @@ class DeskOverview {
       waiting: (counts['waiting'] as num?)?.toInt() ?? 0,
       conversations: (counts['conversations'] as num?)?.toInt() ?? 0,
       archived: (counts['archived'] as num?)?.toInt() ?? 0,
+      waitingIds: json['waitingIds'] is List ? _strings(json['waitingIds']).toSet() : const {},
       emailQuestions: json['emailQuestions'] != false,
     );
   }
