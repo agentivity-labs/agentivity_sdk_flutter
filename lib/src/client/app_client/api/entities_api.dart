@@ -18,9 +18,11 @@ class EntitiesApi {
   // GET /api/v1/entities?kind=agent|team|WorkflowEntity
   // ---------------------------------------------------------------------------
 
-  Future<List<EntityUnit>> fetchEntities({String? kind}) async {
+  /// [tag]: only those with this tag (`solution` for the Solutions), whatever its case.
+  Future<List<EntityUnit>> fetchEntities({String? kind, String? tag}) async {
     final queryParameters = <String, dynamic>{
       if (kind != null && kind.trim().isNotEmpty) 'kind': kind.trim(),
+      if (tag != null && tag.trim().isNotEmpty) 'tag': tag.trim(),
     };
     final response = await _c.get<List<dynamic>>(
       AgentivityHttpCore.v1('/entities'),

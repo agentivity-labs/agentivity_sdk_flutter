@@ -142,45 +142,29 @@ class DeskEntityInfo {
   Map<String, dynamic> toJson() => {'starters': starters, 'minutesSaved': minutesSaved};
 }
 
-/// What fills a group by itself: what a conversation talks to, and words of its title or first message.
-@immutable
-class DeskGroupRule {
-  const DeskGroupRule({this.entityId, this.contains});
-
-  final String? entityId;
-  final String? contains;
-
-  bool get isEmpty => entityId == null && (contains ?? '').trim().isEmpty;
-
-  factory DeskGroupRule.fromJson(Map<String, dynamic> json) => DeskGroupRule(entityId: _text(json['entityId']), contains: _text(json['contains']));
-
-  Map<String, dynamic> toJson() => {'entityId': entityId, 'contains': contains};
-}
-
-/// A group of the caller's conversations: a name, a colour, and the rule that fills it, if any.
+/// A group of the caller's conversations: a name, a colour, and the Solutions whose conversations are in it by themselves (others
+/// are put in by hand).
 @immutable
 class DeskGroup {
-  const DeskGroup({required this.id, required this.name, required this.colour, this.rule, this.count = 0});
+  const DeskGroup({required this.id, required this.name, required this.colour, this.solutionIds = const [], this.count = 0});
 
   final String id;
   final String name;
   final String colour;
-  final DeskGroupRule? rule;
+  final List<String> solutionIds;
   final int count;
 
-  factory DeskGroup.fromJson(Map<String, dynamic> json) {
-    final rule = json['rule'];
-    return DeskGroup(
-      id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
-      colour: json['colour']?.toString() ?? '#5B3BD6',
-      rule: rule is Map ? DeskGroupRule.fromJson(Map<String, dynamic>.from(rule)) : null,
-      count: (json['count'] as num?)?.toInt() ?? 0,
-    );
-  }
+  factory DeskGroup.fromJson(Map<String, dynamic> json) => DeskGroup(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        colour: json['colour']?.toString() ?? '#5B3BD6',
+        solutionIds: _strings(json['solutionIds']),
+        count: (json['count'] as num?)?.toInt() ?? 0,
+      );
 }
 
-/// What the Desk shows to the caller when it opens: its look, the cockpits and elements published to them, their groups and counts.
+/// What the Desk shows to the caller when it opens: its look, the cockpits and the Solutions published to it, their groups and counts.
+/// The Desk works only with Solutions (the agents, teams and workflows tagged "solution").
 @immutable
 class DeskOverview {
   const DeskOverview({

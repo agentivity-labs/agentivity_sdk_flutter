@@ -59,7 +59,7 @@ void main() {
         'a1': {'starters': ['Check an invoice'], 'minutesSaved': 25},
       },
       'groups': [
-        {'id': 'g1', 'name': 'Year-end close', 'colour': '#C26A00', 'rule': {'contains': 'close'}, 'count': 14},
+        {'id': 'g1', 'name': 'Year-end close', 'colour': '#C26A00', 'solutionIds': ['a1'], 'count': 14},
       ],
       'counts': {'waiting': 3, 'conversations': 312, 'archived': 4},
       'emailQuestions': false,
@@ -70,7 +70,7 @@ void main() {
     expect(overview.publishes('a1'), isTrue);
     expect(overview.publishes('a2'), isFalse);
     expect(overview.entities['a1']!.starters, ['Check an invoice']);
-    expect(overview.groups.single.rule!.contains, 'close');
+    expect(overview.groups.single.solutionIds, ['a1']);
     expect(overview.conversations, 312);
     expect(overview.emailQuestions, isFalse);
     expect(const DeskOverview().publishes('anything'), isTrue);

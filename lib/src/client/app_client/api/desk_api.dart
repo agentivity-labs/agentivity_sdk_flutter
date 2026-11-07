@@ -1,7 +1,7 @@
 import '../../core/http_core.dart';
 import '../domain/desk_models.dart';
 
-/// A person's own work on an instance, as Agentivity Desk shows it: how the Desk looks and what it publishes, their conversations
+/// A person's own work on an instance, as Agentivity Desk shows it (it works only with Solutions): how the Desk looks and what it publishes, their conversations
 /// as they keep them (searched, filtered, a page at a time; renamed, pinned, archived, in groups of theirs), what waits for their
 /// answer, the people a conversation is shared with, and the time the teams saved them. Changing how the Desk looks is for who
 /// changes the settings of the instance ([setup], [saveSetup]).
@@ -43,10 +43,11 @@ class DeskApi {
     });
   }
 
-  /// Adds a group of one's conversations ([groupId] null), or changes one.
+  /// Adds a group of one's conversations ([groupId] null), or changes one: every conversation with one of [solutionIds] is in it by
+  /// itself.
   // POST /api/v1/desk/groups, PUT /api/v1/desk/groups/{groupId}
-  Future<void> saveGroup({String? groupId, required String name, required String colour, DeskGroupRule? rule}) async {
-    final data = {'name': name, 'colour': colour, 'rule': rule == null || rule.isEmpty ? null : rule.toJson()};
+  Future<void> saveGroup({String? groupId, required String name, required String colour, List<String> solutionIds = const []}) async {
+    final data = {'name': name, 'colour': colour, 'solutionIds': solutionIds};
     if (groupId == null) {
       await _c.post<dynamic>(AgentivityHttpCore.v1('/desk/groups'), data: data);
     } else {
