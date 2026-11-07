@@ -368,6 +368,7 @@ class ExecutionRecord {
     this.channels = const {},
     this.currentRunId,
     this.createdAt,
+    this.streamId,
   });
 
   final String executionId;
@@ -379,6 +380,12 @@ class ExecutionRecord {
   final Map<String, String> channels;
   final String? currentRunId;
   final DateTime? createdAt;
+
+  /// The stream it is followed on (`/api/v1/streams/{streamId}/events`) while it goes on.
+  final String? streamId;
+
+  /// Whether it has ended: it says nothing more on its stream.
+  bool get ended => const {'completed', 'failed', 'cancelled', 'closed'}.contains(state.toLowerCase());
 
   /// Convenience: returns the default chat thread ID if present.
   String? get chatThreadId => channels['chat'];
@@ -399,6 +406,7 @@ class ExecutionRecord {
       channels: channels,
       currentRunId: _nullableTrimmed(json['currentRunId']),
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+      streamId: _nullableTrimmed(json['streamId']),
     );
   }
 }

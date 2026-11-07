@@ -1,0 +1,119 @@
+import '../../core/http_core.dart';
+import '../domain/desk_models.dart';
+
+/// A person's own work on an instance, as Agentivity Desk shows it: how the Desk looks and what it publishes, their conversations
+/// as they keep them (searched, filtered, a page at a time; renamed, pinned, archived, in groups of theirs), what waits for their
+/// answer, the people a conversation is shared with, and the time the teams saved them. Changing how the Desk looks is for who
+/// changes the settings of the instance ([setup], [saveSetup]).
+///
+/// Part of [AgentivityPlatformClient].
+class DeskApi {
+  DeskApi(this._c);
+  final AgentivityHttpCore _c;
+
+  // GET /api/v1/desk
+  Future<DeskOverview> overview() async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk'));
+    return DeskOverview.fromJson(response.data ?? const {});
+  }
+
+  // GET /api/v1/desk/conversations
+  Future<DeskConversationPage> conversations([DeskConversationQuery query = const DeskConversationQuery()]) async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/conversations'), queryParameters: query.toQuery());
+    return DeskConversationPage.fromJson(response.data ?? const {});
+  }
+
+  // GET /api/v1/desk/conversations/{executionId}
+  Future<DeskConversation> conversation(String executionId) async {
+    final id = _c.requireNormalizedId(executionId, label: 'Execution id');
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/conversations/$id'));
+    return DeskConversation.fromJson(response.data ?? const {});
+  }
+
+  /// Renames, pins, archives or puts in a group (an empty [groupId]: in none) the conversations [executionIds]. An empty [title]
+  /// gives a conversation its first words again. What is null stays as it is.
+  // POST /api/v1/desk/conversations/marks
+  Future<void> mark(List<String> executionIds, {String? title, bool? pinned, bool? archived, String? groupId}) async {
+    await _c.post<dynamic>(AgentivityHttpCore.v1('/desk/conversations/marks'), data: {
+      'executionIds': executionIds,
+      if (title != null) 'title': title,
+      if (pinned != null) 'pinned': pinned,
+      if (archived != null) 'archived': archived,
+      if (groupId != null) 'groupId': groupId,
+    });
+  }
+
+  /// Adds a group of one's conversations ([groupId] null), or changes one.
+  // POST /api/v1/desk/groups, PUT /api/v1/desk/groups/{groupId}
+  Future<void> saveGroup({String? groupId, required String name, required String colour, DeskGroupRule? rule}) async {
+    final data = {'name': name, 'colour': colour, 'rule': rule == null || rule.isEmpty ? null : rule.toJson()};
+    if (groupId == null) {
+      await _c.post<dynamic>(AgentivityHttpCore.v1('/desk/groups'), data: data);
+    } else {
+      await _c.put<dynamic>(AgentivityHttpCore.v1('/desk/groups/${Uri.encodeComponent(groupId)}'), data: data);
+    }
+  }
+
+  /// Deletes a group of one's conversations: they stay, in no group.
+  // DELETE /api/v1/desk/groups/{groupId}
+  Future<void> deleteGroup(String groupId) async {
+    await _c.delete<dynamic>(AgentivityHttpCore.v1('/desk/groups/${Uri.encodeComponent(groupId)}'));
+  }
+
+  /// Whether one is told by e-mail of a question asked to them.
+  // PUT /api/v1/desk/notifications
+  Future<void> setEmailQuestions(bool email) async {
+    await _c.put<dynamic>(AgentivityHttpCore.v1('/desk/notifications'), data: {'emailQuestions': email});
+  }
+
+  /// The time the teams saved the caller; with [cockpitId], also what the teams of that cockpit saved this month.
+  // GET /api/v1/desk/gains
+  Future<DeskGains> gains({String? cockpitId}) async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/gains'), queryParameters: {if (cockpitId != null) 'cockpit': cockpitId});
+    return DeskGains.fromJson(response.data ?? const {});
+  }
+
+  /// The questions and approvals waiting for the caller's answer, newest first.
+  // GET /api/v1/questions
+  Future<List<DeskQuestion>> questions() async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/questions'));
+    final list = (response.data ?? const {})['questions'];
+    return list is List ? list.whereType<Map>().map((q) => DeskQuestion.fromJson(Map<String, dynamic>.from(q))).toList(growable: false) : const [];
+  }
+
+  /// The people a conversation is shared with, and those a question of it is asked to.
+  // GET /api/v1/executions/{executionId}/participants
+  Future<List<DeskParticipant>> participants(String executionId) async {
+    final id = _c.requireNormalizedId(executionId, label: 'Execution id');
+    final data = (await _c.get<dynamic>(AgentivityHttpCore.v1('/executions/$id/participants'))).data;
+    final list = data is Map ? data['participants'] : data;
+    return list is List ? list.whereType<Map>().map((p) => DeskParticipant.fromJson(Map<String, dynamic>.from(p))).toList(growable: false) : const [];
+  }
+
+  /// Shares a conversation with [person] (their e-mail or id): to read it, or to reply in it too.
+  // PUT /api/v1/executions/{executionId}/participants/{person}
+  Future<void> share(String executionId, String person, {required bool mayReply}) async {
+    final id = _c.requireNormalizedId(executionId, label: 'Execution id');
+    await _c.put<dynamic>(AgentivityHttpCore.v1('/executions/$id/participants/${Uri.encodeComponent(person)}'), data: {'mayReply': mayReply});
+  }
+
+  /// Stops sharing a conversation with [personId]; for oneself, leaves it.
+  // DELETE /api/v1/executions/{executionId}/participants/{personId}
+  Future<void> unshare(String executionId, String personId) async {
+    final id = _c.requireNormalizedId(executionId, label: 'Execution id');
+    await _c.delete<dynamic>(AgentivityHttpCore.v1('/executions/$id/participants/${Uri.encodeComponent(personId)}'));
+  }
+
+  /// How the Desk looks and what it shows, to set it (who changes the settings of the instance).
+  // GET /api/v1/desk/setup
+  Future<DeskSetup> setup() async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/setup'));
+    return DeskSetup.fromJson(response.data ?? const {});
+  }
+
+  // PUT /api/v1/desk/setup
+  Future<DeskSetup> saveSetup(DeskSetup setup) async {
+    final response = await _c.put<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/setup'), data: setup.toJson());
+    return DeskSetup.fromJson(response.data ?? const {});
+  }
+}

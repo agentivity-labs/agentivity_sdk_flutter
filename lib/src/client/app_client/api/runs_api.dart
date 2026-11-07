@@ -89,12 +89,14 @@ class RunsApi {
     required String requestId,
     required String response,
     String? source,
+    /// For an approval answered in one click: `approved` or `rejected`.
+    String? outcome,
   }) async {
     final normalizedExecution = _c.requireNormalizedId(executionId, label: 'Execution id');
     final normalizedRequest = _c.requireNormalizedId(requestId, label: 'Request id');
     final result = await _c.post<Map<String, dynamic>>(
       AgentivityHttpCore.v1('/executions/$normalizedExecution/respond'),
-      data: <String, dynamic>{'requestId': normalizedRequest, 'response': response, if (source != null) 'source': source},
+      data: <String, dynamic>{'requestId': normalizedRequest, 'response': response, if (source != null) 'source': source, if (outcome != null) 'outcome': outcome},
     );
     return HilRespondResult.fromJson(result.data ?? const <String, dynamic>{});
   }

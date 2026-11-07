@@ -160,10 +160,12 @@ export 'src/artifacts/ag_ui/ag_artifacts_bundle.dart';
 
 // ── Client: platform API client ────────────────────────────────────────────────
 export 'src/client/app_client/agentivity_client.dart';
+export 'src/client/app_client/api/account_api.dart';
 export 'src/client/app_client/api/agentic_folders_api.dart';
 export 'src/client/app_client/api/apps_api.dart';
 export 'src/client/core/user_tokens.dart' show UserToken, RenewUserToken;
 export 'src/client/app_client/api/conversations_api.dart';
+export 'src/client/app_client/api/desk_api.dart';
 export 'src/client/app_client/api/entities_api.dart';
 export 'src/client/app_client/api/runs_api.dart';
 export 'src/client/app_client/api/voice_api.dart';
@@ -172,6 +174,7 @@ export 'src/client/app_client/domain/agent_models.dart';
 export 'src/client/app_client/domain/agentivity_entity.dart';
 export 'src/client/app_client/domain/canvas_annotation_shared.dart';
 export 'src/client/app_client/domain/chat_models.dart';
+export 'src/client/app_client/domain/desk_models.dart';
 export 'src/client/app_client/domain/entity_models.dart';
 export 'src/client/app_client/domain/execution_models.dart';
 export 'src/client/app_client/domain/interaction_models.dart';
@@ -195,6 +198,8 @@ export 'src/client/extras/api/svg_icons_api.dart';
 export 'src/client/extras/domain/ag_ui_bundle_models.dart';
 
 import 'src/client/app_client/agentivity_client.dart';
+import 'src/client/app_client/api/account_api.dart';
+import 'src/client/app_client/api/desk_api.dart';
 import 'src/client/app_client/api/uploads_api.dart';
 import 'src/client/app_client/api/voice_api.dart';
 import 'src/client/extras/api/ag_ui_bundles_api.dart';
@@ -222,6 +227,8 @@ class AgentivityPlatformClient extends AgentivityClient {
     svgIcons = SvgIconsApi(http);
     voice = VoiceApi(http);
     uploads = UploadsApi(http);
+    account = AccountApi(http);
+    desk = DeskApi(http);
   }
 
   /// AG-UI chat channel: open a streaming run against a chat context/thread.
@@ -238,4 +245,11 @@ class AgentivityPlatformClient extends AgentivityClient {
 
   /// File uploads: hand a run a document (a CV, a contract…) it can read later by id.
   late final UploadsApi uploads;
+
+  /// Signing in as a person: who is signed in, signing in and out, an invitation, a new password, a new address.
+  late final AccountApi account;
+
+  /// A person's own work, as Agentivity Desk shows it: their conversations as they keep them, their groups, what waits for their
+  /// answer, sharing, the time saved, and how the Desk looks.
+  late final DeskApi desk;
 }
