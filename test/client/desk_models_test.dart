@@ -150,6 +150,12 @@ void main() {
     expect(changed.settings.containsKey('title'), isFalse);
     expect(changed, links);
     expect(CockpitContent.fromJson(view.content.toJson()).blocks.length, 2);
+    final looked = links.withStyle('fill', 'tinted').withStyle('border', 'accent').withStyle('fill', null);
+    expect(looked.style, {'border': 'accent'});
+    expect(looked == links, isFalse);
+    final styled = view.content.copyWith(style: {'background': 'gradient', 'colour': '#0F8B8D', 'colour2': '#E0F2FE'});
+    expect(CockpitContent.fromJson(styled.toJson()).style['colour2'], '#E0F2FE');
+    expect(view.content.toJson().containsKey('style'), isFalse);
 
     final managed = ManagedCockpit.fromJson({
       'id': 'finance',

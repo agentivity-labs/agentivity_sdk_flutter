@@ -61,7 +61,14 @@ abstract final class CockpitBlockType {
   /// The rows of a Data Table (`title`, `tableId`, `columns`, `count`, `sortColumn`, `descending`).
   static const table = 'table';
 
-  static const all = [hero, ask, suggestions, waiting, gains, solutions, conversations, text, announcement, links, launch, metric, table];
+  /// An image, a title, a text and a link out of Agentivity (`image`: kept as a data URL or an https address, `imageAt`: top or
+  /// left, `ratio`: wide, classic or square, `title`, `body`, `linkLabel`, `url`).
+  static const card = 'card';
+
+  /// Opens a part of the page: a title, a line under it, a rule (`title`, `subtitle`, `line`). Always the whole width.
+  static const section = 'section';
+
+  static const all = [hero, ask, suggestions, waiting, gains, solutions, conversations, text, announcement, links, launch, metric, table, card, section];
 }
 
 /// A link of a links block.
@@ -78,16 +85,18 @@ class CockpitLink {
   Map<String, dynamic> toJson() => {'label': label, 'url': url, if (note != null) 'note': note};
 }
 
-/// A block of a cockpit: its kind ([CockpitBlockType]), its width in twelfths of the page on a wide screen (4, 6, 8 or 12), and
-/// what it is set to show.
+/// A block of a cockpit: its kind ([CockpitBlockType]), its width in twelfths of the page on a wide screen (4, 6, 8 or 12), what it
+/// is set to show, and how it looks besides the page ([style]: `fill` white, tinted, colour or clear, `colour`, `border` none, thin
+/// or accent, `corners` square, soft or round; what is not said is as the page says).
 @immutable
 class CockpitBlock {
-  const CockpitBlock({required this.id, required this.type, this.span = 12, this.settings = const {}});
+  const CockpitBlock({required this.id, required this.type, this.span = 12, this.settings = const {}, this.style = const {}});
 
   final String id;
   final String type;
   final int span;
   final Map<String, dynamic> settings;
+  final Map<String, dynamic> style;
 
   /// The widths a block may take: a third, a half, two thirds, all of the page.
   static const spans = [4, 6, 8, 12];
@@ -97,9 +106,10 @@ class CockpitBlock {
         type: json['type']?.toString() ?? '',
         span: (json['span'] as num?)?.toInt() ?? 12,
         settings: Map<String, dynamic>.from(_map(json['settings'])),
+        style: Map<String, dynamic>.from(_map(json['style'])),
       );
 
-  Map<String, dynamic> toJson() => {'id': id, 'type': type, 'span': span, 'settings': settings};
+  Map<String, dynamic> toJson() => {'id': id, 'type': type, 'span': span, 'settings': settings, if (style.isNotEmpty) 'style': style};
 
   String? text(String key) => _text(settings[key]);
 
@@ -119,46 +129,68 @@ class CockpitBlock {
     } else {
       next[key] = value;
     }
-    return CockpitBlock(id: id, type: type, span: span, settings: next);
+    return CockpitBlock(id: id, type: type, span: span, settings: next, style: style);
   }
 
-  CockpitBlock copyWith({String? id, int? span, Map<String, dynamic>? settings}) => CockpitBlock(id: id ?? this.id, type: type, span: span ?? this.span, settings: settings ?? this.settings);
+  /// The same block, with [key] of its look set to [value] (null: as the page says).
+  CockpitBlock withStyle(String key, Object? value) {
+    final next = Map<String, dynamic>.from(style);
+    value == null ? next.remove(key) : next[key] = value;
+    return CockpitBlock(id: id, type: type, span: span, settings: settings, style: next);
+  }
+
+  CockpitBlock copyWith({String? id, int? span, Map<String, dynamic>? settings}) =>
+      CockpitBlock(id: id ?? this.id, type: type, span: span ?? this.span, settings: settings ?? this.settings, style: style);
 
   // The same block is one that says the same: what shows it reads it again only when it changed.
   @override
-  bool operator ==(Object other) => other is CockpitBlock && other.id == id && other.type == type && other.span == span && jsonEncode(other.settings) == jsonEncode(settings);
+  bool operator ==(Object other) =>
+      other is CockpitBlock && other.id == id && other.type == type && other.span == span && jsonEncode(other.settings) == jsonEncode(settings) && jsonEncode(other.style) == jsonEncode(style);
 
   @override
-  int get hashCode => Object.hash(id, type, span, jsonEncode(settings));
+  int get hashCode => Object.hash(id, type, span, jsonEncode(settings), jsonEncode(style));
 }
 
-/// What a cockpit is: its name and colour, its Solutions (what it starts, waits and counts for), and its blocks in order.
+/// What a cockpit is: its name and colour, its Solutions (what it starts, waits and counts for), its blocks in order, and how the
+/// page looks ([style]: `background` none, colour, gradient or image, `colour`, `colour2`, `direction` down, diagonal or across,
+/// `image`, `veil` 0 to 90; its cards: `corners` square, soft or round, `border` none, thin or accent, `shadow` none or soft, `fill`
+/// white, tinted or clear; empty: as the Desk has it).
 @immutable
 class CockpitContent {
-  const CockpitContent({required this.name, this.colour, this.entityIds = const [], this.blocks = const []});
+  const CockpitContent({required this.name, this.colour, this.entityIds = const [], this.blocks = const [], this.style = const {}});
 
   final String name;
   final String? colour;
   final List<String> entityIds;
   final List<CockpitBlock> blocks;
+  final Map<String, dynamic> style;
 
   factory CockpitContent.fromJson(Map<String, dynamic> json) => CockpitContent(
         name: json['name']?.toString() ?? '',
         colour: _text(json['colour']),
         entityIds: _strings(json['entityIds']),
         blocks: _maps(json['blocks']).map(CockpitBlock.fromJson).toList(growable: false),
+        style: Map<String, dynamic>.from(_map(json['style'])),
       );
 
-  Map<String, dynamic> toJson() => {'name': name, 'colour': colour, 'entityIds': entityIds, 'blocks': blocks.map((b) => b.toJson()).toList()};
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'colour': colour,
+        'entityIds': entityIds,
+        'blocks': blocks.map((b) => b.toJson()).toList(),
+        if (style.isNotEmpty) 'style': style,
+      };
 
   /// The line of the top of the page, when it says one.
   String? get intro => blocks.where((b) => b.type == CockpitBlockType.hero).firstOrNull?.text('text');
 
-  CockpitContent copyWith({String? name, String? colour, bool clearColour = false, List<String>? entityIds, List<CockpitBlock>? blocks}) => CockpitContent(
+  CockpitContent copyWith({String? name, String? colour, bool clearColour = false, List<String>? entityIds, List<CockpitBlock>? blocks, Map<String, dynamic>? style}) =>
+      CockpitContent(
         name: name ?? this.name,
         colour: clearColour ? null : colour ?? this.colour,
         entityIds: entityIds ?? this.entityIds,
         blocks: blocks ?? this.blocks,
+        style: style ?? this.style,
       );
 }
 
