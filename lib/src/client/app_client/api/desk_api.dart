@@ -97,6 +97,28 @@ class DeskApi {
 
   /// Whether one is told by e-mail of a question asked to them.
   // PUT /api/v1/desk/notifications
+  // PUT /api/v1/desk/tour
+  /// The tour of the Desk seen ([seen]), or to be shown again.
+  Future<void> setTourSeen(bool seen) async {
+    await _c.put<dynamic>(AgentivityHttpCore.v1('/desk/tour'), data: {'seen': seen});
+  }
+
+  // GET /api/v1/desk/setup-progress (who changes the settings)
+  Future<DeskSetupProgress> setupProgress() async {
+    final response = await _c.get<Map<String, dynamic>>(AgentivityHttpCore.v1('/desk/setup-progress'));
+    return DeskSetupProgress.fromJson(response.data ?? const {});
+  }
+
+  // PUT /api/v1/desk/setup-progress
+  /// Says that the Desk was seen as a Desk seat sees it ([sawAsDesk]), or closes the card ([closed]; false opens it again).
+  Future<DeskSetupProgress> setSetupMarks({bool? sawAsDesk, bool? closed}) async {
+    final response = await _c.put<Map<String, dynamic>>(
+      AgentivityHttpCore.v1('/desk/setup-progress'),
+      data: {if (sawAsDesk != null) 'sawAsDesk': sawAsDesk, if (closed != null) 'closed': closed},
+    );
+    return DeskSetupProgress.fromJson(response.data ?? const {});
+  }
+
   Future<void> setEmailQuestions(bool email) async {
     await _c.put<dynamic>(AgentivityHttpCore.v1('/desk/notifications'), data: {'emailQuestions': email});
   }

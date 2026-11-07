@@ -178,6 +178,7 @@ class DeskOverview {
     this.archived = 0,
     this.waitingIds = const {},
     this.emailQuestions = true,
+    this.tourSeen = true,
   });
 
   final DeskBrand brand;
@@ -200,6 +201,9 @@ class DeskOverview {
   /// Whether the caller is told by e-mail of a question asked to them.
   final bool emailQuestions;
 
+  /// Whether the person saw the tour of the Desk: shown once, at the first visit.
+  final bool tourSeen;
+
   bool publishes(String entityId) => shown == null || shown!.contains(entityId);
 
   factory DeskOverview.fromJson(Map<String, dynamic> json) {
@@ -217,8 +221,36 @@ class DeskOverview {
       archived: (counts['archived'] as num?)?.toInt() ?? 0,
       waitingIds: json['waitingIds'] is List ? _strings(json['waitingIds']).toSet() : const {},
       emailQuestions: json['emailQuestions'] != false,
+      tourSeen: json['tourSeen'] != false,
     );
   }
+}
+
+/// Where the setting up of the Desk stands, read from the workspace: Solutions published to it, cockpits published, people on a
+/// seat of the Desk (invitations waiting counted), and whether who sets it up saw it as a Desk seat sees it.
+@immutable
+class DeskSetupProgress {
+  const DeskSetupProgress({this.published = 0, this.cockpitsPublished = 0, this.atDesk = 0, this.sawAsDesk = false, this.done = false, this.closed = false});
+
+  final int published;
+  final int cockpitsPublished;
+  final int atDesk;
+  final bool sawAsDesk;
+
+  /// Every step done.
+  final bool done;
+
+  /// The card closed by who sets the Desk up.
+  final bool closed;
+
+  factory DeskSetupProgress.fromJson(Map<String, dynamic> json) => DeskSetupProgress(
+        published: (json['published'] as num?)?.toInt() ?? 0,
+        cockpitsPublished: (json['cockpitsPublished'] as num?)?.toInt() ?? 0,
+        atDesk: (json['atDesk'] as num?)?.toInt() ?? 0,
+        sawAsDesk: json['sawAsDesk'] == true,
+        done: json['done'] == true,
+        closed: json['closed'] == true,
+      );
 }
 
 /// How the Desk of the workspace looks and what it shows, as the Studio sets it.
