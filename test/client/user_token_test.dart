@@ -38,7 +38,7 @@ void main() {
 
   test('sends their token rather than the key', () async {
     final instance = _Instance((_) => _json([]));
-    final client = _client(instance, apiKey: 'agp_page')..setUserToken(UserToken('agu_alice', expiresAt: _inMinutes(15)));
+    final client = _client(instance, apiKey: 'agv_server')..setUserToken(UserToken('agu_alice', expiresAt: _inMinutes(15)));
 
     await client.http.get<dynamic>('/api/v1/executions');
 

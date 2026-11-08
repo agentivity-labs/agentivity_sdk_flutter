@@ -59,12 +59,16 @@ internal matter of the instance: an SDK never names one. A key that may reach an
   );
   ```
 
-- **An app in people's hands** (Flutter web, mobile, desktop): anything shipped can be read, so treat it as a web page and use a **key for
-  a web page** `agp_…`. It talks to the one agent, team or workflow it was made for,
-  only from the sites you allow on it (the browser's `Origin`), and a site may start only a limited number of conversations a minute.
+- **An app in people's hands** (Flutter web, mobile, desktop): anything shipped can be read, so it never holds a key. Declare an **App**
+  in the Studio (*Administration › Apps*): it opens the agents, teams and workflows you choose, whole spaces, or every Solution, and
+  each of its users has their own conversations. Its users are either yours, vouched for by your server with the App's secret
+  (`aps_…`, never in the app), or anonymous visitors of a demo, one per device.
 
   ```dart
-  final connector = AgentivityPlatformConnector(baseUrl: 'https://my-instance.example.com', authToken: 'agp_…');
+  // Your users: your server gives the token of the user of the app.
+  client.setUserToken(token, renew: () => myServer.agentivityToken());
+  // A demo: each device gets an anonymous visitor of its own.
+  client.apps.visitDemo('…');
   ```
 
 The key goes as `Authorization: Bearer <key>` (the instance also reads `x-api-key`).
@@ -88,8 +92,9 @@ try {
 | `sign_in_required` | 401 | The instance asks for a key and got none. |
 | `invalid_key` | 401 | The key was revoked, has ended, or is mistyped. |
 | `key_scope` | 403 | The key's scope (`api`, `read`, `mcp`) does not cover this call. |
-| `origin_not_allowed` | 403 | A key for a web page, used from a site it does not allow. |
-| `publishable_scope` | 403 | A key for a web page, used for another element than its own. |
+| `origin_not_allowed` | 403 | An App, used from a site it does not allow. |
+| `app_scope` | 403 | Through an App, a call it does not open. |
+| `app_element` | 403 | Through an App, an agent, team or workflow it does not open. |
 | `permission_denied` | 403 | The role of the key's owner does not allow this (`permission` names what was needed). |
 | `people_only` | 403 | Only a person signed in to the Studio does this, never a key. |
 | `space_not_visible` | 403 | The element is in a space the key's owner is not in. |

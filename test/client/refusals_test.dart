@@ -46,7 +46,7 @@ void main() {
 
     test('is said in words when the instance gives only its code', () {
       expect(_refused({'error': 'sign_in_required'}, 401).userMessage, contains('give the SDK an API key (agv_'));
-      expect(_refused({'error': 'origin_not_allowed'}, 403).userMessage, contains('add it to the sites of the key'));
+      expect(_refused({'error': 'origin_not_allowed'}, 403).userMessage, contains("Add it to the App's sites"));
       expect(_refused({'error': 'sign_in_required'}, 401).kind, ApiFailureKind.key);
     });
 
