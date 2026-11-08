@@ -170,6 +170,7 @@ export 'src/client/app_client/api/cockpits_api.dart';
 export 'src/client/app_client/api/desk_api.dart';
 export 'src/client/app_client/api/entities_api.dart';
 export 'src/client/app_client/api/runs_api.dart';
+export 'src/client/app_client/api/spaces_api.dart';
 export 'src/client/app_client/api/voice_api.dart';
 export 'src/client/app_client/api/uploads_api.dart';
 export 'src/client/app_client/domain/agent_models.dart';
@@ -189,6 +190,7 @@ export 'src/client/app_client/domain/workflow_argument_type.dart';
 export 'src/client/app_client/domain/workflow_models.dart';
 export 'src/client/app_client/domain/workflow_graph_models.dart';
 export 'src/client/app_client/domain/execution_status_models.dart';
+export 'src/client/app_client/domain/space_models.dart';
 export 'src/client/core/api_contract.dart';
 export 'src/client/core/http_core.dart';
 export 'src/client/core/waking_workspace.dart';
@@ -204,6 +206,7 @@ import 'src/client/app_client/agentivity_client.dart';
 import 'src/client/app_client/api/account_api.dart';
 import 'src/client/app_client/api/cockpits_api.dart';
 import 'src/client/app_client/api/desk_api.dart';
+import 'src/client/app_client/api/spaces_api.dart';
 import 'src/client/app_client/api/uploads_api.dart';
 import 'src/client/app_client/api/voice_api.dart';
 import 'src/client/extras/api/ag_ui_bundles_api.dart';
@@ -234,6 +237,7 @@ class AgentivityPlatformClient extends AgentivityClient {
     account = AccountApi(http);
     desk = DeskApi(http);
     cockpits = CockpitsApi(http);
+    spaces = SpacesApi(http);
   }
 
   /// AG-UI chat channel: open a streaming run against a chat context/thread.
@@ -260,4 +264,7 @@ class AgentivityPlatformClient extends AgentivityClient {
 
   /// The cockpits of the Desk as the Studio builds them: drafted, published, owned, ordered.
   late final CockpitsApi cockpits;
+
+  /// The spaces the person is in, and the one they work in (the same choice for the Studio and the Desk).
+  late final SpacesApi spaces;
 }
