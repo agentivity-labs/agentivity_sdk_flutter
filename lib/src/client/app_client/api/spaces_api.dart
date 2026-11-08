@@ -22,4 +22,8 @@ class SpacesApi {
   // PUT /api/v1/spaces/current
   /// Works in [spaceId] from now on: what is listed after shows only it.
   Future<void> choose(String spaceId) => _c.put<void>(AgentivityHttpCore.v1('/spaces/current'), data: {'spaceId': spaceId});
+
+  // PUT /api/v1/spaces/current ("*")
+  /// Looks at every space of the person together again: no space chosen.
+  Future<void> chooseAll() => choose('*');
 }

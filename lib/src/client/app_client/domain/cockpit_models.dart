@@ -267,9 +267,13 @@ class ManagedCockpit {
     this.updatedBy,
     this.mayEdit = false,
     this.mayManage = false,
+    this.spaceId = 'default',
   });
 
   final String id;
+
+  /// The space it is in: its members see it in the Desk, who manages the cockpits there changes it.
+  final String spaceId;
   final CockpitContent draft;
   final CockpitContent? published;
   final int order;
@@ -301,6 +305,7 @@ class ManagedCockpit {
         updatedBy: _text(json['updatedBy']),
         mayEdit: json['mayEdit'] == true,
         mayManage: json['mayManage'] == true,
+        spaceId: _text(json['spaceId']) ?? 'default',
       );
 }
 

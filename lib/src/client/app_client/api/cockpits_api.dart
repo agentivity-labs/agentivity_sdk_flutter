@@ -44,6 +44,10 @@ class CockpitsApi {
   // POST /api/v1/cockpits/{id}/unpublish
   Future<ManagedCockpit> unpublish(String id) async => _one((await _c.post<dynamic>(_path(id, '/unpublish'))).data);
 
+  /// Puts it in another space: its members see it in the Desk. For who manages the cockpits where it is and where it goes.
+  // PUT /api/v1/cockpits/{id}/space
+  Future<ManagedCockpit> moveToSpace(String id, String spaceId) async => _one((await _c.put<dynamic>(_path(id, '/space'), data: {'spaceId': spaceId})).data);
+
   /// Who changes and publishes it besides who manages the cockpits: each by their id or their e-mail.
   // PUT /api/v1/cockpits/{id}/owners
   Future<ManagedCockpit> setOwners(String id, List<String> owners) async => _one((await _c.put<dynamic>(_path(id, '/owners'), data: {'owners': owners})).data);

@@ -103,9 +103,12 @@ class DeskBrand {
 /// A cockpit: a page of the Desk for a department (Finance, HR…), with the elements it starts.
 @immutable
 class DeskCockpit {
-  const DeskCockpit({required this.id, required this.name, this.intro, this.colour, this.entityIds = const [], this.waiting = 0, this.mayEdit = false});
+  const DeskCockpit({required this.id, required this.name, this.spaceId = 'default', this.intro, this.colour, this.entityIds = const [], this.waiting = 0, this.mayEdit = false});
 
   final String id;
+
+  /// The space it is in: who is in it sees it.
+  final String spaceId;
   final String name;
   final String? intro;
   final String? colour;
@@ -120,6 +123,7 @@ class DeskCockpit {
   factory DeskCockpit.fromJson(Map<String, dynamic> json) => DeskCockpit(
         id: json['id']?.toString() ?? '',
         name: json['name']?.toString() ?? '',
+        spaceId: _text(json['spaceId']) ?? 'default',
         intro: _text(json['intro']),
         colour: _text(json['colour']),
         entityIds: _strings(json['entityIds']),

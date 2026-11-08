@@ -1,6 +1,6 @@
 /// A space of the workspace (Finance, HR…) the person is in: each agent, team, workflow and conversation is in one.
 class WorkspaceSpace {
-  const WorkspaceSpace({required this.id, required this.name, this.description = '', this.isDefault = false, this.isCurrent = false, this.archived = false});
+  const WorkspaceSpace({required this.id, required this.name, this.description = '', this.isDefault = false, this.isCurrent = false, this.isViewed = false, this.archived = false});
 
   final String id;
   final String name;
@@ -9,8 +9,11 @@ class WorkspaceSpace {
   /// General: everything made without a space, everyone in it.
   final bool isDefault;
 
-  /// The space the person works in now: the lists of the Studio and of the Desk show it.
+  /// The space the person works in now: what they make goes in it.
   final bool isCurrent;
+
+  /// The space the lists show alone; none is when every space of the person is looked at together.
+  final bool isViewed;
   final bool archived;
 
   factory WorkspaceSpace.fromJson(Map<String, dynamic> json) => WorkspaceSpace(
@@ -19,6 +22,7 @@ class WorkspaceSpace {
         description: json['description'] as String? ?? '',
         isDefault: json['isDefault'] == true,
         isCurrent: json['isCurrent'] == true,
+        isViewed: json['isViewed'] == true,
         archived: json['archived'] == true,
       );
 }
