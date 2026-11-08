@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-/// The token of a user of an App (`agu_…`), worth a few minutes: given by the App's server for one of its own users, or by
-/// signing in through the App for a person of the instance. [expiresAt], when known, lets the client ask for the next one in time.
+/// The token of a user of an API key (`agu_…`), worth a few minutes: got by your server, with the key, for one of your users, or
+/// by signing in through the key for a person of the workspace. [expiresAt], when known, lets the client ask for the next one in time.
 class UserToken {
   const UserToken(this.token, {this.expiresAt});
 
@@ -15,7 +15,7 @@ class UserToken {
   final DateTime? expiresAt;
 }
 
-/// Asks for the next token of the user: the App's server again, or the instance for a person signed in through the App.
+/// Asks for the next token of the user: your server again, or the instance for a person signed in through the key.
 typedef RenewUserToken = Future<UserToken> Function();
 
 /// The user a client speaks for, with their token: on every request (rather than the key), asked again a minute before its end and

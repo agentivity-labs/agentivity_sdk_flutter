@@ -45,8 +45,8 @@ void main() {
     });
 
     test('is said in words when the instance gives only its code', () {
-      expect(_refused({'error': 'sign_in_required'}, 401).userMessage, contains('give the SDK an API key (agv_'));
-      expect(_refused({'error': 'origin_not_allowed'}, 403).userMessage, contains("Add it to the App's sites"));
+      expect(_refused({'error': 'sign_in_required'}, 401).userMessage, contains('requires an API key (agv_'));
+      expect(_refused({'error': 'key_scope'}, 403).userMessage, contains('give it the permission it needs'));
       expect(_refused({'error': 'sign_in_required'}, 401).kind, ApiFailureKind.key);
     });
 
@@ -58,7 +58,7 @@ void main() {
         response: Response<Object>(requestOptions: options, statusCode: 401, data: <String, dynamic>{'error': 'invalid_key'}),
       );
 
-      expect(panels.userFacingErrorMessage(error), contains('The key is not valid'));
+      expect(panels.userFacingErrorMessage(error), contains('This API key is not valid'));
       expect(panels.ApiException.fromDio(error).errorCode, 'invalid_key');
     });
 

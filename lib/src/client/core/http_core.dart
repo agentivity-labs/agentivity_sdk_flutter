@@ -32,7 +32,7 @@ class AgentivityHttpCore {
     }
   }
 
-  /// The user of an App the client speaks for, with their token (see [UserTokens]).
+  /// The user of an API key the client speaks for, with their token (see [UserTokens]).
   late final UserTokens userTokens;
 
   /// Told whenever a request gets no answer (the server cannot be reached) and whenever one does.

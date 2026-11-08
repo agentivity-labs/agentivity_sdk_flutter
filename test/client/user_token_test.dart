@@ -80,7 +80,7 @@ void main() {
     expect([instance.authorizationOf(0), instance.authorizationOf(1)], ['Bearer agu_old', 'Bearer agu_next']);
   });
 
-  test('a person signed in through the App: renewed with the token they have, then signed out', () async {
+  test('a person signed in through the key: renewed with the token they have, then signed out', () async {
     final instance = _Instance((options) {
       if (options.path.endsWith('/sign-in')) {
         return _json({'token': 'agu_alice', 'expiresAt': _inMinutes(0.5).toUtc().toIso8601String(), 'user': {'id': 'u1', 'name': 'Alice', 'email': 'alice@example.test'}});
@@ -90,16 +90,16 @@ void main() {
     });
     final client = _client(instance);
 
-    final signedIn = await client.apps.signIn(appId: 'hr', email: 'alice@example.test', password: 'secret');
+    final signedIn = await client.keys.signIn(keyId: 'hr', email: 'alice@example.test', password: 'secret');
     await client.http.get<dynamic>('/api/v1/executions');
-    await client.apps.signOut('hr');
+    await client.keys.signOut('hr');
     await client.http.get<dynamic>('/api/v1/executions');
 
     expect(signedIn.name, 'Alice');
-    expect(instance.asked[1].path, contains('/api/v1/apps/hr/user-tokens/renew'));
+    expect(instance.asked[1].path, contains('/api/v1/keys/hr/user-tokens/renew'));
     expect(instance.authorizationOf(1), 'Bearer agu_alice');
     expect(instance.authorizationOf(2), 'Bearer agu_alice_2');
-    expect(instance.asked[3].path, contains('/api/v1/apps/hr/sign-out'));
+    expect(instance.asked[3].path, contains('/api/v1/keys/hr/sign-out'));
     expect(instance.authorizationOf(3), 'Bearer agu_alice_2');
     expect(instance.authorizationOf(4), isNull);
   });
@@ -116,21 +116,19 @@ class _Kept implements VisitorStore {
 }
 
 void demoVisitors() {
-  test('a visitor of a demo is asked once, then kept for the next visit', () async {
+  test('a visitor of a demo is asked of its server once, then kept for the next visit', () async {
     var given = 0;
-    final instance = _Instance((options) => options.path.endsWith('/visitors')
-        ? _json({'token': 'agu_visitor_${++given}', 'expiresAt': _inMinutes(60 * 24 * 7).toUtc().toIso8601String()})
-        : _json([]));
+    final instance = _Instance((options) => _json([]));
+    Future<UserToken> fromServer() async => UserToken('agu_visitor_${++given}', expiresAt: _inMinutes(60 * 24 * 7));
     final kept = _Kept();
 
-    final first = _client(instance)..apps.visitDemo('demo', store: kept);
+    final first = _client(instance)..keys.visitDemo(fromServer, store: kept);
     await first.http.get<dynamic>('/api/v1/executions');
-    final again = _client(instance)..apps.visitDemo('demo', store: kept);
+    final again = _client(instance)..keys.visitDemo(fromServer, store: kept);
     await again.http.get<dynamic>('/api/v1/executions');
 
     expect(given, 1);
-    expect(instance.asked[0].path, contains('/api/v1/apps/demo/visitors'));
+    expect(instance.authorizationOf(0), 'Bearer agu_visitor_1');
     expect(instance.authorizationOf(1), 'Bearer agu_visitor_1');
-    expect(instance.authorizationOf(2), 'Bearer agu_visitor_1');
   });
 }

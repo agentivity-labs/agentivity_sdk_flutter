@@ -10,7 +10,7 @@ import 'api/agentic_folders_api.dart';
 import 'api/data_tables_api.dart';
 import 'api/icons_api.dart';
 import 'api/workspace_sleep_api.dart';
-import 'api/apps_api.dart';
+import 'api/keys_api.dart';
 import '../core/user_tokens.dart';
 
 export '../core/connection_monitor.dart';
@@ -54,10 +54,10 @@ class AgentivityClient {
     dataTables = DataTablesApi(_http);
     icons = IconsApi(_http);
     sleep = WorkspaceSleepApi(_http);
-    apps = AppsApi(_http);
+    keys = KeysApi(_http);
   }
 
-  /// Speaks for a user of an App: each of them has their own conversations. The App's server gets their token (with its secret,
+  /// Speaks for a user of an API key: each of them has their own conversations. Your server gets their token (with the key,
   /// never from an app on people's devices); [renew] asks it for the next one, which the client does a minute before the end and
   /// when one is refused. Without a token yet, [renew] is asked for one at the first request. `null` and no [renew]: no user.
   void setUserToken(UserToken? token, {RenewUserToken? renew}) => _http.userTokens.set(token, renew);
@@ -94,8 +94,8 @@ class AgentivityClient {
   /// where the app owns the data. Schema/folders/versions are Studio-only.
   late final DataTablesApi dataTables;
 
-  /// The users of an App: a person of the instance signs in through it (see also [setUserToken]).
-  late final AppsApi apps;
+  /// The users of an API key: people of the workspace sign in through it, a demo keeps its visitor (see also [setUserToken]).
+  late final KeysApi keys;
 
   /// The sleep of a hosted workspace: when it sleeps, keep it awake, wake it (with [WorkspaceSleepGate]).
   late final WorkspaceSleepApi sleep;

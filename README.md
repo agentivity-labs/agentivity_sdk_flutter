@@ -46,11 +46,14 @@ AgUiChatDiscussion(
 
 ## Keys, and what the instance refuses
 
-An instance that asks to sign in wants a key with every request; one that does not (Community) wants none. Spaces are an
-internal matter of the instance: an SDK never names one. A key that may reach an element is enough.
+An instance that asks to sign in wants a key with every request; one that does not (Community) wants none. Anything outside the
+instance (a SaaS, a script, a website, a mobile app) talks to it with an **API key** `agv_…`, made by an administrator in the Studio
+under *API keys*. A key is never a person: it belongs to a space, opens only the Solutions you choose there (or every Solution of
+the space), and does what its permissions say: **run** them and follow their executions, use the space's **assets** (Data Tables
+rows, Knowledge Bases), serve an AI assistant over **MCP**, give tokens to the **users** of your system. It builds nothing: agents, teams and
+workflows are made in the Studio.
 
-- **A program of yours** (a server, a script, a back office): a **secret key** `agv_…`, made in the Studio under *Your API keys*.
-  It acts with the rights of the person who made it. Keep it on the server; never put it in a web page.
+- **On your server** (a server, a script, a back office): give the key to the client. Keep it there; never put it in an app.
 
   ```dart
   final client = AgentivityPlatformClient(
@@ -59,16 +62,17 @@ internal matter of the instance: an SDK never names one. A key that may reach an
   );
   ```
 
-- **An app in people's hands** (Flutter web, mobile, desktop): anything shipped can be read, so it never holds a key. Declare an **App**
-  in the Studio (*Administration › Apps*): it opens the agents, teams and workflows you choose, whole spaces, or every Solution, and
-  each of its users has their own conversations. Its users are either yours, vouched for by your server with the App's secret
-  (`aps_…`, never in the app), or anonymous visitors of a demo, one per device.
+- **An app in people's hands** (Flutter web, mobile, desktop): anything shipped can be read, so it never holds a key. With a key
+  that has the permission *users*, your server asks the instance for the token of each of your users
+  (`POST /api/v1/keys/user-tokens`, worth 15 minutes), or for an anonymous visitor of a demo (`POST /api/v1/keys/visitors`), and
+  the app speaks for them; each has their own conversations. People of the workspace sign in through the key instead
+  (`client.keys.signIn(keyId: …, email: …, password: …)`).
 
   ```dart
   // Your users: your server gives the token of the user of the app.
   client.setUserToken(token, renew: () => myServer.agentivityToken());
-  // A demo: each device gets an anonymous visitor of its own.
-  client.apps.visitDemo('…');
+  // A demo: each device keeps the anonymous visitor the demo's server gave it.
+  client.keys.visitDemo(() => myServer.agentivityVisitor());
   ```
 
 The key goes as `Authorization: Bearer <key>` (the instance also reads `x-api-key`).
@@ -90,14 +94,14 @@ try {
 | `code` | Status | What it means |
 |---|---|---|
 | `sign_in_required` | 401 | The instance asks for a key and got none. |
-| `invalid_key` | 401 | The key was revoked, has ended, or is mistyped. |
-| `key_scope` | 403 | The key's scope (`api`, `read`, `mcp`) does not cover this call. |
-| `origin_not_allowed` | 403 | An App, used from a site it does not allow. |
-| `app_scope` | 403 | Through an App, a call it does not open. |
-| `app_element` | 403 | Through an App, an agent, team or workflow it does not open. |
-| `permission_denied` | 403 | The role of the key's owner does not allow this (`permission` names what was needed). |
+| `invalid_key` | 401 | The key was deleted, renewed, or is mistyped. |
+| `key_scope` | 403 | The key's permissions (`run`, `assets`, `mcp`, `users`) do not cover this call. |
+| `key_in_page` | 403 | The key was sent from a web page: it stays on your server. |
+| `key_solutions` | 403 | With a key, a call it does not open. |
+| `key_solution` | 403 | With a key, a Solution it does not open. |
+| `permission_denied` | 403 | This is not allowed (`permission` names what was needed). |
 | `people_only` | 403 | Only a person signed in to the Studio does this, never a key. |
-| `space_not_visible` | 403 | The element is in a space the key's owner is not in. |
+| `space_not_visible` | 403 | The element is in another space than the key. |
 | `edition_feature` | 403 | The edition of the instance does not include this. |
 | `edition_limit` | 403 | The edition of the instance allows no more of this. |
 | `too_many_starts` | 429 | Too many conversations started from one site: try again in a minute. |
