@@ -167,9 +167,13 @@ class AgUiChatDiscussion extends StatefulWidget {
   /// for history but not rendered as a redundant user bubble.
   final Future<void> Function(ChatHilGate gate, String text, String source)? onHilResponse;
 
-  /// Lets an interactive widget hand a file to the platform — a `SourceInput` upload. Typically
-  /// `(name, bytes) => client.uploads.upload(bytes, name)`. Without it, `SourceInput` can only take a link or pasted text.
+  /// Lets an interactive widget hand a file to the platform — a `SourceInput` upload. Left out, the [client]'s own uploads are
+  /// used, so any app shows a card and takes a file with nothing to wire: give this only to upload somewhere else.
   final Future<UploadedFile> Function(String fileName, Uint8List bytes)? onUploadFile;
+
+  /// How a widget uploads a file here: what the app gave, or the platform's client. Null only when there is neither.
+  Future<UploadedFile> Function(String fileName, Uint8List bytes)? get _upload =>
+      onUploadFile ?? (client != null ? (name, bytes) => client!.uploads.upload(bytes, name) : null);
 
   /// Called when the user presses the stop button in the input box — the interrupt every chat app offers while a model is
   /// working. Providing it turns the send button into a stop button for as long as a run is in progress; the app cancels
@@ -545,7 +549,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
             theme: theme,
             widgetRegistry: widget.widgetRegistry,
             enabled: isActiveWidget,
-            onUploadFile: widget.onUploadFile,
+            onUploadFile: widget._upload,
             onWidgetSubmit: isActiveWidget && widget.onHilResponse != null
                 ? (response) {
                     final gate = widget.controller.pendingHilGate;
@@ -774,7 +778,6 @@ class _MessageBubble extends StatelessWidget {
                       ...?block.widgetProps,
                       if (onWidgetSubmit != null) '__onSubmit': onWidgetSubmit,
                       if (onUploadFile != null) '__upload': onUploadFile,
-        if (onUploadFile != null) '__upload': onUploadFile,
                     };
                     final built = widgetRegistry!.build(context, block.type, props) ?? AgUnknownChoices.fromProps(props);
                     if (built == null) return const SizedBox.shrink();

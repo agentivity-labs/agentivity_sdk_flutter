@@ -203,15 +203,8 @@ export 'src/client/extras/api/svg_icons_api.dart';
 export 'src/client/extras/domain/ag_ui_bundle_models.dart';
 
 import 'src/client/app_client/agentivity_client.dart';
-import 'src/client/app_client/api/account_api.dart';
 import 'src/client/app_client/api/cockpits_api.dart';
 import 'src/client/app_client/api/desk_api.dart';
-import 'src/client/app_client/api/spaces_api.dart';
-import 'src/client/app_client/api/uploads_api.dart';
-import 'src/client/app_client/api/voice_api.dart';
-import 'src/client/extras/api/ag_ui_bundles_api.dart';
-import 'src/client/extras/api/chat_context_api.dart';
-import 'src/client/extras/api/svg_icons_api.dart';
 
 /// The full Agentivity platform client: everything in [AgentivityClient]
 /// (entities, generic run lifecycle, HIL, conversations, folders) plus the
@@ -228,35 +221,16 @@ import 'src/client/extras/api/svg_icons_api.dart';
 /// final run = await client.runs.startExecution(entityId: agents.first.id, input: 'Hello');
 /// ```
 class AgentivityPlatformClient extends AgentivityClient {
-  AgentivityPlatformClient({super.dio, required super.baseUrl, super.apiKey}) {
-    chat = ChatContextApi(http);
-    agUiBundles = AgUiBundlesApi(http);
-    svgIcons = SvgIconsApi(http);
-    voice = VoiceApi(http);
-    uploads = UploadsApi(http);
-    account = AccountApi(http);
+  AgentivityPlatformClient({super.dio, required super.baseUrl, super.apiKey});
+}
+
+/// The client of Agentivity Desk: everything any app has, and what the Desk is — a person's own work and the cockpits they were
+/// given. An app that is not the Desk has no use for these, so they are here and not on [AgentivityPlatformClient].
+class AgentivityDeskClient extends AgentivityClient {
+  AgentivityDeskClient({super.dio, required super.baseUrl, super.apiKey}) {
     desk = DeskApi(http);
     cockpits = CockpitsApi(http);
-    spaces = SpacesApi(http);
   }
-
-  /// AG-UI chat channel: open a streaming run against a chat context/thread.
-  late final ChatContextApi chat;
-
-  /// AG-UI widget bundle discovery — for apps that render generative UI.
-  late final AgUiBundlesApi agUiBundles;
-
-  /// Icon assets (node icons, brand icons, embedded icons) as SVG.
-  late final SvgIconsApi svgIcons;
-
-  /// Server-side voice transcription for chat dictation.
-  late final VoiceApi voice;
-
-  /// File uploads: hand a run a document (a CV, a contract…) it can read later by id.
-  late final UploadsApi uploads;
-
-  /// Signing in as a person: who is signed in, signing in and out, an invitation, a new password, a new address.
-  late final AccountApi account;
 
   /// A person's own work, as Agentivity Desk shows it: their conversations as they keep them, their groups, what waits for their
   /// answer, sharing, the time saved, the cockpits as published, and how the Desk looks.
@@ -264,7 +238,4 @@ class AgentivityPlatformClient extends AgentivityClient {
 
   /// The cockpits of the Desk as the Studio builds them: drafted, published, owned, ordered.
   late final CockpitsApi cockpits;
-
-  /// The spaces the person is in, and the one they work in (the same choice for the Studio and the Desk).
-  late final SpacesApi spaces;
 }

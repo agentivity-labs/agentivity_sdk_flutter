@@ -9,6 +9,13 @@ import 'api/conversations_api.dart';
 import 'api/agentic_folders_api.dart';
 import 'api/data_tables_api.dart';
 import 'api/icons_api.dart';
+import 'api/uploads_api.dart';
+import '../extras/api/chat_context_api.dart';
+import '../extras/api/ag_ui_bundles_api.dart';
+import '../extras/api/svg_icons_api.dart';
+import 'api/voice_api.dart';
+import 'api/account_api.dart';
+import 'api/spaces_api.dart';
 import 'api/workspace_sleep_api.dart';
 import 'api/keys_api.dart';
 import '../core/user_tokens.dart';
@@ -55,6 +62,13 @@ class AgentivityClient {
     icons = IconsApi(_http);
     sleep = WorkspaceSleepApi(_http);
     keys = KeysApi(_http);
+    uploads = UploadsApi(_http);
+    chat = ChatContextApi(_http);
+    agUiBundles = AgUiBundlesApi(_http);
+    svgIcons = SvgIconsApi(_http);
+    voice = VoiceApi(_http);
+    account = AccountApi(_http);
+    spaces = SpacesApi(_http);
   }
 
   /// Speaks for a user of an API key: each of them has their own conversations. Your server gets their token (with the key,
@@ -96,6 +110,28 @@ class AgentivityClient {
 
   /// The users of an API key: people of the workspace sign in through it, a demo keeps its visitor (see also [setUserToken]).
   late final KeysApi keys;
+
+  /// File uploads: hand a run a document (a CV, a contract…) it can read later by id. Every app has it, so an interaction that
+  /// asks for a file (a `SourceInput`) takes one with nothing to wire.
+  late final UploadsApi uploads;
+
+  /// AG-UI chat channel: open a streaming run against a chat context/thread.
+  late final ChatContextApi chat;
+
+  /// AG-UI widget bundle discovery — for apps that render generative UI.
+  late final AgUiBundlesApi agUiBundles;
+
+  /// Icon assets (node icons, brand icons, embedded icons) as SVG.
+  late final SvgIconsApi svgIcons;
+
+  /// Server-side voice transcription for chat dictation.
+  late final VoiceApi voice;
+
+  /// Signing in as a person: who is signed in, signing in and out, an invitation, a new password, a new address.
+  late final AccountApi account;
+
+  /// The spaces the person is in, and the one they work in (the same choice for the Studio and the Desk).
+  late final SpacesApi spaces;
 
   /// The sleep of a hosted workspace: when it sleeps, keep it awake, wake it (with [WorkspaceSleepGate]).
   late final WorkspaceSleepApi sleep;
