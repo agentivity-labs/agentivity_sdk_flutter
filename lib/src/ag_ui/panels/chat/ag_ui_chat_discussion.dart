@@ -87,7 +87,7 @@ class AgUiChatDiscussion extends StatefulWidget {
     this.activityStyle = const AgUiChatActivityStyle(),
     this.activityBuilder,
     this.showTeamProgress = true,
-    this.client,
+    required this.client,
     this.teamProgressSource,
     this.onNewConversation,
     this.conversationEndTexts = const AgUiConversationEndTexts(),
@@ -172,8 +172,7 @@ class AgUiChatDiscussion extends StatefulWidget {
   final Future<UploadedFile> Function(String fileName, Uint8List bytes)? onUploadFile;
 
   /// How a widget uploads a file here: what the app gave, or the platform's client. Null only when there is neither.
-  Future<UploadedFile> Function(String fileName, Uint8List bytes)? get _upload =>
-      onUploadFile ?? (client != null ? (name, bytes) => client!.uploads.upload(bytes, name) : null);
+  Future<UploadedFile> Function(String fileName, Uint8List bytes) get _upload => onUploadFile ?? (name, bytes) => client.uploads.upload(bytes, name);
 
   /// Called when the user presses the stop button in the input box — the interrupt every chat app offers while a model is
   /// working. Providing it turns the send button into a stop button for as long as a run is in progress; the app cancels
@@ -214,7 +213,7 @@ class AgUiChatDiscussion extends StatefulWidget {
 
   /// The platform's client. Given, [showTeamProgress] reads the execution: every member, each one's result. Without it, it goes by
   /// the stream alone: the names and statuses of the agents that took a turn.
-  final AgentivityClient? client;
+  final AgentivityClient client;
 
   /// Reads the execution from somewhere else than [client].
   final AgUiTeamProgressSource? teamProgressSource;
@@ -475,7 +474,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
 
   Future<void> _closeConversation() async {
     final id = widget.executionId ?? widget.controller.executionId;
-    if (id != null) await widget.client?.runs.closeExecution(id);
+    if (id != null) await widget.client.runs.closeExecution(id);
     widget.controller.markConversationEnded();
   }
 
@@ -580,7 +579,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
           AgUiChatConversationEnd(
             ended: conversationEnded,
             onContinue: _goOn,
-            onClose: widget.client != null && (widget.executionId ?? widget.controller.executionId) != null ? _closeConversation : null,
+            onClose: (widget.executionId ?? widget.controller.executionId) != null ? _closeConversation : null,
             onStartNew: widget.onNewConversation,
             texts: widget.conversationEndTexts,
           ),
@@ -828,8 +827,3 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-/// Deprecated name for [AgUiChatDiscussion] — "Panel" undersold that this widget
-/// already orchestrates both the message list and the composer as one component.
-/// Kept as a source-compatible alias; migrate to [AgUiChatDiscussion] directly.
-@Deprecated('Renamed to AgUiChatDiscussion — same widget, clearer name.')
-typedef AgUiChatPanel = AgUiChatDiscussion;

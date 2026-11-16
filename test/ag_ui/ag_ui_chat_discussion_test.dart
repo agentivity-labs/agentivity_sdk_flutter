@@ -39,7 +39,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AgUiChatDiscussion(controller: controller, threadId: 't1'),
+          body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: controller, threadId: 't1'),
         ),
       ),
     );
@@ -57,22 +57,4 @@ void main() {
     expect(provider.lastSentText, 'hello there');
   });
 
-  testWidgets('the deprecated AgUiChatPanel alias still builds the same widget', (tester) async {
-    final provider = _FakeChatProvider(threads: [_thread('t1')]);
-    final controller = ChatController(provider: provider, contextId: 'ctx1');
-    addTearDown(controller.dispose);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          // ignore: deprecated_member_use_from_same_package
-          body: AgUiChatPanel(controller: controller, threadId: 't1'),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-
-    expect(find.byType(AgUiChatDiscussion), findsOneWidget);
-  });
 }

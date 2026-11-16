@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   ChatController chat() => ChatController.fromStream(events: const Stream.empty(), contextId: 'x');
 
-  Widget host(ChatController c, {VoidCallback? onNew}) => MaterialApp(home: Scaffold(body: AgUiChatDiscussion(controller: c, autoLoad: false, onNewConversation: onNew)));
+  Widget host(ChatController c, {VoidCallback? onNew}) => MaterialApp(home: Scaffold(body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: c, autoLoad: false, onNewConversation: onNew)));
 
   test('reads the end of a job from the stream', () {
     final e = AgUiEvent.fromJson({'type': 'RUN_FINISHED', 'runId': 'r', 'outcome': 'success', 'jobFinished': true});

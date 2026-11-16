@@ -112,7 +112,7 @@ void main() {
     });
 
     Future<void> pumpChat(WidgetTester tester, {bool show = true, bool? running, String? label}) =>
-        tester.pumpWidget(_host(AgUiChatDiscussion(controller: controller, autoLoad: false, showActivityIndicator: show, running: running, activityLabel: label)));
+        tester.pumpWidget(_host(AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: controller, autoLoad: false, showActivityIndicator: show, running: running, activityLabel: label)));
 
     testWidgets('is off unless asked for', (tester) async {
       await pumpChat(tester, show: false);

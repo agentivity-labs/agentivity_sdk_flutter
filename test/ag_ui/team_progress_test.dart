@@ -37,7 +37,7 @@ AgUiTeamProgressSource _source(ExecutionStatuses? Function() statuses, {bool tea
 ExecutionStatuses _statuses(String state, Map<String, ExecutionMemberStep> steps) => ExecutionStatuses(executionState: state, nodes: const {}, members: {for (final e in steps.entries) e.key: e.value.state!}, memberSteps: steps, lastStepAt: DateTime.utc(2026, 1, 1, 10, 4, 32));
 
 Widget _chat(ChatController c, {AgUiTeamProgressSource? source, bool show = true}) => MaterialApp(
-  home: Scaffold(body: AgUiChatDiscussion(controller: c, autoLoad: false, teamProgressSource: source, showTeamProgress: show, showActiveMemberIndicator: true)),
+  home: Scaffold(body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: c, autoLoad: false, teamProgressSource: source, showTeamProgress: show, showActiveMemberIndicator: true)),
 );
 
 /// Lets the reads of the widget come back; the moving mark never settles.

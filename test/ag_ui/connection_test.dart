@@ -170,7 +170,7 @@ void main() {
     testWidgets('appears in a conversation given the connection, with no other wiring', (tester) async {
       final monitor = ConnectionMonitor();
       addTearDown(monitor.dispose);
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: AgUiChatDiscussion(controller: _controller(), threadId: 't1', connection: monitor))));
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: _controller(), threadId: 't1', connection: monitor))));
       monitor.httpFailed('Connection refused');
       await tester.pump();
 

@@ -34,7 +34,7 @@ Future<void> _pump(WidgetTester tester, ChatController controller, {Future<void>
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: AgUiChatDiscussion(controller: controller, threadId: 't1', widgetRegistry: _registry(), onHilResponse: onHilResponse),
+        body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: controller, threadId: 't1', widgetRegistry: _registry(), onHilResponse: onHilResponse),
       ),
     ),
   );

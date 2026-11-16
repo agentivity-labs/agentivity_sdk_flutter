@@ -24,7 +24,7 @@ void main() {
     final answers = <String>[];
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: AgUiChatDiscussion(
+        body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), 
           controller: controller,
           threadId: 't1',
           onHilResponse: (gate, text, source) {

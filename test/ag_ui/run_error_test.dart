@@ -67,7 +67,7 @@ void main() {
   group('the error notice', () {
     testWidgets('words an account out of credit for the end user, and keeps what the provider said', (tester) async {
       final c = _controller();
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: AgUiChatDiscussion(controller: c, threadId: 't1'))));
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: c, threadId: 't1'))));
       expect(find.byType(AgUiChatRunError), findsNothing);
 
       c.feedEvent(_event({'type': 'RUN_ERROR', 'message': 'Needs Analyst: refused. (Anthropic says: Your credit balance is too low)', 'code': 'llm_billing'}));
@@ -80,7 +80,7 @@ void main() {
 
     testWidgets('can be dismissed', (tester) async {
       final c = _controller();
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: AgUiChatDiscussion(controller: c, threadId: 't1'))));
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: c, threadId: 't1'))));
       c.feedEvent(_event({'type': 'RUN_ERROR', 'message': 'boom'}));
       await tester.pump();
       expect(find.text('Something went wrong'), findsOneWidget);
