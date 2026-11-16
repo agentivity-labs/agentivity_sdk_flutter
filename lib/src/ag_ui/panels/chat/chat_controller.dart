@@ -119,6 +119,9 @@ class ChatController extends ChangeNotifier {
   List<ChatThread> _threads = const [];
   // thread-id → messages list
   final Map<String, List<ChatMessage>> _messagesByThread = {};
+
+  /// Per thread, the messages moved into it from the stand-in thread, which the thread's own may still replace.
+  final Map<String, Set<String>> _stoodIn = {};
   // message-id → in-progress text (for TEXT_MESSAGE_START/CONTENT/END)
   final Map<String, StringBuffer> _inProgress = {};
   // message-id → threadId (to route TEXT_MESSAGE_CONTENT to the right thread)
@@ -312,8 +315,12 @@ class ChatController extends ChangeNotifier {
   /// relevant events without rewiring [fromStream].
   void feedEvent(AgUiEvent event) => _onAgUiEvent(event);
 
+  /// The thread made for what had nowhere to go, until the conversation announces one of its own.
+  static const ownThreadId = 'conversation';
+
   /// Directly registers [thread] without a network call.
   void addThread(ChatThread thread) {
+    if (thread.threadId != ownThreadId) _handOverOwnThread(thread.threadId);
     final idx = _threads.indexWhere((t) => t.threadId == thread.threadId);
     if (idx >= 0) {
       final updated = List<ChatThread>.from(_threads);
@@ -350,6 +357,16 @@ class ChatController extends ChangeNotifier {
       }
     }
     final existing = List<ChatMessage>.from(_messagesByThread[threadId] ?? []);
+    // The same message, once as the conversation wrote it while no thread had been announced, once as the thread says it: the
+    // stand-in gives way to the one the workspace keeps, rather than the person reading what they said twice.
+    final stoodIn = _stoodIn[threadId];
+    if (stoodIn != null && stoodIn.isNotEmpty && message.text.trim().isNotEmpty) {
+      final same = existing.indexWhere((m) => stoodIn.contains(m.id) && m.role == message.role && m.text.trim() == message.text.trim());
+      if (same >= 0) {
+        stoodIn.remove(existing[same].id);
+        existing.removeAt(same);
+      }
+    }
     final idx = existing.indexWhere((m) => m.id == message.id);
     if (idx >= 0) {
       existing[idx] = message;
@@ -358,6 +375,29 @@ class ChatController extends ChangeNotifier {
     }
     _messagesByThread[threadId] = existing;
     notifyListeners();
+  }
+
+  /// The conversation announces a thread of its own, after something was written in the stand-in one ([ownThread]): what was
+  /// written there was standing in for this thread, so it moves into it and the stand-in goes. Only one thread is shown at a
+  /// time, so leaving the two side by side hides one half of the conversation — in the Desk it hid the question an agent asked
+  /// with, card and all, behind the person's own message. What the workspace already keeps (the person's own message, said
+  /// again by the thread) is not said twice.
+  void _handOverOwnThread(String threadId) {
+    final written = _messagesByThread[ownThreadId];
+    if (!_threads.any((t) => t.threadId == ownThreadId)) return;
+    _threads = _threads.where((t) => t.threadId != ownThreadId).toList();
+    _messagesByThread.remove(ownThreadId);
+    if (written == null || written.isEmpty) return;
+    final already = _messagesByThread[threadId] ?? const <ChatMessage>[];
+    final said = already.where((m) => m.text.trim().isNotEmpty).map((m) => '${m.role} ${m.text.trim()}').toSet();
+    final moved = [
+      for (final message in written)
+        if (!said.contains('${message.role} ${message.text.trim()}')) message,
+    ];
+    if (moved.isEmpty) return;
+    _messagesByThread[threadId] = [...moved, ...already];
+    // What the thread has not said yet: said by it later, it takes the place of the stand-in.
+    _stoodIn[threadId] = {for (final message in moved) message.id};
   }
 
   /// Returns locally-cached messages for [threadId].
@@ -387,6 +427,7 @@ class ChatController extends ChangeNotifier {
   void clear() {
     _threads = const [];
     _messagesByThread.clear();
+    _stoodIn.clear();
     _pendingHilGate = null;
     _isAwaitingResponse = false;
     _activeMember = null;
@@ -549,7 +590,7 @@ class ChatController extends ChangeNotifier {
   /// The thread of a conversation that announced none, made once and kept: what has nowhere else to go is shown there rather
   /// than lost.
   String ownThread() {
-    const own = 'conversation';
+    const own = ownThreadId;
     if (!_threads.any((t) => t.threadId == own)) {
       addThread(
         ChatThread(

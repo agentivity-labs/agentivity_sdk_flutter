@@ -350,6 +350,11 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
     if (old.controller != widget.controller) {
       old.controller.removeListener(_onControllerChange);
       widget.controller.addListener(_onControllerChange);
+      // What is on screen belongs to the chat that is going: a page that builds a chat, then swaps it for the one it has read
+      // the conversation into, kept showing the empty one until something new was announced — and on a conversation that has
+      // ended, nothing ever is, so it stayed empty for good.
+      _messages = const [];
+      _loadMessages();
     }
     if (old.threadId != widget.threadId) _loadMessages();
     if (old.controller != widget.controller || old.showTeamProgress != widget.showTeamProgress || old.client != widget.client || old.teamProgressSource != widget.teamProgressSource || old.executionId != widget.executionId || old.teamMembers != widget.teamMembers) {
