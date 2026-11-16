@@ -546,6 +546,26 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  /// The thread of a conversation that announced none, made once and kept: what has nowhere else to go is shown there rather
+  /// than lost.
+  String ownThread() {
+    const own = 'conversation';
+    if (!_threads.any((t) => t.threadId == own)) {
+      addThread(
+        ChatThread(
+          threadId: own,
+          contextId: _contextId,
+          runId: _runId ?? '',
+          title: '',
+          isDefault: true,
+          status: 'active',
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+    return own;
+  }
+
   void _handleCustomEvent(CustomEvent event) {
     final value = event.value;
     final data =
@@ -643,9 +663,13 @@ class ChatController extends ChangeNotifier {
         // as a widget invocation from the agent. Store it as a ChatMessage so the
         // panel can render it via the widget registry.
         if (!event.name.startsWith('CHAT_') && !event.name.startsWith('HIL_')) {
+          // A card sent before any thread was announced (an agent on its own, whose question carries its widget) used to be
+          // dropped here: the person saw nothing, and nothing said why. It gets the conversation's own thread instead.
           final threadId =
-              _pendingHilGate?.threadId ?? _threads.lastOrNull?.threadId;
-          if (threadId != null) {
+              _pendingHilGate?.threadId ??
+              _threads.lastOrNull?.threadId ??
+              ownThread();
+          {
             final props =
                 value is Map<String, dynamic>
                     ? value
