@@ -503,6 +503,8 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
       // gate (the reply request resolves once the run suspends again), and clearing unconditionally wiped that new question.
       if (widget.controller.pendingHilGate?.requestId == gate.requestId) {
         widget.controller.clearHilGate();
+        // It is working again from here: what it answers to said it had finished when it stopped to ask.
+        widget.controller.noteWorkingAgain();
       }
     } finally {
       if (mounted && _submittingGate == gate.requestId) setState(() => _submittingGate = null);

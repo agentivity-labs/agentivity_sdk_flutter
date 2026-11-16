@@ -421,6 +421,17 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The person has answered a question: the run takes its work up again. The run that stopped to ask said it was finished
+  /// (interrupted), and the one that goes on announces no new start, so nothing said the work had resumed — the conversation
+  /// sat still, with no sign of anything happening, for as long as the work took. Cleared by the stream as usual: what ends,
+  /// what fails, what asks next.
+  void noteWorkingAgain() {
+    if (_isAwaitingResponse) return;
+    _isAwaitingResponse = true;
+    _jobFinished = false;
+    notifyListeners();
+  }
+
   /// Resets all conversation state — threads, messages, HIL gate, error.
   /// Use when starting a new execution so the panel shows a clean slate
   /// without disposing and recreating the controller (which would break listeners).
