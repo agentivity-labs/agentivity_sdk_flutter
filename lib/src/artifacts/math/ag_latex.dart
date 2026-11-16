@@ -31,7 +31,6 @@ class AgLatex extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'LaTeX',
       icon: Icons.functions_rounded,
       child: Center(
         child: SingleChildScrollView(

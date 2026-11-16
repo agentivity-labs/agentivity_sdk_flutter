@@ -54,7 +54,6 @@ class _AgConfirmCardState extends State<AgConfirmCard> {
     return AgArtifactCard(
       title: title,
       icon: Icons.check_circle_outline_rounded,
-      type: 'Confirmation',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,

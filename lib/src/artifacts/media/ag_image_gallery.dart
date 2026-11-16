@@ -53,7 +53,6 @@ class AgImageGallery extends StatelessWidget {
     return AgArtifactCard(
       title: title,
       icon: Icons.photo_library_rounded,
-      type: 'Images',
       child: LayoutBuilder(
         builder: (context, constraints) {
           // As many columns as were asked for, fewer when a picture would drop under ~140px.

@@ -30,7 +30,6 @@ class AgTimeline extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'Timeline',
       icon: Icons.timeline_rounded,
       child: Column(
         mainAxisSize: MainAxisSize.min,

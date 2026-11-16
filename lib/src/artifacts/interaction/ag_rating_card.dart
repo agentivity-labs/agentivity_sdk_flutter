@@ -64,7 +64,6 @@ class _AgRatingCardState extends State<AgRatingCard> {
     return AgArtifactCard(
       title: title,
       icon: Icons.star_outline_rounded,
-      type: 'Rating',
       // Disabled/answered visual state is owned by the chat panel's message
       // bubble (_MessageBubble._dimIfDisabled), not here — see ag_choice_card.dart's
       // matching comment for why a second local dimming layer used to make

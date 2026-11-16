@@ -67,7 +67,6 @@ class AgSummaryCard extends StatelessWidget {
     return AgArtifactCard(
       title: title,
       icon: Icons.receipt_long_rounded,
-      type: 'Summary',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,

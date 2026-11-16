@@ -44,7 +44,6 @@ class AgMetricCard extends StatelessWidget {
     return AgArtifactCard(
       title: title,
       icon: Icons.speed_rounded,
-      type: 'Metric',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

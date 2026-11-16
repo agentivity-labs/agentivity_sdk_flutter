@@ -65,7 +65,6 @@ class AgLineChart extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'Line Chart',
       icon: Icons.show_chart_rounded,
       child: SizedBox(
         height: height,

@@ -68,7 +68,6 @@ class AgAreaChart extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'Area Chart',
       icon: Icons.area_chart_rounded,
       child: SizedBox(
         height: height,

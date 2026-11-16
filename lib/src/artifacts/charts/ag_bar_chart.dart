@@ -58,7 +58,6 @@ class AgBarChart extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'Bar Chart',
       icon: Icons.bar_chart_rounded,
       child: SizedBox(
         height: height,

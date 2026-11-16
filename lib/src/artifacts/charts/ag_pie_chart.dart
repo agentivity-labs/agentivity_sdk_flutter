@@ -57,7 +57,6 @@ class _AgPieChartState extends State<AgPieChart> {
 
     return AgArtifactCard(
       title: title,
-      type: donut ? 'Donut Chart' : 'Pie Chart',
       icon: Icons.pie_chart_rounded,
       child: Column(
         mainAxisSize: MainAxisSize.min,

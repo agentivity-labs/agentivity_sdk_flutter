@@ -89,7 +89,6 @@ class _AgDatePickerCardState extends State<AgDatePickerCard> {
     return AgArtifactCard(
       title: title,
       icon: Icons.calendar_today_rounded,
-      type: mode == 'range' ? 'Period' : 'Date',
       // Disabled/answered visual state is owned by the chat panel's message
       // bubble (_MessageBubble._dimIfDisabled), not here — see ag_choice_card.dart's
       // matching comment for why a second local dimming layer used to make

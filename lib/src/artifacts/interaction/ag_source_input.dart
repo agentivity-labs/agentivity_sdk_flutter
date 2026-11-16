@@ -273,7 +273,6 @@ class _AgSourceInputState extends State<AgSourceInput> {
     return AgArtifactCard(
       title: title,
       icon: Icons.upload_file_rounded,
-      type: 'Source',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,

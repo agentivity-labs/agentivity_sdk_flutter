@@ -53,7 +53,6 @@ class AgKeyValue extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'Key–Value',
       icon: Icons.list_alt_rounded,
       child: Column(
         mainAxisSize: MainAxisSize.min,

@@ -23,7 +23,13 @@ class AgArtifactCard extends StatelessWidget {
   final Widget child;
   final IconData? icon;
 
-  /// Optional type badge shown next to the title (e.g. "Bar Chart").
+  /// Optional badge shown next to the title, for something the card's content
+  /// does not already say: a code block's language, a status card's outcome.
+  ///
+  /// Never the card's own kind. A person reading a card wants its title and its
+  /// content, not the name of the widget drawing it — "Key-Value" beside a
+  /// Contract Checker flag and "Select" beside a decision told them nothing and
+  /// read as a debug tag, so no built-in card passes its kind here any more.
   final String? type;
 
   /// When set, a copy icon copies this string to the clipboard.

@@ -87,7 +87,6 @@ class AgRadarChart extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'Radar',
       icon: Icons.radar_rounded,
       child: Column(
         mainAxisSize: MainAxisSize.min,

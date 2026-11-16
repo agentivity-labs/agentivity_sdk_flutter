@@ -29,7 +29,6 @@ class AgJsonViewer extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'JSON',
       icon: Icons.data_object_rounded,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,

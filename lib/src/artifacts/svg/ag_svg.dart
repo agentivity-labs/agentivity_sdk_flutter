@@ -33,7 +33,6 @@ class AgSvg extends StatelessWidget {
 
     return AgArtifactCard(
       title: title,
-      type: 'SVG',
       icon: Icons.image_rounded,
       child: SizedBox(
         height: height,

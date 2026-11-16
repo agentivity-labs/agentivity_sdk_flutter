@@ -107,7 +107,6 @@ class _AgChoiceCardState extends State<AgChoiceCard> {
     return AgArtifactCard(
       title: title,
       icon: Icons.tune_rounded,
-      type: _multiple ? 'Multi-select' : 'Select',
       // Disabled/answered visual state is owned by the chat panel's message
       // bubble (_MessageBubble._dimIfDisabled), not here. _toggle/_submit
       // already guard on _submitted, so no IgnorePointer/Opacity is needed
