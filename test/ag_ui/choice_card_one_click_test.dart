@@ -61,6 +61,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 50));
 
+    // The person had been typing: the box under the conversation holds the focus when they turn to the card.
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
+
     await tester.tap(find.text('Approve it'));
     await tester.pump();
     await tester.tap(find.text('Confirm'));
