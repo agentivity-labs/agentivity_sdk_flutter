@@ -137,12 +137,13 @@ class DeskApi {
     return CockpitView.fromJson(response.data ?? const {});
   }
 
-  /// What a block of a cockpit shows of a Data Table: its figure, or its rows.
+  /// What a block of a cockpit shows of a Data Table: its figure, or its rows. [search] is what the person typed in the block's
+  /// own search box, looked for in the columns it shows — the rows are chosen in the database, never here.
   // GET /api/v1/desk/cockpits/{cockpitId}/blocks/{blockId}
-  Future<CockpitBlockData> cockpitBlock(String cockpitId, String blockId, {bool draft = false}) async {
+  Future<CockpitBlockData> cockpitBlock(String cockpitId, String blockId, {bool draft = false, String? search}) async {
     final response = await _c.get<Map<String, dynamic>>(
       AgentivityHttpCore.v1('/desk/cockpits/${Uri.encodeComponent(cockpitId)}/blocks/${Uri.encodeComponent(blockId)}'),
-      queryParameters: {if (draft) 'draft': true},
+      queryParameters: {if (draft) 'draft': true, if (search != null && search.trim().isNotEmpty) 'q': search.trim()},
     );
     return CockpitBlockData.fromJson(response.data ?? const {});
   }
