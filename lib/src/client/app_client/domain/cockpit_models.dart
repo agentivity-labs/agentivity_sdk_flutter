@@ -42,6 +42,9 @@ abstract final class CockpitBlockType {
   /// The person's conversations with its Solutions (`title`, `count`).
   static const conversations = 'conversations';
 
+  /// A chart of a Data Table (`tableId`, `kind`: bars, lines or parts; `labelColumn`, `valueKind`, `valueColumn`, `count`).
+  static const chart = 'chart';
+
   /// A text (`title`, `body`): paragraphs, and lines that start with "- ".
   static const text = 'text';
 
@@ -68,7 +71,7 @@ abstract final class CockpitBlockType {
   /// Opens a part of the page: a title, a line under it, a rule (`title`, `subtitle`, `line`). Always the whole width.
   static const section = 'section';
 
-  static const all = [hero, ask, suggestions, waiting, gains, solutions, conversations, text, announcement, links, launch, metric, table, card, section];
+  static const all = [hero, ask, suggestions, waiting, gains, solutions, conversations, text, announcement, links, launch, metric, table, chart, card, section];
 }
 
 /// A link of a links block.
@@ -218,11 +221,14 @@ class CockpitView {
 /// What a block of a Data Table shows: a figure ([value]) or rows ([columns], [rows], of [total]); [problem] when it cannot.
 @immutable
 class CockpitBlockData {
-  const CockpitBlockData({this.value, this.columns = const [], this.rows = const [], this.total = 0, this.problem});
+  const CockpitBlockData({this.value, this.columns = const [], this.rows = const [], this.points = const [], this.total = 0, this.problem});
 
   final double? value;
   final List<String> columns;
   final List<List<String>> rows;
+
+  /// What a chart draws: one point per group, already counted, added up or averaged by the database.
+  final List<CockpitPoint> points;
   final int total;
   final String? problem;
 
@@ -230,9 +236,24 @@ class CockpitBlockData {
         value: (json['value'] as num?)?.toDouble(),
         columns: _strings(json['columns']),
         rows: json['rows'] is List ? (json['rows'] as List).whereType<List>().map((r) => r.map((c) => c?.toString() ?? '').toList(growable: false)).toList(growable: false) : const [],
+        points: json['points'] is List
+            ? (json['points'] as List).whereType<Map>().map((p) => CockpitPoint.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
+            : const [],
         total: (json['total'] as num?)?.toInt() ?? 0,
         problem: _text(json['problem']),
       );
+}
+
+/// One point of a chart: what it is about, and how much of it there is.
+@immutable
+class CockpitPoint {
+  const CockpitPoint({required this.label, required this.value});
+
+  final String label;
+  final double value;
+
+  factory CockpitPoint.fromJson(Map<String, dynamic> json) =>
+      CockpitPoint(label: _text(json['label']) ?? '', value: (json['value'] as num?)?.toDouble() ?? 0);
 }
 
 /// An owner of a cockpit: their id, and their name and e-mail when the workspace knows its people.
