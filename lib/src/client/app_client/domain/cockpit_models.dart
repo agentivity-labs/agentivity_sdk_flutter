@@ -85,7 +85,7 @@ class CockpitLink {
   Map<String, dynamic> toJson() => {'label': label, 'url': url, if (note != null) 'note': note};
 }
 
-/// A block of a cockpit: its kind ([CockpitBlockType]), its width in twelfths of the page on a wide screen (4, 6, 8 or 12), what it
+/// A block of a cockpit: its kind ([CockpitBlockType]), its width in twelfths of the page on a wide screen (3, 4, 6, 8 or 12), what it
 /// is set to show, and how it looks besides the page ([style]: `fill` white, tinted, colour or clear, `colour`, `border` none, thin
 /// or accent, `corners` square, soft or round; what is not said is as the page says).
 @immutable
@@ -98,8 +98,8 @@ class CockpitBlock {
   final Map<String, dynamic> settings;
   final Map<String, dynamic> style;
 
-  /// The widths a block may take: a third, a half, two thirds, all of the page.
-  static const spans = [4, 6, 8, 12];
+  /// The widths a block may take: a quarter, a third, a half, two thirds, all of the page.
+  static const spans = [3, 4, 6, 8, 12];
 
   factory CockpitBlock.fromJson(Map<String, dynamic> json) => CockpitBlock(
         id: json['id']?.toString() ?? '',
