@@ -43,7 +43,7 @@ abstract final class CockpitBlockType {
   static const conversations = 'conversations';
 
   /// A chart of a Data Table (`tableId`, `kind`: bars, lines or parts; `labelKind`: a column, a stretch of time (`period`,
-  /// with `by`: day, month, quarter or year) or an expression; `labelColumn`, `labelExpression`, `valueKind`, `valueColumn`,
+  /// with `by`: day, week, month, quarter or year, cut where the platform is) or an expression; `labelColumn`, `labelExpression`, `valueKind`, `valueColumn`,
   /// `valueExpression`, `count`, `filters`, `where`, `periodColumn`, `period`). A chart over time is drawn oldest group first.
   /// An expression is read and turned into SQL by the service; nothing of it is read here.
   static const chart = 'chart';
