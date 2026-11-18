@@ -249,6 +249,7 @@ class CockpitBlockData {
     this.value,
     this.before,
     this.columns = const [],
+    this.kinds = const [],
     this.rows = const [],
     this.points = const [],
     this.people = const [],
@@ -266,6 +267,10 @@ class CockpitBlockData {
   /// What a chart draws: one point per group, already counted, added up or averaged by the database.
   final List<CockpitPoint> points;
 
+  /// What each column of [rows] holds: moment, date, number, yesno or text. A moment arrives in UTC, to be shown where the
+  /// person reading is.
+  final List<String> kinds;
+
   /// Who a block of people puts forward, by the names the workspace knows them under.
   final List<CockpitPerson> people;
   final int total;
@@ -275,6 +280,7 @@ class CockpitBlockData {
         value: (json['value'] as num?)?.toDouble(),
         before: (json['before'] as num?)?.toDouble(),
         columns: _strings(json['columns']),
+        kinds: _strings(json['kinds']),
         rows: json['rows'] is List ? (json['rows'] as List).whereType<List>().map((r) => r.map((c) => c?.toString() ?? '').toList(growable: false)).toList(growable: false) : const [],
         points: json['points'] is List
             ? (json['points'] as List).whereType<Map>().map((p) => CockpitPoint.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
@@ -338,15 +344,24 @@ class CockpitPerson {
 }
 
 /// One point of a chart: what it is about, and how much of it there is.
+///
+/// A chart over time says [day] instead — the day its stretch of time starts on, as a day and not as words, because what is read
+/// under the bar is written where it is read. See `timeLabel` in the Desk kit.
 @immutable
 class CockpitPoint {
-  const CockpitPoint({required this.label, required this.value});
+  const CockpitPoint({this.label = '', this.day, required this.value});
 
   final String label;
+
+  /// The first day of the stretch of time this point stands for (2026-11-18), on a chart drawn over time.
+  final DateTime? day;
   final double value;
 
-  factory CockpitPoint.fromJson(Map<String, dynamic> json) =>
-      CockpitPoint(label: _text(json['label']) ?? '', value: (json['value'] as num?)?.toDouble() ?? 0);
+  factory CockpitPoint.fromJson(Map<String, dynamic> json) => CockpitPoint(
+        label: _text(json['label']) ?? '',
+        day: _text(json['day']) is String ? DateTime.tryParse(_text(json['day'])!) : null,
+        value: (json['value'] as num?)?.toDouble() ?? 0,
+      );
 }
 
 /// An owner of a cockpit: their id, and their name and e-mail when the workspace knows its people.
