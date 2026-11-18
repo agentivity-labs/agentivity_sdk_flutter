@@ -42,7 +42,9 @@ abstract final class CockpitBlockType {
   /// The person's conversations with its Solutions (`title`, `count`).
   static const conversations = 'conversations';
 
-  /// A chart of a Data Table (`tableId`, `kind`: bars, lines or parts; `labelColumn`, `valueKind`, `valueColumn`, `count`).
+  /// A chart of a Data Table (`tableId`, `kind`: bars, lines or parts; `labelKind`, `labelColumn`, `labelExpression`,
+  /// `valueKind`, `valueColumn`, `valueExpression`, `count`, `filters`, `where`). An expression is read and turned into SQL by
+  /// the service; nothing of it is read here.
   static const chart = 'chart';
 
   /// A text (`title`, `body`): paragraphs, and lines that start with "- ".
@@ -57,11 +59,12 @@ abstract final class CockpitBlockType {
   /// A button that starts a Solution with what to say already written (`entityId`, `label`, `prompt`, `note`).
   static const launch = 'launch';
 
-  /// A figure of a Data Table (`label`, `tableId`, `kind`: count, sum, average, min or max, `column`, `filterColumn`,
-  /// `filterValue`, `unit`).
+  /// A figure of a Data Table (`label`, `tableId`, `kind`: count, sum, average, min, max or expression, `column`,
+  /// `expression`, `filterColumn`, `filterValue`, `filters`, `where`, `unit`).
   static const metric = 'metric';
 
-  /// The rows of a Data Table (`title`, `tableId`, `columns`, `count`, `sortColumn`, `descending`).
+  /// The rows of a Data Table (`title`, `tableId`, `columns`, `count`, `sortColumn`, `descending`, `filters`, `where`,
+  /// `search`).
   static const table = 'table';
 
   /// An image, a title, a text and a link out of Agentivity (`image`: kept as a data URL or an https address, `imageAt`: top or
