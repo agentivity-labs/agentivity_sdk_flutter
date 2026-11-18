@@ -282,6 +282,8 @@ class CockpitBlockData {
     this.kinds = const [],
     this.rows = const [],
     this.points = const [],
+    this.series = const [],
+    this.trend = const [],
     this.people = const [],
     this.total = 0,
     this.sortedBy,
@@ -298,6 +300,13 @@ class CockpitBlockData {
 
   /// What a chart draws: one point per group, already counted, added up or averaged by the database.
   final List<CockpitPoint> points;
+
+  /// The same groups cut by a second column, when the chart is: each series has one value per point, in their order, the
+  /// largest series first. Empty for a chart of one series.
+  final List<CockpitSeries> series;
+
+  /// Which way a figure went: its measure over the last stretches of time, the oldest first; null where a stretch held nothing.
+  final List<double?> trend;
 
   /// What each column of [rows] holds: moment, date, number, yesno or text. A moment arrives in UTC, to be shown where the
   /// person reading is.
@@ -321,6 +330,10 @@ class CockpitBlockData {
         points: json['points'] is List
             ? (json['points'] as List).whereType<Map>().map((p) => CockpitPoint.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
             : const [],
+        series: json['series'] is List
+            ? (json['series'] as List).whereType<Map>().map((p) => CockpitSeries.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
+            : const [],
+        trend: json['trend'] is List ? (json['trend'] as List).map((v) => (v as num?)?.toDouble()).toList(growable: false) : const [],
         people: json['people'] is List
             ? (json['people'] as List).whereType<Map>().map((p) => CockpitPerson.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
             : const [],
@@ -328,6 +341,20 @@ class CockpitBlockData {
         sortedBy: _text(json['sortedBy']),
         sortedDown: json['sortedDown'] == true,
         problem: _text(json['problem']),
+      );
+}
+
+/// One series of a chart cut by a second column: what it is called, and its value at each point of the chart.
+@immutable
+class CockpitSeries {
+  const CockpitSeries({required this.name, required this.values});
+
+  final String name;
+  final List<double> values;
+
+  factory CockpitSeries.fromJson(Map<String, dynamic> json) => CockpitSeries(
+        name: json['name']?.toString() ?? '',
+        values: json['values'] is List ? (json['values'] as List).map((v) => (v as num?)?.toDouble() ?? 0).toList(growable: false) : const [],
       );
 }
 
