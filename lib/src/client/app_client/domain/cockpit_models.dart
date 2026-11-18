@@ -110,7 +110,7 @@ class CockpitLink {
 /// or accent, `corners` square, soft or round; what is not said is as the page says).
 @immutable
 class CockpitBlock {
-  const CockpitBlock({required this.id, required this.type, this.span = 12, this.settings = const {}, this.style = const {}});
+  const CockpitBlock({required this.id, required this.type, this.span = units, this.settings = const {}, this.style = const {}});
 
   final String id;
   final String type;
@@ -119,12 +119,35 @@ class CockpitBlock {
   final Map<String, dynamic> style;
 
   /// The widths a block may take: a quarter, a third, a half, two thirds, all of the page.
-  static const spans = [3, 4, 6, 8, 12];
+  /// How many parts the width of a page is cut into: forty-eight, which is both sixteen and twelve, so a block may be a
+  /// sixteenth of the page or a third of it. A page written when it was cut into twelfths keeps its widths exactly — the
+  /// service turns each of its twelfths into four, once.
+  static const units = 48;
+
+  /// The widths the designer offers: a sixteenth, an eighth, a sixth, a quarter, a third, three eighths, a half, two thirds,
+  /// three quarters, all of it. Any width between them is kept as it is dragged.
+  static const spans = [3, 6, 8, 9, 12, 16, 18, 24, 32, 36, 48];
+
+  /// What a width is called, for a person choosing one.
+  static String spanName(int span) => switch (span) {
+        3 => '1/16',
+        6 => '1/8',
+        8 => '1/6',
+        9 => '3/16',
+        12 => '1/4',
+        16 => '1/3',
+        18 => '3/8',
+        24 => '1/2',
+        32 => '2/3',
+        36 => '3/4',
+        48 => 'Full',
+        _ => '$span/48',
+      };
 
   factory CockpitBlock.fromJson(Map<String, dynamic> json) => CockpitBlock(
         id: json['id']?.toString() ?? '',
         type: json['type']?.toString() ?? '',
-        span: (json['span'] as num?)?.toInt() ?? 12,
+        span: (json['span'] as num?)?.toInt() ?? units,
         settings: Map<String, dynamic>.from(_map(json['settings'])),
         style: Map<String, dynamic>.from(_map(json['style'])),
       );
@@ -191,6 +214,10 @@ class CockpitContent {
   final List<CockpitBlock> blocks;
   final Map<String, dynamic> style;
 
+  /// How many parts the width of the page is cut into. Always said when a page is kept, so that the service reads its widths
+  /// as they are: a page that says nothing is read as one written when the page was cut into twelfths, and converted once.
+  int get grid => CockpitBlock.units;
+
   factory CockpitContent.fromJson(Map<String, dynamic> json) => CockpitContent(
         name: json['name']?.toString() ?? '',
         colour: _text(json['colour']),
@@ -205,6 +232,7 @@ class CockpitContent {
         'entityIds': entityIds,
         'blocks': blocks.map((b) => b.toJson()).toList(),
         if (style.isNotEmpty) 'style': style,
+        'grid': grid,
       };
 
   /// The line of the top of the page, when it says one.
@@ -254,6 +282,8 @@ class CockpitBlockData {
     this.points = const [],
     this.people = const [],
     this.total = 0,
+    this.sortedBy,
+    this.sortedDown = false,
     this.problem,
   });
 
@@ -274,6 +304,10 @@ class CockpitBlockData {
   /// Who a block of people puts forward, by the names the workspace knows them under.
   final List<CockpitPerson> people;
   final int total;
+
+  /// Which column the rows came back sorted by, and whether from the largest: what the page draws the arrow on.
+  final String? sortedBy;
+  final bool sortedDown;
   final String? problem;
 
   factory CockpitBlockData.fromJson(Map<String, dynamic> json) => CockpitBlockData(
@@ -289,6 +323,8 @@ class CockpitBlockData {
             ? (json['people'] as List).whereType<Map>().map((p) => CockpitPerson.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
             : const [],
         total: (json['total'] as num?)?.toInt() ?? 0,
+        sortedBy: _text(json['sortedBy']),
+        sortedDown: json['sortedDown'] == true,
         problem: _text(json['problem']),
       );
 }
