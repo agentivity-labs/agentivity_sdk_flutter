@@ -42,9 +42,10 @@ abstract final class CockpitBlockType {
   /// The person's conversations with its Solutions (`title`, `count`).
   static const conversations = 'conversations';
 
-  /// A chart of a Data Table (`tableId`, `kind`: bars, lines or parts; `labelKind`, `labelColumn`, `labelExpression`,
-  /// `valueKind`, `valueColumn`, `valueExpression`, `count`, `filters`, `where`). An expression is read and turned into SQL by
-  /// the service; nothing of it is read here.
+  /// A chart of a Data Table (`tableId`, `kind`: bars, lines or parts; `labelKind`: a column, a stretch of time (`period`,
+  /// with `by`: day, month, quarter or year) or an expression; `labelColumn`, `labelExpression`, `valueKind`, `valueColumn`,
+  /// `valueExpression`, `count`, `filters`, `where`, `periodColumn`, `period`). A chart over time is drawn oldest group first.
+  /// An expression is read and turned into SQL by the service; nothing of it is read here.
   static const chart = 'chart';
 
   /// A text (`title`, `body`): paragraphs, and lines that start with "- ".
@@ -59,12 +60,14 @@ abstract final class CockpitBlockType {
   /// A button that starts a Solution with what to say already written (`entityId`, `label`, `prompt`, `note`).
   static const launch = 'launch';
 
-  /// A figure of a Data Table (`label`, `tableId`, `kind`: count, sum, average, min, max or expression, `column`,
-  /// `expression`, `filterColumn`, `filterValue`, `filters`, `where`, `unit`).
+  /// A figure of a Data Table (`label`, `tableId`, `kind`: count, sum, average, min, max, a percentile (p50…p99) or
+  /// expression, `column`, `expression`, `filterColumn`, `filterValue`, `filters`, `where`, `unit`). It may read one stretch
+  /// of time (`periodColumn`, `period`: today, 7d, 30d, 90d, 12m, ytd) and say how it moved against the stretch before it
+  /// (`compare`, `rise`: which way is the good way).
   static const metric = 'metric';
 
   /// The rows of a Data Table (`title`, `tableId`, `columns`, `count`, `sortColumn`, `descending`, `filters`, `where`,
-  /// `search`).
+  /// `search`, `periodColumn`, `period`).
   static const table = 'table';
 
   /// An image, a title, a text and a link out of Agentivity (`image`: kept as a data URL or an https address, `imageAt`: top or
@@ -221,12 +224,16 @@ class CockpitView {
       );
 }
 
-/// What a block of a Data Table shows: a figure ([value]) or rows ([columns], [rows], of [total]); [problem] when it cannot.
+/// What a block of a Data Table shows: a figure ([value], and [before] over the stretch of time before it) or rows ([columns],
+/// [rows], of [total]); [problem] when it cannot.
 @immutable
 class CockpitBlockData {
-  const CockpitBlockData({this.value, this.columns = const [], this.rows = const [], this.points = const [], this.total = 0, this.problem});
+  const CockpitBlockData({this.value, this.before, this.columns = const [], this.rows = const [], this.points = const [], this.total = 0, this.problem});
 
   final double? value;
+
+  /// The same figure over the stretch of time just before the one shown, when it says which way it is going; null otherwise.
+  final double? before;
   final List<String> columns;
   final List<List<String>> rows;
 
@@ -237,6 +244,7 @@ class CockpitBlockData {
 
   factory CockpitBlockData.fromJson(Map<String, dynamic> json) => CockpitBlockData(
         value: (json['value'] as num?)?.toDouble(),
+        before: (json['before'] as num?)?.toDouble(),
         columns: _strings(json['columns']),
         rows: json['rows'] is List ? (json['rows'] as List).whereType<List>().map((r) => r.map((c) => c?.toString() ?? '').toList(growable: false)).toList(growable: false) : const [],
         points: json['points'] is List
