@@ -332,19 +332,31 @@ class CockpitBlockData {
 /// One button of a block of quick actions: the Solution it starts, and what it says to it.
 @immutable
 class CockpitAction {
-  const CockpitAction({required this.entityId, required this.label, this.prompt, this.note});
+  const CockpitAction({required this.entityId, required this.label, this.prompt, this.note, this.icon});
 
   final String entityId;
   final String label;
   final String? prompt;
   final String? note;
 
+  /// The icon it wears, by name (task_alt, reply, escalate…); null: the mark of what its Solution is.
+  final String? icon;
+
   factory CockpitAction.fromJson(Map<String, dynamic> json) => CockpitAction(
         entityId: json['entityId']?.toString() ?? '',
         label: json['label']?.toString() ?? '',
         prompt: _text(json['prompt']),
         note: _text(json['note']),
+        icon: _text(json['icon']),
       );
+
+  Map<String, dynamic> toJson() => {
+        'entityId': entityId,
+        'label': label,
+        if (prompt != null) 'prompt': prompt,
+        if (note != null) 'note': note,
+        if (icon != null) 'icon': icon,
+      };
 }
 
 /// One tab of a block of rows: its name, and what it keeps on top of what the block keeps.
