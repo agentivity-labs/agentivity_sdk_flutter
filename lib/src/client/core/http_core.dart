@@ -5,6 +5,7 @@ import 'connection_monitor.dart';
 import 'slow_calls.dart';
 import 'user_tokens.dart';
 import 'waking_workspace.dart';
+import 'where_we_are.dart';
 import 'workspace_sleep.dart';
 
 /// Internal HTTP transport shared by all [*Api] components.
@@ -22,6 +23,9 @@ class AgentivityHttpCore {
       : _dio = dio ?? Dio(_buildOptions(baseUrl, apiKey)) {
     if (!_dio.interceptors.any((i) => i is SleepingWorkspaceInterceptor)) {
       _dio.interceptors.insert(0, SleepingWorkspaceInterceptor());
+    }
+    if (!_dio.interceptors.any((i) => i is WhereWeAreInterceptor)) {
+      _dio.interceptors.add(WhereWeAreInterceptor());
     }
     userTokens = _dio.interceptors.whereType<UserTokens>().firstOrNull ?? UserTokens(_dio);
     if (!_dio.interceptors.contains(userTokens)) {

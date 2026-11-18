@@ -60,6 +60,14 @@ abstract final class CockpitBlockType {
   /// A button that starts a Solution with what to say already written (`entityId`, `label`, `prompt`, `note`).
   static const launch = 'launch';
 
+  /// What a department does every day, as several buttons in one block (`title`, `actions`: each an `entityId`, a `label`, a
+  /// `prompt` and a `note`).
+  static const actions = 'actions';
+
+  /// Who to ask when no Solution can help (`title`, `people`: each an `id` of a person and a `note`). The service gives back
+  /// their names and e-mails; the page keeps only who it names.
+  static const people = 'people';
+
   /// A figure of a Data Table (`label`, `tableId`, `kind`: count, sum, average, min, max, a percentile (p50…p99) or
   /// expression, `column`, `expression`, `filterColumn`, `filterValue`, `filters`, `where`, `unit`). It may read one stretch
   /// of time (`periodColumn`, `period`: today, 7d, 30d, 90d, 12m, ytd) and say how it moved against the stretch before it
@@ -67,7 +75,7 @@ abstract final class CockpitBlockType {
   static const metric = 'metric';
 
   /// The rows of a Data Table (`title`, `tableId`, `columns`, `count`, `sortColumn`, `descending`, `filters`, `where`,
-  /// `search`, `periodColumn`, `period`).
+  /// `search`, `periodColumn`, `period`, `tabs`: each a `label` and the `where` it keeps on top of the block's own).
   static const table = 'table';
 
   /// An image, a title, a text and a link out of Agentivity (`image`: kept as a data URL or an https address, `imageAt`: top or
@@ -77,7 +85,10 @@ abstract final class CockpitBlockType {
   /// Opens a part of the page: a title, a line under it, a rule (`title`, `subtitle`, `line`). Always the whole width.
   static const section = 'section';
 
-  static const all = [hero, ask, suggestions, waiting, gains, solutions, conversations, text, announcement, links, launch, metric, table, chart, card, section];
+  static const all = [
+    hero, ask, suggestions, waiting, gains, solutions, conversations, text, announcement, links, launch, actions, people,
+    metric, table, chart, card, section,
+  ];
 }
 
 /// A link of a links block.
@@ -129,6 +140,12 @@ class CockpitBlock {
   List<String> strings(String key) => _strings(settings[key]);
 
   List<CockpitLink> get links => _maps(settings['links']).map(CockpitLink.fromJson).toList(growable: false);
+
+  /// The buttons of a block of quick actions.
+  List<CockpitAction> get actions => _maps(settings['actions']).map(CockpitAction.fromJson).toList(growable: false);
+
+  /// The tabs of a block of rows: the same rows read several ways.
+  List<CockpitTab> get tabs => _maps(settings['tabs']).map(CockpitTab.fromJson).toList(growable: false);
 
   /// The same block, with [key] set to [value] (null or empty: taken away).
   CockpitBlock withSetting(String key, Object? value) {
@@ -228,7 +245,16 @@ class CockpitView {
 /// [rows], of [total]); [problem] when it cannot.
 @immutable
 class CockpitBlockData {
-  const CockpitBlockData({this.value, this.before, this.columns = const [], this.rows = const [], this.points = const [], this.total = 0, this.problem});
+  const CockpitBlockData({
+    this.value,
+    this.before,
+    this.columns = const [],
+    this.rows = const [],
+    this.points = const [],
+    this.people = const [],
+    this.total = 0,
+    this.problem,
+  });
 
   final double? value;
 
@@ -239,6 +265,9 @@ class CockpitBlockData {
 
   /// What a chart draws: one point per group, already counted, added up or averaged by the database.
   final List<CockpitPoint> points;
+
+  /// Who a block of people puts forward, by the names the workspace knows them under.
+  final List<CockpitPerson> people;
   final int total;
   final String? problem;
 
@@ -250,8 +279,61 @@ class CockpitBlockData {
         points: json['points'] is List
             ? (json['points'] as List).whereType<Map>().map((p) => CockpitPoint.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
             : const [],
+        people: json['people'] is List
+            ? (json['people'] as List).whereType<Map>().map((p) => CockpitPerson.fromJson(Map<String, dynamic>.from(p))).toList(growable: false)
+            : const [],
         total: (json['total'] as num?)?.toInt() ?? 0,
         problem: _text(json['problem']),
+      );
+}
+
+/// One button of a block of quick actions: the Solution it starts, and what it says to it.
+@immutable
+class CockpitAction {
+  const CockpitAction({required this.entityId, required this.label, this.prompt, this.note});
+
+  final String entityId;
+  final String label;
+  final String? prompt;
+  final String? note;
+
+  factory CockpitAction.fromJson(Map<String, dynamic> json) => CockpitAction(
+        entityId: json['entityId']?.toString() ?? '',
+        label: json['label']?.toString() ?? '',
+        prompt: _text(json['prompt']),
+        note: _text(json['note']),
+      );
+}
+
+/// One tab of a block of rows: its name, and what it keeps on top of what the block keeps.
+@immutable
+class CockpitTab {
+  const CockpitTab({required this.label, this.where});
+
+  final String label;
+  final String? where;
+
+  factory CockpitTab.fromJson(Map<String, dynamic> json) => CockpitTab(label: json['label']?.toString() ?? '', where: _text(json['where']));
+}
+
+/// One person a cockpit puts forward: who they are here, and what they are the one to ask about.
+@immutable
+class CockpitPerson {
+  const CockpitPerson({required this.id, this.name, this.email, this.note});
+
+  final String id;
+  final String? name;
+  final String? email;
+  final String? note;
+
+  /// What to call them: their name, else their e-mail, else their id.
+  String get label => name ?? email ?? id;
+
+  factory CockpitPerson.fromJson(Map<String, dynamic> json) => CockpitPerson(
+        id: json['id']?.toString() ?? '',
+        name: _text(json['name']),
+        email: _text(json['email']),
+        note: _text(json['note']),
       );
 }
 

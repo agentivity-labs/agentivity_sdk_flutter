@@ -197,6 +197,7 @@ export 'src/client/app_client/domain/space_models.dart';
 export 'src/client/core/api_contract.dart';
 export 'src/client/core/http_core.dart';
 export 'src/client/core/waking_workspace.dart';
+export 'src/client/core/where_we_are.dart';
 export 'src/client/core/workspace_sleep.dart';
 export 'src/client/core/slow_calls.dart';
 export 'src/client/core/streaming_request.dart';
