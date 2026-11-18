@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../icons/icon_ref.dart';
+
 // The cockpits of Agentivity Desk: the starting page of each department, made of blocks. The Desk reads them as published
 // ([CockpitView]); the Studio builds them as drafts and publishes them ([ManagedCockpit]).
 
@@ -339,15 +341,15 @@ class CockpitAction {
   final String? prompt;
   final String? note;
 
-  /// The icon it wears, by name (task_alt, reply, escalate…); null: the mark of what its Solution is.
-  final String? icon;
+  /// The icon it wears, from the icon catalog; null: the mark of what its Solution is.
+  final IconRef? icon;
 
   factory CockpitAction.fromJson(Map<String, dynamic> json) => CockpitAction(
         entityId: json['entityId']?.toString() ?? '',
         label: json['label']?.toString() ?? '',
         prompt: _text(json['prompt']),
         note: _text(json['note']),
-        icon: _text(json['icon']),
+        icon: IconRef.tryParse(json['icon']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -355,7 +357,7 @@ class CockpitAction {
         'label': label,
         if (prompt != null) 'prompt': prompt,
         if (note != null) 'note': note,
-        if (icon != null) 'icon': icon,
+        if (icon != null) 'icon': icon!.toJson(),
       };
 }
 
