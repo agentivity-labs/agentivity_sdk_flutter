@@ -28,9 +28,16 @@ class CockpitsApi {
   // GET /api/v1/cockpits/{id}
   Future<ManagedCockpit> get(String id) async => _one((await _c.get<dynamic>(_path(id))).data);
 
-  /// Keeps the draft: the Desk still shows what is published.
-  // PUT /api/v1/cockpits/{id}/draft
-  Future<ManagedCockpit> saveDraft(String id, CockpitContent content) async => _one((await _c.put<dynamic>(_path(id, '/draft'), data: content.toJson())).data);
+  /// Keeps the draft: the Desk still shows what is published. Given [basedOn] — when the cockpit was last changed, as it was read
+  /// ([ManagedCockpit.updatedAt]) — a draft changed since by someone else is not overwritten: the save is refused (409,
+  /// `draft_changed`), and the cockpit is to be read again.
+  // PUT /api/v1/cockpits/{id}/draft?basedOn=
+  Future<ManagedCockpit> saveDraft(String id, CockpitContent content, {DateTime? basedOn}) async => _one((await _c.put<dynamic>(
+        _path(id, '/draft'),
+        data: content.toJson(),
+        queryParameters: basedOn == null ? null : {'basedOn': basedOn.toUtc().toIso8601String()},
+      ))
+          .data);
 
   /// The draft becomes what the Desk shows.
   // POST /api/v1/cockpits/{id}/publish
