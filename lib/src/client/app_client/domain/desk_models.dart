@@ -184,6 +184,7 @@ class DeskOverview {
     this.emailQuestions = true,
     this.tourSeen = true,
     this.popular = const [],
+    this.favorites = const [],
   });
 
   final DeskBrand brand;
@@ -212,6 +213,9 @@ class DeskOverview {
   /// The Solutions most used in the workspace these seven days, among those the caller sees: the most used first, five at most.
   final List<DeskPopular> popular;
 
+  /// The Solutions the caller keeps among their favorites, the latest added first (those still shown to them).
+  final List<String> favorites;
+
   bool publishes(String entityId) => shown == null || shown!.contains(entityId);
 
   factory DeskOverview.fromJson(Map<String, dynamic> json) {
@@ -231,6 +235,7 @@ class DeskOverview {
       emailQuestions: json['emailQuestions'] != false,
       tourSeen: json['tourSeen'] != false,
       popular: _maps(json['popular']).map(DeskPopular.fromJson).where((p) => p.entityId.isNotEmpty).toList(growable: false),
+      favorites: json['favorites'] is List ? _strings(json['favorites']) : const [],
     );
   }
 }

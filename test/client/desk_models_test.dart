@@ -73,6 +73,8 @@ void main() {
     expect(overview.popular.single.entityId, 'a1');
     expect(overview.popular.single.people, 48);
     expect(const DeskOverview().popular, isEmpty);
+    expect(DeskOverview.fromJson({'favorites': ['a1', 'a2']}).favorites, ['a1', 'a2']);
+    expect(const DeskOverview().favorites, isEmpty);
     expect(overview.cockpits.single.waiting, 2);
     expect(overview.publishes('a1'), isTrue);
     expect(overview.publishes('a2'), isFalse);

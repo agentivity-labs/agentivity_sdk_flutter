@@ -97,6 +97,15 @@ class DeskApi {
 
   /// Whether one is told by e-mail of a question asked to them.
   // PUT /api/v1/desk/notifications
+  // PUT and DELETE /api/v1/desk/favorites/{entityId}
+  /// Puts a Solution among one's favorites ([favorite]), first, or takes it out; the favorites as they are now.
+  Future<List<String>> setFavorite(String entityId, bool favorite) async {
+    final path = AgentivityHttpCore.v1('/desk/favorites/${Uri.encodeComponent(entityId)}');
+    final response = favorite ? await _c.put<Map<String, dynamic>>(path) : await _c.delete<Map<String, dynamic>>(path);
+    final list = response.data?['favorites'];
+    return list is List ? [for (final f in list) if (f is String) f] : const [];
+  }
+
   // PUT /api/v1/desk/tour
   /// The tour of the Desk seen ([seen]), or to be shown again.
   Future<void> setTourSeen(bool seen) async {
