@@ -148,7 +148,7 @@ Renderable _fromTemplate(Map<String, dynamic> file) {
   }
   final kind = _toKind(root?['kind']) ?? _toKind(byId[rootId]?.kind);
   if (kind == null) {
-    throw const RenderableError(RenderableErrorCode.unsupportedKind, 'The root of a Template is a team, a workflow or an agent.');
+    throw const RenderableError(RenderableErrorCode.unsupportedKind, 'The root of a Template is a team, an automation or an agent.');
   }
   return Renderable(
     kind: kind,
@@ -193,7 +193,7 @@ Renderable _fromWrapper(Map<String, dynamic> wrapper) {
 Renderable _fromBare(Map<String, dynamic> entity) {
   final kind = _guessKind(entity);
   if (kind == null) {
-    throw const RenderableError(RenderableErrorCode.unsupportedKind, 'This object is not a team, a workflow or an agent.');
+    throw const RenderableError(RenderableErrorCode.unsupportedKind, 'This object is not a team, an automation or an agent.');
   }
   final id = _text(entity['id']) ?? '';
   return Renderable(kind: kind, id: id, name: _text(entity['name']) ?? id, entity: entity);
@@ -211,7 +211,7 @@ Renderable resolveRenderable(Object? source) {
   }
   final map = _rec(value);
   if (map == null) {
-    throw const RenderableError(RenderableErrorCode.notAnObject, 'Nothing to draw: expected a Template, a team, a workflow or an agent.');
+    throw const RenderableError(RenderableErrorCode.notAnObject, 'Nothing to draw: expected a Template, a team, an automation or an agent.');
   }
   // The marketplace answers { data: ... } (or { data, meta }): what to draw is inside.
   if (_rec(map['data']) != null &&
