@@ -183,6 +183,7 @@ class DeskOverview {
     this.waitingIds = const {},
     this.emailQuestions = true,
     this.tourSeen = true,
+    this.popular = const [],
   });
 
   final DeskBrand brand;
@@ -208,6 +209,9 @@ class DeskOverview {
   /// Whether the person saw the tour of the Desk: shown once, at the first visit.
   final bool tourSeen;
 
+  /// The Solutions most used in the workspace these seven days, among those the caller sees: the most used first, five at most.
+  final List<DeskPopular> popular;
+
   bool publishes(String entityId) => shown == null || shown!.contains(entityId);
 
   factory DeskOverview.fromJson(Map<String, dynamic> json) {
@@ -226,8 +230,21 @@ class DeskOverview {
       waitingIds: json['waitingIds'] is List ? _strings(json['waitingIds']).toSet() : const {},
       emailQuestions: json['emailQuestions'] != false,
       tourSeen: json['tourSeen'] != false,
+      popular: _maps(json['popular']).map(DeskPopular.fromJson).where((p) => p.entityId.isNotEmpty).toList(growable: false),
     );
   }
+}
+
+/// A Solution much used in the workspace: how many people started a conversation with it these seven days.
+@immutable
+class DeskPopular {
+  const DeskPopular({required this.entityId, required this.people});
+
+  final String entityId;
+  final int people;
+
+  factory DeskPopular.fromJson(Map<String, dynamic> json) =>
+      DeskPopular(entityId: _text(json['entityId']) ?? '', people: (json['people'] as num?)?.toInt() ?? 0);
 }
 
 /// Where the setting up of the Desk stands, read from the workspace: Solutions published to it, cockpits published, people on a

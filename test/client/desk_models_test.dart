@@ -63,9 +63,16 @@ void main() {
       ],
       'counts': {'waiting': 3, 'conversations': 312, 'archived': 4},
       'emailQuestions': false,
+      'popular': [
+        {'entityId': 'a1', 'people': 48},
+        {'entityId': '', 'people': 3},
+      ],
     });
 
     expect(overview.brand.name, 'Acme');
+    expect(overview.popular.single.entityId, 'a1');
+    expect(overview.popular.single.people, 48);
+    expect(const DeskOverview().popular, isEmpty);
     expect(overview.cockpits.single.waiting, 2);
     expect(overview.publishes('a1'), isTrue);
     expect(overview.publishes('a2'), isFalse);
