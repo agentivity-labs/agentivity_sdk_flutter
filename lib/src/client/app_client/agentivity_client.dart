@@ -15,6 +15,7 @@ import '../extras/api/ag_ui_bundles_api.dart';
 import '../extras/api/svg_icons_api.dart';
 import 'api/voice_api.dart';
 import 'api/account_api.dart';
+import 'api/helpdesk_api.dart';
 import 'api/support_api.dart';
 import 'api/spaces_api.dart';
 import 'api/workspace_sleep_api.dart';
@@ -70,6 +71,7 @@ class AgentivityClient {
     voice = VoiceApi(_http);
     account = AccountApi(_http);
     support = SupportApi(_http);
+    helpdesk = HelpdeskApi(_http);
     spaces = SpacesApi(_http);
   }
 
@@ -134,6 +136,9 @@ class AgentivityClient {
 
   /// The support of Agentivity, for the person signed in on a hosted workspace.
   late final SupportApi support;
+
+  /// The help desk of the workspace: what the people of the Desk ask, and how its agents answer.
+  late final HelpdeskApi helpdesk;
 
   /// The spaces the person is in, and the one they work in (the same choice for the Studio and the Desk).
   late final SpacesApi spaces;

@@ -165,7 +165,9 @@ export 'src/artifacts/ag_ui/ag_artifacts_bundle.dart';
 // ── Client: platform API client ────────────────────────────────────────────────
 export 'src/client/app_client/agentivity_client.dart';
 export 'src/client/app_client/api/account_api.dart';
+export 'src/client/app_client/api/helpdesk_api.dart';
 export 'src/client/app_client/api/support_api.dart';
+export 'src/client/app_client/domain/helpdesk_models.dart';
 export 'src/client/app_client/domain/support_models.dart';
 export 'src/client/app_client/api/agentic_folders_api.dart';
 export 'src/client/app_client/api/keys_api.dart';
