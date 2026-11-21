@@ -15,6 +15,7 @@ import '../extras/api/ag_ui_bundles_api.dart';
 import '../extras/api/svg_icons_api.dart';
 import 'api/voice_api.dart';
 import 'api/account_api.dart';
+import 'api/support_api.dart';
 import 'api/spaces_api.dart';
 import 'api/workspace_sleep_api.dart';
 import 'api/keys_api.dart';
@@ -68,6 +69,7 @@ class AgentivityClient {
     svgIcons = SvgIconsApi(_http);
     voice = VoiceApi(_http);
     account = AccountApi(_http);
+    support = SupportApi(_http);
     spaces = SpacesApi(_http);
   }
 
@@ -129,6 +131,9 @@ class AgentivityClient {
 
   /// Signing in as a person: who is signed in, signing in and out, an invitation, a new password, a new address.
   late final AccountApi account;
+
+  /// The support of Agentivity, for the person signed in on a hosted workspace.
+  late final SupportApi support;
 
   /// The spaces the person is in, and the one they work in (the same choice for the Studio and the Desk).
   late final SpacesApi spaces;
