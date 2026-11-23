@@ -458,13 +458,14 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
     });
   }
 
-  Future<void> _send(String text) async {
+  // [attachments]: the files of this message (the photos a person adds later in a conversation go with it, as the first ones).
+  Future<void> _send(String text, [List<ChatAttachment>? attachments]) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     _inputController.clear();
     _offerAnswered = true;
     try {
-      await widget.controller.sendMessage(threadId: _activeThreadId, text: trimmed);
+      await widget.controller.sendMessage(threadId: _activeThreadId, text: trimmed, attachments: attachments == null || attachments.isEmpty ? null : attachments);
     } catch (error) {
       // Refused, not failed: the text is not lost, and a conversation that has ended says what comes next.
       if (!widget.controller.noteSendRefused(error)) rethrow;
@@ -637,7 +638,7 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
                   running: (widget.running ?? false) || widget.controller.isAwaitingResponse,
                   onStop: widget.onStop == null ? null : _stop,
                   stopping: _stopping,
-                  onSend: (text, attachments) => _send(text),
+                  onSend: (text, attachments) => _send(text, [for (final a in attachments) if (a is AgUiImageBytesAttachment) ImageBytesAttachment(bytes: a.bytes, name: a.name, mimeType: a.mimeType)]),
                 ),
           ),
       ],

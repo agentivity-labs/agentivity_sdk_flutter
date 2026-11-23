@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:agentivity_sdk/agentivity_sdk.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +13,7 @@ class _FakeChatProvider implements IChatProvider {
   final List<ChatMessage> messages;
   int sendCallCount = 0;
   String? lastSentText;
+  List<ChatAttachment>? lastAttachments;
 
   @override
   Future<List<ChatThread>> listThreads({required String contextId}) async => threads;
@@ -25,6 +28,7 @@ class _FakeChatProvider implements IChatProvider {
   Future<void> sendMessage({required String contextId, String? threadId, required String text, List<ChatAttachment>? attachments}) async {
     sendCallCount++;
     lastSentText = text;
+    lastAttachments = attachments;
   }
 }
 
@@ -55,6 +59,24 @@ void main() {
 
     expect(provider.sendCallCount, 1);
     expect(provider.lastSentText, 'hello there');
+  });
+
+  testWidgets('a later message goes with its photos, as the first one', (tester) async {
+    final provider = _FakeChatProvider(threads: [_thread('t1')]);
+    final controller = ChatController(provider: provider, contextId: 'ctx1');
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: AgUiChatDiscussion(client: AgentivityPlatformClient(baseUrl: 'http://localhost:1'), controller: controller, threadId: 't1'))),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final photo = Uint8List.fromList([1, 2, 3]);
+    tester.widget<AgUiChatInput>(find.byType(AgUiChatInput)).onSend('and the kitchen', [AgUiImageBytesAttachment(bytes: photo, name: 'kitchen.jpg', mimeType: 'image/jpeg')]);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final sent = provider.lastAttachments!.single as ImageBytesAttachment;
+    expect(sent.bytes, photo);
+    expect(sent.mimeType, 'image/jpeg');
   });
 
 }
