@@ -180,6 +180,8 @@ export 'src/client/app_client/api/runs_api.dart';
 export 'src/client/app_client/api/spaces_api.dart';
 export 'src/client/app_client/api/voice_api.dart';
 export 'src/client/app_client/api/uploads_api.dart';
+export 'src/client/app_client/api/files_api.dart';
+export 'src/client/app_client/domain/file_models.dart';
 export 'src/client/app_client/domain/agent_models.dart';
 export 'src/client/app_client/domain/agentivity_entity.dart';
 export 'src/client/app_client/domain/canvas_annotation_shared.dart';

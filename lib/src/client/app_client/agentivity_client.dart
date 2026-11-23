@@ -10,6 +10,7 @@ import 'api/agentic_folders_api.dart';
 import 'api/data_tables_api.dart';
 import 'api/icons_api.dart';
 import 'api/uploads_api.dart';
+import 'api/files_api.dart';
 import '../extras/api/chat_context_api.dart';
 import '../extras/api/ag_ui_bundles_api.dart';
 import '../extras/api/svg_icons_api.dart';
@@ -65,6 +66,7 @@ class AgentivityClient {
     sleep = WorkspaceSleepApi(_http);
     keys = KeysApi(_http);
     uploads = UploadsApi(_http);
+    files = FilesApi(_http);
     chat = ChatContextApi(_http);
     agUiBundles = AgUiBundlesApi(_http);
     svgIcons = SvgIconsApi(_http);
@@ -118,6 +120,9 @@ class AgentivityClient {
   /// File uploads: hand a run a document (a CV, a contract…) it can read later by id. Every app has it, so an interaction that
   /// asks for a file (a `SourceInput`) takes one with nothing to wire.
   late final UploadsApi uploads;
+
+  /// The files of the workspace: upload several at once, read one back, a link that opens one for a time.
+  late final FilesApi files;
 
   /// AG-UI chat channel: open a streaming run against a chat context/thread.
   late final ChatContextApi chat;
