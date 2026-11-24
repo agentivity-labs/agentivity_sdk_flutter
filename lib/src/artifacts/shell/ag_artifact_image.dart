@@ -31,19 +31,21 @@ class AgArtifactLinks {
 
   static void Function(Uri uri)? onOpen;
 
-  /// Where the instance is (its API base, e.g. `https://my.agentivity.app/`), for the pictures it keeps itself: a step's image
-  /// arrives as `/api/v1/resources/…`. Without it, those pictures show their placeholder.
+  /// Where the instance is (its API base, e.g. `https://my.agentivity.app/`), for the pictures and files it keeps itself: a step's
+  /// image arrives as `/api/v1/resources/…`, a file of the workspace (the photos to approve) as `/api/v1/files/…`. Without it,
+  /// those show their placeholder.
   static String? instanceBaseUrl;
 
-  /// [path] read from the instance when it is one of its own pictures (`/api/v1/resources/…`) and [instanceBaseUrl] is set.
+  /// [path] read from the instance when it is one of its own pictures or files (`/api/v1/resources/…`, `/api/v1/files/…`) and
+  /// [instanceBaseUrl] is set.
   static String? instanceUrl(String path) {
     final base = instanceBaseUrl?.trim();
-    if (base == null || base.isEmpty || !path.startsWith('/api/v1/resources/')) return null;
+    if (base == null || base.isEmpty || !(path.startsWith('/api/v1/resources/') || path.startsWith('/api/v1/files/'))) return null;
     return (base.endsWith('/') ? base.substring(0, base.length - 1) : base) + path;
   }
 
   /// The address that saves [url] rather than shows it: the instance's own pictures are asked as a download, any other is opened.
-  static String downloadUrl(String url) => url.contains('/api/v1/resources/') ? '$url${url.contains('?') ? '&' : '?'}download=true' : url;
+  static String downloadUrl(String url) => url.contains('/api/v1/resources/') || url.contains('/api/v1/files/') ? '$url${url.contains('?') ? '&' : '?'}download=true' : url;
 
   static void open(BuildContext context, String url) {
     final uri = Uri.tryParse(url);

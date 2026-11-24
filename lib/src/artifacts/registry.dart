@@ -18,6 +18,7 @@ import 'interaction/ag_rating_card.dart';
 import 'interaction/ag_summary_card.dart';
 import 'interaction/ag_source_input.dart';
 import 'math/ag_latex.dart';
+import 'media/ag_file_list.dart';
 import 'media/ag_image_gallery.dart';
 import 'status/ag_status_card.dart';
 import 'status/ag_timeline.dart';
@@ -43,6 +44,7 @@ const Set<String> artifactDisplayComponents = {
   'Latex',
   'Svg',
   'ImageGallery',
+  'FileList',
   // Recaps what was collected and asks nothing itself.
   'SummaryCard',
 };
@@ -83,6 +85,7 @@ Map<String, AgUiComponentBuilder> buildArtifactsRegistry() {
     'DatePickerCard': (context, p) => AgDatePickerCard(props: p),
     'SummaryCard':    (context, p) => AgSummaryCard(props: p),
     'ImageGallery':   (context, p) => AgImageGallery(props: p),
+    'FileList':       (context, p) => AgFileList(props: p),
     'SourceInput':    (context, p) => AgSourceInput(props: p),
   };
 }

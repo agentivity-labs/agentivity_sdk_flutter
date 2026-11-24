@@ -147,6 +147,7 @@ export 'src/artifacts/interaction/ag_question_form.dart';
 export 'src/artifacts/interaction/ag_rating_card.dart';
 export 'src/artifacts/interaction/ag_summary_card.dart';
 export 'src/artifacts/interaction/ag_source_input.dart';
+export 'src/artifacts/media/ag_file_list.dart';
 export 'src/artifacts/media/ag_image_gallery.dart';
 export 'src/artifacts/shell/ag_artifact_image.dart';
 

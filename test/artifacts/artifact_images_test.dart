@@ -159,6 +159,39 @@ void main() {
     });
   });
 
+  group('AgFileList', () {
+    tearDown(() => AgArtifactLinks.instanceBaseUrl = null);
+
+    testWidgets('lists the documents to approve by name and size, and opens one of the instance from it', (tester) async {
+      AgArtifactLinks.instanceBaseUrl = 'http://localhost:5005/';
+      Uri? opened;
+      AgArtifactLinks.onOpen = (uri) => opened = uri;
+      await tester.pumpWidget(_wrap(const AgFileList(props: {
+        'title': 'Document',
+        'files': [
+          {'id': 'abc', 'name': 'inspection.pdf', 'mimeType': 'application/pdf', 'sizeBytes': 1251865, 'url': '/api/v1/files/abc'},
+        ],
+      })));
+
+      expect(find.text('inspection.pdf'), findsOneWidget);
+      expect(find.text('1.2 MB'), findsOneWidget);
+      await tester.tap(find.text('inspection.pdf'));
+      expect(opened.toString(), 'http://localhost:5005/api/v1/files/abc');
+    });
+
+    test('is registered under its name, as a widget that asks nothing', () {
+      expect(buildArtifactsRegistry().containsKey('FileList'), isTrue);
+      expect(artifactDisplayComponents, contains('FileList'));
+    });
+
+    test('the files of the instance are read from it, like its pictures', () {
+      AgArtifactLinks.instanceBaseUrl = 'https://acme.agentivity.app';
+      expect(agSafeImageUrl('/api/v1/files/abc'), 'https://acme.agentivity.app/api/v1/files/abc');
+      expect(AgArtifactLinks.downloadUrl('https://acme.agentivity.app/api/v1/files/abc'), 'https://acme.agentivity.app/api/v1/files/abc?download=true');
+      expect(agSafeImageUrl('/api/v1/other/abc'), isNull);
+    });
+  });
+
   group('AgUiMarkdownBody images', () {
     testWidgets('renders nothing for an address that is not http(s)', (tester) async {
       await tester.pumpWidget(_wrap(const AgUiMarkdownBody(data: 'Before ![x](javascript:alert(1)) after')));

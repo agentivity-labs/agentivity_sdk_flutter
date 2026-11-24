@@ -467,6 +467,7 @@ class DeskQuestion {
     this.createdAt,
     this.startedBy,
     this.askedToYou = false,
+    this.files = 0,
   });
 
   final String requestId;
@@ -485,8 +486,11 @@ class DeskQuestion {
   /// Asked to them by name (an approval by a colleague), rather than waiting in a conversation of theirs.
   final bool askedToYou;
 
-  /// Answered in one click: a yes or no.
-  bool get quick => const {'approval', 'confirm', 'confirmation', 'yesno', 'yes_no'}.contains((kind ?? '').toLowerCase());
+  /// How many files are shown with it (the photos, the PDF to approve): they are seen in its conversation before it is answered.
+  final int files;
+
+  /// Answered in one click: a yes or no that shows no file (one with files is answered once they were seen, in its conversation).
+  bool get quick => files == 0 && const {'approval', 'confirm', 'confirmation', 'yesno', 'yes_no'}.contains((kind ?? '').toLowerCase());
 
   factory DeskQuestion.fromJson(Map<String, dynamic> json) => DeskQuestion(
         requestId: json['requestId']?.toString() ?? '',
@@ -500,6 +504,7 @@ class DeskQuestion {
         createdAt: _date(json['createdAt']),
         startedBy: _text(json['startedBy']),
         askedToYou: json['askedToYou'] == true,
+        files: json['files'] is List ? (json['files'] as List).length : 0,
       );
 }
 

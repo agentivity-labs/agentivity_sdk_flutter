@@ -65,7 +65,8 @@ class AgImageGallery extends StatelessWidget {
             spacing: gap,
             runSpacing: gap,
             children: images.map((image) {
-              final href = agSafeHttpUrl(image['href']);
+              // A link on the web, or the instance's own picture (the photo to approve, opened in full).
+              final href = agSafeHttpUrl(image['href']) ?? (image['href'] is String ? AgArtifactLinks.instanceUrl((image['href'] as String).trim()) : null);
               final caption = image['caption'] as String?;
               final alt = image['alt'] as String? ?? caption;
               Widget picture = AgArtifactImage(src: image['url'] as String?, alt: alt, aspectRatio: ratio, fit: fit);
