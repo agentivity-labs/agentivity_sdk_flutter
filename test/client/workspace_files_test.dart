@@ -84,4 +84,29 @@ void main() {
     // An upload as it answered before files: its fileId.
     expect(FileRef.fromJson({'fileId': 'u1', 'name': 'cv.pdf', 'mimeType': 'application/pdf', 'size': 3}).id, 'u1');
   });
+
+  test('what is joined to a message is uploaded at once and sent by its ids, a file already uploaded by its own', () async {
+    final client = AgentivityClient(baseUrl: baseUrl);
+
+    final ids = await filesForARun(client, [
+      AgUiImageBytesAttachment(bytes: Uint8List.fromList(utf8.encode('kitchen')), name: 'kitchen.jpg', mimeType: 'image/jpeg'),
+      AgUiFileBytesAttachment(bytes: Uint8List.fromList(utf8.encode('%PDF')), name: 'report.pdf', mimeType: 'application/pdf'),
+      const FileAttachment(fileId: 'cccccccccccccccccccccccccccccccc', name: 'plan.pdf'),
+      const AgUiFileAttachment(path: 'C:/notes.txt', name: 'notes.txt'),
+    ]);
+
+    expect(ids, ['c' * 32, 'a' * 32, 'b' * 32]);
+    expect(calls.single.uri.path, '/api/v1/uploads');
+    expect(bodies.single, allOf(contains('filename="kitchen.jpg"'), contains('filename="report.pdf"')));
+  });
+
+  test('a file too large is refused by name before anything is sent', () async {
+    final client = AgentivityClient(baseUrl: baseUrl);
+
+    await expectLater(
+      filesForARun(client, [AgUiFileBytesAttachment(bytes: Uint8List(FileUpload.sizeMost + 1), name: 'scan.pdf')]),
+      throwsA(isA<ImageTooLargeForARun>().having((e) => e.toString(), 'said', allOf(contains('scan.pdf'), contains('25 MB')))),
+    );
+    expect(calls, isEmpty);
+  });
 }

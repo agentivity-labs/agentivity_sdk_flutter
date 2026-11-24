@@ -49,5 +49,11 @@ class WorkflowArgumentTypes {
   static const choice = 'Choice';
   static const assetRef = 'AssetRef';
 
-  static const List<String> primary = <String>[text, textList, structured, number, boolean, credentials, imageRef, choice];
+  /// A file of the workspace (a PDF, a photo), given by its id: what a workflow starts with is then picked as a file.
+  static const file = 'File';
+
+  /// Several files of the workspace (the photos of a visit), given by their ids.
+  static const files = 'Files';
+
+  static const List<String> primary = <String>[text, textList, structured, number, boolean, credentials, imageRef, file, files, choice];
 }

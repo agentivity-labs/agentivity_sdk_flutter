@@ -1,5 +1,7 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../client/app_client/api/uploads_api.dart';
 import '../shared/ag_calendar.dart';
 import 'package:flutter/services.dart';
 
@@ -27,7 +29,8 @@ import '../theme/ag_artifacts_theme.dart';
 ///
 /// `type` is `'text'` (default), `'multiline'` (a longer free answer), `'date'` (a native date picker —
 /// always use this for a question about a date, never a free-text field), `'number'`, `'boolean'`
-/// (Yes/No), or `'choice'` (one of `options`, as buttons).
+/// (Yes/No), `'choice'` (one of `options`, as buttons), or `'file'` (one or several files, picked and uploaded through
+/// `props['__upload']`; answered with their names and ids: `IMG_1.jpg [3f2a…], IMG_2.jpg [9c1d…]`).
 ///
 /// When submitted, calls `props['__onSubmit']` with a structured text response — a boolean answer reads
 /// as "Yes"/"No", a date answer as its ISO date (`2027-07-01`):
@@ -46,7 +49,7 @@ class AgQuestionForm extends StatefulWidget {
   State<AgQuestionForm> createState() => _AgQuestionFormState();
 }
 
-enum _QuestionType { text, multiline, date, number, boolean, choice }
+enum _QuestionType { text, multiline, date, number, boolean, choice, file }
 
 _QuestionType _typeOf(Map<String, dynamic> q) => switch (q['type']) {
   'multiline' => _QuestionType.multiline,
@@ -54,6 +57,7 @@ _QuestionType _typeOf(Map<String, dynamic> q) => switch (q['type']) {
   'number' => _QuestionType.number,
   'boolean' => _QuestionType.boolean,
   'choice' => _QuestionType.choice,
+  'file' => _QuestionType.file,
   _ =>
     _QuestionType
         .text, // covers 'text' and anything an older/unknown SDK might send.
@@ -67,6 +71,10 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
   // controller; for date it is the ISO date the controller only displays formatted; for boolean
   // there is no controller at all.
   late final List<String?> _answers;
+  // The files picked for a file question, once uploaded (their names and ids), and the question uploading now.
+  final Map<int, List<UploadedFile>> _files = {};
+  int? _uploading;
+  String? _uploadProblem;
   bool _submitted = false;
 
   @override
@@ -112,6 +120,54 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
       _controllers[i].text =
           '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
     });
+  }
+
+  // Picks files for the question [i] and uploads them, one after the other: the answer names them with their ids.
+  Future<void> _pickFiles(int i) async {
+    if (_submitted || _uploading != null) return;
+    final upload = widget.props['__upload'] as Future<UploadedFile> Function(String, Uint8List)?;
+    if (upload == null) {
+      setState(() => _uploadProblem = 'Files cannot be sent from here.');
+      return;
+    }
+    final picked = await FilePicker.pickFiles(allowMultiple: true, withData: true);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _uploading = i;
+      _uploadProblem = null;
+    });
+    try {
+      for (final file in picked.files) {
+        final bytes = file.bytes;
+        if (bytes == null) continue;
+        final kept = await upload(file.name, bytes);
+        if (!mounted) return;
+        setState(() => (_files[i] ??= []).add(kept));
+      }
+    } on Object catch (error) {
+      if (mounted) setState(() => _uploadProblem = 'A file could not be sent: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading = null;
+          _answers[i] = _answerOf(i);
+        });
+      }
+    }
+  }
+
+  void _removeFile(int i, UploadedFile file) {
+    if (_submitted) return;
+    setState(() {
+      _files[i]?.remove(file);
+      _answers[i] = _answerOf(i);
+    });
+  }
+
+  // What a file question answers: the names of its files with their ids, which the step reads.
+  String? _answerOf(int i) {
+    final files = _files[i] ?? const <UploadedFile>[];
+    return files.isEmpty ? null : files.map((f) => '${f.name} [${f.fileId}]').join(', ');
   }
 
   void _submit() {
@@ -193,6 +249,49 @@ class _AgQuestionFormState extends State<AgQuestionForm> {
     }
 
     switch (_types[i]) {
+      case _QuestionType.file:
+        final files = _files[i] ?? const <UploadedFile>[];
+        final busy = _uploading == i;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (files.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final file in files)
+                      InputChip(
+                        avatar: Icon(file.mimeType.startsWith('image/') ? Icons.image_outlined : Icons.description_outlined, size: 16),
+                        label: Text(file.name, style: TextStyle(fontFamily: fontFamily, fontSize: 12)),
+                        onDeleted: _submitted ? null : () => _removeFile(i, file),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                  ],
+                ),
+              ),
+            OutlinedButton.icon(
+              onPressed: _submitted || _uploading != null ? null : () => _pickFiles(i),
+              icon: busy ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.attach_file_rounded, size: 16),
+              label: Text(busy ? 'Sending…' : (files.isEmpty ? (hint ?? 'Choose files') : 'Add files'), style: TextStyle(fontFamily: fontFamily, fontSize: 13)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: cs.onSurface,
+                side: BorderSide(color: cs.outlineVariant),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                minimumSize: const Size(0, 34),
+              ),
+            ),
+            if (_uploadProblem != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(_uploadProblem!, style: TextStyle(fontSize: 12, color: cs.error)),
+              ),
+          ],
+        );
+
       case _QuestionType.choice:
         final raw = _questions[i]['options'];
         return options(raw is List ? raw.map((o) => o.toString()).toList() : const <String>[]);

@@ -29,6 +29,12 @@ final class ImageBytesAttachment extends ChatAttachment {
   final Uint8List bytes;
 }
 
+/// A document as raw bytes (a PDF, a Word file): uploaded with the message, like a photo.
+final class FileBytesAttachment extends ChatAttachment {
+  FileBytesAttachment({required this.bytes, super.name, super.mimeType});
+  final Uint8List bytes;
+}
+
 /// File referenced by a backend-assigned file ID.
 final class FileAttachment extends ChatAttachment {
   const FileAttachment({required this.fileId, super.name, super.mimeType});

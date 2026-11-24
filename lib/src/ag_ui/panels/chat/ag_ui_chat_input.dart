@@ -36,6 +36,13 @@ final class AgUiImageBytesAttachment extends AgUiInputAttachment {
   final String? mimeType;
 }
 
+/// A document picked as bytes (a PDF, a Word file, a text): sent with the message like a photo, read by the model as text.
+final class AgUiFileBytesAttachment extends AgUiInputAttachment {
+  const AgUiFileBytesAttachment({required this.bytes, super.name, this.mimeType});
+  final Uint8List bytes;
+  final String? mimeType;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AgUiChatInput
 // ─────────────────────────────────────────────────────────────────────────────
@@ -490,6 +497,13 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
   // ── File attachments ────────────────────────────────────────────────────────
 
   static const _imageExtensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'};
+  static const _documentTypes = {
+    'pdf': 'application/pdf',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'txt': 'text/plain',
+    'md': 'text/markdown',
+    'csv': 'text/csv',
+  };
 
   Future<void> _pickFiles() async {
     // withData: true so picked images arrive as bytes (AgUiImageBytesAttachment)
@@ -504,6 +518,8 @@ class _AgUiChatInputState extends State<AgUiChatInput> with SingleTickerProvider
         if (f.bytes != null && _imageExtensions.contains(extension)) {
           final mimeExtension = extension == 'jpg' ? 'jpeg' : extension;
           _attachments.add(AgUiImageBytesAttachment(bytes: f.bytes!, name: f.name, mimeType: 'image/$mimeExtension'));
+        } else if (f.bytes != null) {
+          _attachments.add(AgUiFileBytesAttachment(bytes: f.bytes!, name: f.name, mimeType: _documentTypes[extension]));
         } else if (f.path != null) {
           _attachments.add(AgUiFileAttachment(path: f.path!, name: f.name));
         }
@@ -1016,7 +1032,7 @@ class _AttachmentChips extends StatelessWidget {
 
   IconData _icon(AgUiInputAttachment att) {
     if (att is AgUiImageBytesAttachment) return Icons.image_outlined;
-    if (att is AgUiFileAttachment) {
+    if (att is AgUiFileAttachment || att is AgUiFileBytesAttachment) {
       final ext = (att.name ?? '').split('.').last.toLowerCase();
       return switch (ext) {
         'pdf' => Icons.picture_as_pdf_outlined,
@@ -1031,6 +1047,7 @@ class _AttachmentChips extends StatelessWidget {
 
   String _fallbackName(AgUiInputAttachment att) => switch (att) {
     AgUiFileAttachment _ => 'File',
+    AgUiFileBytesAttachment _ => 'File',
     AgUiImageBytesAttachment _ => 'Image',
   };
 }

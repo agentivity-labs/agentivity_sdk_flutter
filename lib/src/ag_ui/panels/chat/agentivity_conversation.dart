@@ -201,13 +201,14 @@ class AgentivityConversation implements IChatProvider {
   /// team or a workflow and sends it back on the stream; for an agent alone, it is written here.
   @override
   Future<void> sendMessage({required String contextId, String? threadId, required String text, List<ChatAttachment>? attachments}) async {
-    await send(text, images: imagesForARun(attachments ?? const []));
+    await send(text, files: await filesForARun(client, attachments ?? const []));
   }
 
-  /// Sends [text] (with [images], for an agent): the first message starts the execution, the next ones go on with it.
-  Future<void> send(String text, {List<Map<String, String>>? images}) async {
+  /// Sends [text], with [files] (their ids, uploaded first) or [images] (sent as they are): the first message starts the
+  /// execution, the next ones go on with it. An agent, a team and a workflow are all given them.
+  Future<void> send(String text, {List<Map<String, String>>? images, List<String>? files}) async {
     if (_alone) _write(ChatMessageRole.user, text);
-    final started = await client.runs.startExecution(entityId: entityId, input: text, executionId: executionId, enableHil: true, images: images == null || images.isEmpty ? null : images);
+    final started = await client.runs.startExecution(entityId: entityId, input: text, executionId: executionId, enableHil: true, images: images == null || images.isEmpty ? null : images, files: files == null || files.isEmpty ? null : files);
     _started(started.executionId);
     if (started.streamUrl.isNotEmpty) _follow(started.streamUrl);
   }

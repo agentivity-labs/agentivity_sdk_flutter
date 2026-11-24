@@ -638,7 +638,13 @@ class _AgUiChatDiscussionState extends State<AgUiChatDiscussion> {
                   running: (widget.running ?? false) || widget.controller.isAwaitingResponse,
                   onStop: widget.onStop == null ? null : _stop,
                   stopping: _stopping,
-                  onSend: (text, attachments) => _send(text, [for (final a in attachments) if (a is AgUiImageBytesAttachment) ImageBytesAttachment(bytes: a.bytes, name: a.name, mimeType: a.mimeType)]),
+                  onSend: (text, attachments) => _send(text, [
+                    for (final a in attachments)
+                      if (a is AgUiImageBytesAttachment)
+                        ImageBytesAttachment(bytes: a.bytes, name: a.name, mimeType: a.mimeType)
+                      else if (a is AgUiFileBytesAttachment)
+                        FileBytesAttachment(bytes: a.bytes, name: a.name, mimeType: a.mimeType),
+                  ]),
                 ),
           ),
       ],

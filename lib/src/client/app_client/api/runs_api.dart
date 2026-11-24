@@ -24,9 +24,11 @@ class RunsApi {
     String? executionId,
     bool enableHil = false,
     int? maxAgentIterations,
-    /// Images attached to this turn (vision) — agent-kind executions only for
-    /// now. Each entry: `{'base64Data': ..., 'mimeType': ...}`.
+    /// Images attached to this turn, sent as they are (`{'base64Data': ..., 'mimeType': ...}`): kept as files of the execution.
     List<Map<String, String>>? images,
+    /// Files sent with this turn, by their id (as `client.files.upload` gives them), 20 at most: the photos of a conversation, a
+    /// PDF. An agent is given them numbered and named, every member of a team too, a workflow in its file input.
+    List<String>? files,
   }) async {
     final normalizedEntityId = _c.requireNormalizedId(entityId, label: 'Entity id');
     final body = <String, dynamic>{
@@ -36,6 +38,7 @@ class RunsApi {
       'enableHil': enableHil,
       if (maxAgentIterations != null) 'maxAgentIterations': maxAgentIterations,
       if (images != null && images.isNotEmpty) 'images': images,
+      if (files != null && files.isNotEmpty) 'files': files,
     };
     final response = await _c.post<Map<String, dynamic>>(
       AgentivityHttpCore.v1('/executions'),
